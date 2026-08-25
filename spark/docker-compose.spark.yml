@@ -1,0 +1,61 @@
+name: newspulse-spark
+
+services:
+  spark-master:
+    image: apache/spark:3.5.3-python3
+    container_name: newspulse-spark-master
+    entrypoint: ["/usr/bin/tini", "-s", "--"]
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.master.Master
+      - --host
+      - spark-master
+      - --port
+      - "7077"
+      - --webui-port
+      - "8082"
+    ports:
+      - "7077:7077"
+      - "8082:8082"
+    volumes:
+      - ./spark:/opt/spark-apps/spark
+      - ./config:/opt/spark-apps/config
+      - ./warehouse:/opt/spark-apps/warehouse
+      - spark-checkpoints:/tmp/spark-checkpoints
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8082 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - newspulse-net
+
+  spark-worker:
+    image: apache/spark:3.5.3-python3
+    container_name: newspulse-spark-worker
+    entrypoint: ["/usr/bin/tini", "-s", "--"]
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - spark://spark-master:7077
+    environment:
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    volumes:
+      - ./spark:/opt/spark-apps/spark
+      - ./config:/opt/spark-apps/config
+      - ./warehouse:/opt/spark-apps/warehouse
+      - spark-checkpoints:/tmp/spark-checkpoints
+    networks:
+      - newspulse-net
+
+volumes:
+  spark-checkpoints:
+
+networks:
+  newspulse-net:
+    driver: bridge

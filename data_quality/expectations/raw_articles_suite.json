@@ -1,0 +1,134 @@
+{
+  "expectation_suite_name": "raw_articles_suite",
+  "meta": {
+    "description": "Validation rules for raw.articles — data loaded from Spark/MongoDB. Minimal cleaning, checks completeness and basic types.",
+    "layer": "raw",
+    "table": "raw.articles"
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 1 },
+      "meta": { "purpose": "Table must not be empty" }
+    },
+
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "url" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "url_hash" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "title" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "source" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "category" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "url" },
+      "meta": { "purpose": "Every article must have a URL" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "url_hash" },
+      "meta": { "purpose": "url_hash is the dedup key" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "title" },
+      "meta": { "purpose": "Every article must have a title" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": { "column": "url_hash" },
+      "meta": { "purpose": "No duplicate articles (dedup by url_hash)" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_match_regex",
+      "kwargs": {
+        "column": "url",
+        "regex": "^https?://.+",
+        "mostly": 0.99
+      },
+      "meta": { "purpose": "URLs must be valid HTTP(S)" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "source",
+        "value_set": ["vnexpress", "tuoitre", "thanhnien", "VnExpress", "Tuổi Trẻ", "Thanh Niên"],
+        "mostly": 0.99
+      },
+      "meta": { "purpose": "Source must be one of the 3 configured newspapers" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "category",
+        "value_set": ["sports", "tech", "economy", "politics", "general", "entertainment", "health", "education", "world", "law"],
+        "mostly": 0.95
+      },
+      "meta": { "purpose": "Category must match Kafka topics" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "word_count",
+        "min_value": 0,
+        "max_value": 50000,
+        "mostly": 0.95
+      },
+      "meta": { "purpose": "Word count sanity check — negative or extremely long articles are suspicious" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "publish_hour",
+        "min_value": 0,
+        "max_value": 23,
+        "mostly": 0.99
+      },
+      "meta": { "purpose": "publish_hour must be 0-23" }
+    },
+
+    {
+      "expectation_type": "expect_column_value_lengths_to_be_between",
+      "kwargs": {
+        "column": "url_hash",
+        "min_value": 32,
+        "max_value": 64,
+        "mostly": 0.99
+      },
+      "meta": { "purpose": "url_hash should be MD5 (32) or SHA256 (64)" }
+    },
+
+    {
+      "expectation_type": "expect_column_value_lengths_to_be_between",
+      "kwargs": {
+        "column": "title",
+        "min_value": 5,
+        "max_value": 1000,
+        "mostly": 0.95
+      },
+      "meta": { "purpose": "Titles should be reasonable length — too short or too long indicates parsing issues" }
+    }
+  ],
+  "ge_cloud_id": null,
+  "data_asset_type": null
+}

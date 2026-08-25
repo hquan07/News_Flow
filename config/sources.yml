@@ -1,0 +1,55 @@
+# NewsPulse source configuration
+sources:
+  vnexpress:
+    domain: vnexpress.net
+    base_url: https://vnexpress.net
+    rss_base: https://vnexpress.net/rss
+    rate_limit: 2  # seconds between requests
+    enabled: true
+
+  tuoitre:
+    domain: tuoitre.vn
+    base_url: https://tuoitre.vn
+    rss_base: https://tuoitre.vn/rss
+    rate_limit: 2
+    enabled: true
+
+  thanhnien:
+    domain: thanhnien.vn
+    base_url: https://thanhnien.vn
+    rss_base: https://thanhnien.vn/rss
+    rate_limit: 2
+    enabled: true
+
+# Category mapping (Vietnamese slug → canonical name)
+categories:
+  - slug: the-thao
+    name: Thể thao
+    topic: news.sports
+  - slug: cong-nghe
+    name: Công nghệ
+    topic: news.tech
+  - slug: khoa-hoc
+    name: Khoa học
+    topic: news.tech
+  - slug: kinh-doanh
+    name: Kinh doanh
+    topic: news.economy
+  - slug: thoi-su
+    name: Thời sự
+    topic: news.politics
+  - slug: giai-tri
+    name: Giải trí
+    topic: news.entertainment
+  - slug: suc-khoe
+    name: Sức khỏe
+    topic: news.health
+  - slug: giao-duc
+    name: Giáo dục
+    topic: news.education
+  - slug: the-gioi
+    name: Thế giới
+    topic: news.world
+  - slug: phap-luat
+    name: Pháp luật
+    topic: news.law

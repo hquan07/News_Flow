@@ -1,0 +1,122 @@
+{
+  "expectation_suite_name": "staging_articles_suite",
+  "meta": {
+    "description": "Validation rules for staging.articles — cleaned and deduped data. Stricter than raw layer.",
+    "layer": "staging",
+    "table": "staging.articles"
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 1 },
+      "meta": { "purpose": "Staging must have data after ELT" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "url" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "url_hash" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "title" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "source" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "source_domain" },
+      "meta": { "purpose": "source_domain should be populated in staging" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "category" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": { "column": "url_hash" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "source",
+        "value_set": ["vnexpress", "tuoitre", "thanhnien"]
+      },
+      "meta": { "purpose": "Source names must be normalized in staging (lowercase)" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "source_domain",
+        "value_set": ["vnexpress.net", "tuoitre.vn", "thanhnien.vn"]
+      },
+      "meta": { "purpose": "Domains must match configured sources" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "category",
+        "value_set": ["sports", "tech", "economy", "politics", "general", "entertainment", "health", "education", "world", "law"]
+      },
+      "meta": { "purpose": "All 10 categories — no unknown values in staging" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_match_regex",
+      "kwargs": {
+        "column": "url",
+        "regex": "^https://.+"
+      },
+      "meta": { "purpose": "All 3 sources use HTTPS" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "word_count",
+        "min_value": 0,
+        "max_value": 50000
+      }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "publish_hour",
+        "min_value": 0,
+        "max_value": 23
+      }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "content",
+        "mostly": 0.90
+      },
+      "meta": { "purpose": "At least 90% of articles should have content after cleaning" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "crawl_latency_minutes",
+        "min_value": 0,
+        "max_value": 14400,
+        "mostly": 0.95
+      },
+      "meta": { "purpose": "Crawl latency should be < 10 days; extreme values indicate timestamp issues" }
+    }
+  ],
+  "ge_cloud_id": null,
+  "data_asset_type": null
+}

@@ -1,0 +1,77 @@
+{
+  "expectation_suite_name": "warehouse_dimensions_suite",
+  "meta": {
+    "description": "Validation rules for warehouse dimension tables: dim_source, dim_category, dim_time, dim_keyword, dim_entity, dim_author.",
+    "layer": "warehouse",
+    "tables": ["dim_source", "dim_category", "dim_time", "dim_keyword", "dim_entity", "dim_author"]
+  },
+  "expectations": [
+
+    {"_comment": "===== dim_source ====="},
+
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 3 },
+      "meta": { "purpose": "Must have at least 3 seeded sources", "query_table": "warehouse.dim_source" }
+    },
+
+    {"_comment": "===== dim_category ====="},
+
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 10 },
+      "meta": { "purpose": "Must have all 10 seeded categories", "query_table": "warehouse.dim_category" }
+    },
+
+    {"_comment": "===== dim_time ====="},
+
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 1000 },
+      "meta": { "purpose": "dim_time covers 2024-2026 (1096 days)", "query_table": "warehouse.dim_time" }
+    },
+
+    {"_comment": "===== dim_keyword ====="},
+
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "keyword" },
+      "meta": { "query_table": "warehouse.dim_keyword" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": { "column": "keyword" },
+      "meta": { "query_table": "warehouse.dim_keyword" }
+    },
+
+    {"_comment": "===== dim_entity ====="},
+
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "entity_type",
+        "value_set": ["person", "location", "organization", "PER", "LOC", "ORG"]
+      },
+      "meta": { "purpose": "NER types from underthesea", "query_table": "warehouse.dim_entity" }
+    },
+
+    {"_comment": "===== dim_author ====="},
+
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "name" },
+      "meta": { "query_table": "warehouse.dim_author" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "article_count",
+        "min_value": 0,
+        "max_value": 100000
+      },
+      "meta": { "query_table": "warehouse.dim_author" }
+    }
+  ],
+  "ge_cloud_id": null,
+  "data_asset_type": null
+}

@@ -1,0 +1,115 @@
+{
+  "expectation_suite_name": "warehouse_fact_article_suite",
+  "meta": {
+    "description": "Validation rules for warehouse.fact_article and referential integrity with dimension tables.",
+    "layer": "warehouse",
+    "table": "warehouse.fact_article"
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 1 },
+      "meta": { "purpose": "Fact table must have data" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "url_hash" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "source_id" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "category_id" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "url" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "title" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": { "column": "url_hash" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "source_id",
+        "value_set": [1, 2, 3]
+      },
+      "meta": { "purpose": "Only 3 sources seeded: vnexpress(1), tuoitre(2), thanhnien(3)" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "category_id",
+        "min_value": 1,
+        "max_value": 10
+      },
+      "meta": { "purpose": "10 categories seeded (IDs 1-10)" }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "word_count",
+        "min_value": 0,
+        "max_value": 50000
+      }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "publish_hour",
+        "min_value": 0,
+        "max_value": 23
+      }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "person_count",
+        "min_value": 0,
+        "max_value": 500
+      },
+      "meta": { "purpose": "NER person count sanity" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "location_count",
+        "min_value": 0,
+        "max_value": 500
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "org_count",
+        "min_value": 0,
+        "max_value": 500
+      }
+    },
+
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "keyword_count",
+        "min_value": 0,
+        "max_value": 200
+      }
+    }
+  ],
+  "ge_cloud_id": null,
+  "data_asset_type": null
+}
