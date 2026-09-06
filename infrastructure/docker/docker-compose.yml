@@ -21,13 +21,13 @@ x-airflow-common: &airflow-common
     PG_PASSWORD: ${PG_PASSWORD:-newspulse}
     PYTHONPATH: /opt/airflow
   volumes:
-    - ./dags:/opt/airflow/dags
-    - ./crawlers:/opt/airflow/crawlers
-    - ./kafka_utils:/opt/airflow/kafka_utils
-    - ./config:/opt/airflow/config
-    - ./warehouse:/opt/airflow/warehouse
-    - ./monitoring:/opt/airflow/monitoring
-    - ./data_quality:/opt/airflow/data_quality
+    - ../../data_platform/dags:/opt/airflow/dags
+    - ../../crawlers:/opt/airflow/crawlers
+    - ../kafka_utils:/opt/airflow/kafka_utils
+    - ../../config:/opt/airflow/config
+    - ../../data_platform/warehouse:/opt/airflow/warehouse
+    - ../monitoring:/opt/airflow/monitoring
+    - ../../data_platform/data_quality:/opt/airflow/data_quality
     - airflow-logs:/opt/airflow/logs
   depends_on:
     airflow-db:
@@ -165,7 +165,7 @@ services:
       POSTGRES_PASSWORD: ${PG_PASSWORD:-newspulse}
     volumes:
       - pg-data:/var/lib/postgresql/data
-      - ./warehouse/migrations:/docker-entrypoint-initdb.d
+      - ../../data_platform/warehouse/migrations:/docker-entrypoint-initdb.d
     command:
       - postgres
       - -c
@@ -279,7 +279,7 @@ services:
       MONGO_PORT: "27017"
       MONGO_DB: ${MONGO_DB:-newspulse}
     volumes:
-      - ../api:/app/api
+      - ../../api:/app/api
     depends_on:
       postgres:
         condition: service_healthy
@@ -315,9 +315,9 @@ services:
     environment:
       - PYTHONPATH=/opt/spark-apps
     volumes:
-      - ../spark:/opt/spark-apps/spark
-      - ../config:/opt/spark-apps/config
-      - ../warehouse:/opt/spark-apps/warehouse
+      - ../../spark:/opt/spark-apps/spark
+      - ../../config:/opt/spark-apps/config
+      - ../../data_platform/warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8082 || exit 1"]
@@ -344,9 +344,9 @@ services:
       spark-master:
         condition: service_healthy
     volumes:
-      - ../spark:/opt/spark-apps/spark
-      - ../config:/opt/spark-apps/config
-      - ../warehouse:/opt/spark-apps/warehouse
+      - ../../spark:/opt/spark-apps/spark
+      - ../../config:/opt/spark-apps/config
+      - ../../data_platform/warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
 
 

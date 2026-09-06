@@ -20,7 +20,7 @@ NC='\033[0m'
 
 # ── Config ──
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-COMPOSE="docker compose -f $PROJECT_DIR/docker-compose.yml"
+COMPOSE="docker compose -f $PROJECT_DIR/infrastructure/docker/docker-compose.yml"
 
 # Load .env if exists (same as docker compose does)
 if [ -f "$PROJECT_DIR/.env" ]; then
@@ -198,7 +198,7 @@ check_prerequisites() {
         ok "Disk: ${disk_gb}GB available"
     fi
 
-    [ -f "$PROJECT_DIR/docker-compose.yml" ] || fail "docker-compose.yml not found"
+    [ -f "$PROJECT_DIR/infrastructure/docker/docker-compose.yml" ] || fail "docker-compose.yml not found"
     ok "Project: $PROJECT_DIR"
 }
 
@@ -365,8 +365,8 @@ phase2() {
             sleep 10
         fi
         ok "Spark UI: http://localhost:8082"
-    elif [ -f "$PROJECT_DIR/docker-compose.spark.yml" ]; then
-        docker compose -f "$PROJECT_DIR/docker-compose.spark.yml" up -d 2>/dev/null || {
+    elif [ -f "$PROJECT_DIR/infrastructure/docker/docker-compose.spark.yml" ]; then
+        docker compose -f "$PROJECT_DIR/infrastructure/docker/docker-compose.spark.yml" up -d 2>/dev/null || {
             warn "Spark failed to start — check docker-compose.spark.yml"
         }
         sleep 15
@@ -374,7 +374,7 @@ phase2() {
         if docker ps --filter "name=newspulse-spark-master" --filter "status=running" -q | grep -q .; then
             ok "Spark UI: http://localhost:8082"
         else
-            warn "Spark master not running — check: docker compose -f docker-compose.spark.yml logs spark-master"
+            warn "Spark master not running — check: docker compose -f infrastructure/docker/docker-compose.spark.yml logs spark-master"
         fi
     else
         warn "Spark not found in docker-compose — skipping"
@@ -433,7 +433,7 @@ except Exception:
             warn "FastAPI: HTTP $api_code — check: docker compose logs api"
         fi
     else
-        warn "API service not in docker-compose.yml"
+        warn "API service not in infrastructure/docker/docker-compose.yml"
     fi
 
 
@@ -457,7 +457,7 @@ phase4() {
     # ── Health checks ──
     log "Running health checks..."
     dc_exec airflow-scheduler \
-        bash -c "cd /opt/airflow && python monitoring/health_monitor.py" || {
+        bash -c "cd /opt/airflow && python infrastructure/monitoring/health_monitor.py" || {
         warn "Health monitor not available. Manual check:"
         echo ""
         $COMPOSE ps
@@ -466,7 +466,7 @@ phase4() {
     # ── Data quality ──
     log "Running data quality checks..."
     dc_exec airflow-scheduler \
-        bash -c "cd /opt/airflow && python data_quality/run_validations.py" || {
+        bash -c "cd /opt/airflow && python data_platform/data_quality/run_validations.py" || {
         warn "DQ runner not available. Row counts:"
         dc_exec postgres psql -U "$PG_USER" -d "$PG_DB" -c "
             SELECT 'raw.articles' AS tbl, COUNT(*) FROM raw.articles
@@ -479,7 +479,7 @@ phase4() {
     }
 
     # ── Performance indexes ──
-    if [ -f "$PROJECT_DIR/warehouse/migrations/7_performance_indexes.sql" ]; then
+    if [ -f "$PROJECT_DIR/data_platform/warehouse/migrations/7_performance_indexes.sql" ]; then
         log "Applying performance indexes..."
         dc_exec postgres psql -U "$PG_USER" -d "$PG_DB" \
             -f "/docker-entrypoint-initdb.d/7_performance_indexes.sql" || {
