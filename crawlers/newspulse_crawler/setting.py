@@ -19,6 +19,7 @@ USER_AGENT = os.getenv("USER_AGENT", "NewsPulse/1.0 (+https://github.com/newspul
 ITEM_PIPELINES = {
     "newspulse_crawler.pipelines.DedupPipeline": 100,
     "newspulse_crawler.pipelines.CleanTextPipeline": 200,
+    "newspulse_crawler.pipelines.MinIOPipeline": 250,
     "newspulse_crawler.pipelines.MongoPipeline": 300,
     "newspulse_crawler.pipelines.KafkaPipeline": 400,
 }
@@ -26,6 +27,7 @@ ITEM_PIPELINES = {
 # Middlewares
 DOWNLOADER_MIDDLEWARES = {
     "newspulse_crawler.middlewares.RotateUserAgentMiddleware": 400,
+    # 'newspulse_crawler.middlewares.MockProxyMiddleware': 410,
 }
 
 # Auto-throttle

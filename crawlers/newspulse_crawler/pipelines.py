@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import re
+import boto3
 
 from itemadapter import ItemAdapter
 from pymongo import MongoClient, ASCENDING
@@ -44,7 +45,57 @@ class CleanTextPipeline:
 
         return item
 
-# 3. MongoDB
+# 3. MinIO
+class MinIOPipeline:
+
+    def __init__(self, endpoint, access_key, secret_key, bucket_name):
+        self.endpoint = endpoint
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.bucket_name = bucket_name
+        self.s3_client = None
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(
+            endpoint=crawler.settings.get("MINIO_ENDPOINT", "http://minio:9000"),
+            access_key=crawler.settings.get("MINIO_ACCESS_KEY", "admin"),
+            secret_key=crawler.settings.get("MINIO_SECRET_KEY", "admin123"),
+            bucket_name=crawler.settings.get("MINIO_BUCKET", "raw-html"),
+        )
+
+    def open_spider(self, spider):
+        self.s3_client = boto3.client(
+            "s3",
+            endpoint_url=self.endpoint,
+            aws_access_key_id=self.access_key,
+            aws_secret_access_key=self.secret_key,
+        )
+        try:
+            self.s3_client.create_bucket(Bucket=self.bucket_name)
+        except Exception:
+            pass  # Bucket might already exist
+
+    def process_item(self, item, spider):
+        adapter = ItemAdapter(item)
+        raw_html = adapter.get("raw_html")
+        url = adapter.get("url")
+        if raw_html and url:
+            url_hash = hashlib.md5(url.encode()).hexdigest()
+            object_name = f"{spider.name}/{url_hash}.html"
+            try:
+                self.s3_client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=object_name,
+                    Body=raw_html.encode("utf-8"),
+                    ContentType="text/html"
+                )
+                logger.debug("Uploaded raw HTML to MinIO: %s", object_name)
+            except Exception as e:
+                logger.error("Failed to upload to MinIO: %s", e)
+        return item
+
+# 4. MongoDB
 class MongoPipeline:
 
     def __init__(self, mongo_uri: str, mongo_db: str):

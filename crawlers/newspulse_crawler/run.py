@@ -4,7 +4,7 @@ from scrapy.utils.project import get_project_settings
 
 logger = logging.getLogger(__name__)
 
-SPIDER_NAMES = ["vnexpress", "tuoitre", "thanhnien"]
+SPIDER_NAMES = ["vnexpress", "tuoitre", "thanhnien", "dantri", "laodong", "tienphong"]
 
 
 def run_all():

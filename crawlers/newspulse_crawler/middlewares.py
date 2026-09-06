@@ -16,3 +16,18 @@ class RotateUserAgentMiddleware:
 
     def process_request(self, request, spider):
         request.headers["User-Agent"] = random.choice(USER_AGENTS)
+
+
+class MockProxyMiddleware:
+    """Mock proxy rotation for testing"""
+    
+    PROXIES = [
+        "http://mock-proxy-1.local:8080",
+        "http://mock-proxy-2.local:8080",
+        "http://mock-proxy-3.local:8080",
+    ]
+
+    def process_request(self, request, spider):
+        proxy = random.choice(self.PROXIES)
+        request.meta['proxy'] = proxy
+        logger.debug(f"Using mock proxy: {proxy}")
