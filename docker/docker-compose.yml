@@ -1,6 +1,6 @@
 x-airflow-common: &airflow-common
   build:
-    context: .
+    context: ..
     dockerfile: docker/airflow/Dockerfile
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -104,6 +104,43 @@ services:
       "
 
   # ==================== STORAGE ====================
+  minio:
+    image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-admin123}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "19000:9000"
+    environment:
+      CLICKHOUSE_DB: newspulse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-admin123}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   mongo:
     image: mongo:7.0
     ports:
@@ -222,7 +259,7 @@ services:
   # ==================== API + DASHBOARD ====================
   api:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     container_name: newspulse-api
     ports:
@@ -242,8 +279,7 @@ services:
       MONGO_PORT: "27017"
       MONGO_DB: ${MONGO_DB:-newspulse}
     volumes:
-      - ./api:/app/api
-      - ./static:/app/static
+      - ../api:/app/api
     depends_on:
       postgres:
         condition: service_healthy
@@ -279,9 +315,9 @@ services:
     environment:
       - PYTHONPATH=/opt/spark-apps
     volumes:
-      - ./spark:/opt/spark-apps/spark
-      - ./config:/opt/spark-apps/config
-      - ./warehouse:/opt/spark-apps/warehouse
+      - ../spark:/opt/spark-apps/spark
+      - ../config:/opt/spark-apps/config
+      - ../warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8082 || exit 1"]
@@ -301,16 +337,16 @@ services:
     env_file:
       - .env
     environment:
-      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_MEMORY=4g
       - SPARK_WORKER_CORES=2
       - PYTHONPATH=/opt/spark-apps
     depends_on:
       spark-master:
         condition: service_healthy
     volumes:
-      - ./spark:/opt/spark-apps/spark
-      - ./config:/opt/spark-apps/config
-      - ./warehouse:/opt/spark-apps/warehouse
+      - ../spark:/opt/spark-apps/spark
+      - ../config:/opt/spark-apps/config
+      - ../warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
 
 
@@ -323,3 +359,5 @@ volumes:
   airflow-logs:
   metabase-data:
   spark-checkpoints:
+  minio-data:
+  clickhouse-data:

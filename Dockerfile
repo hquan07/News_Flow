@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Application code
 COPY api/ ./api/
-COPY static/ ./static/
+
 
 # Expose port
 EXPOSE 8000
