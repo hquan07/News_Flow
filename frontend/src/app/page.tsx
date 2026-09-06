@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, Legend, CartesianAxis 
+import { useEffect, useState, useCallback, useRef } from 'react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { Activity, BookOpen, BarChart2, Radio, Bell, ThumbsUp, Hash, Users, MessageSquare } from 'lucide-react';
+import { Activity, BookOpen, BarChart2, Radio, ThumbsUp, Hash, Users, MessageSquare, AlertTriangle } from 'lucide-react';
 
 const API_BASE = 'http://localhost:8001/api/v1';
 
@@ -16,88 +16,143 @@ type FeedEvent = {
   data?: any;
 };
 
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffSec = Math.floor((now - then) / 1000);
+  if (diffSec < 60) return `${diffSec}s trước`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} phút trước`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} giờ trước`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay} ngày trước`;
+}
+
+async function safeFetch(url: string): Promise<any> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState('overview');
   const [feed, setFeed] = useState<FeedEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const [overviewData, setOverviewData] = useState<any>(null);
-  const [trendingData, setTrendingData] = useState<any>(null);
   const [articles, setArticles] = useState<any[]>([]);
+  const [articlesMeta, setArticlesMeta] = useState<any>({});
+  const [page, setPage] = useState(1);
 
-  // ML Analytics State
   const [sentimentDist, setSentimentDist] = useState<any[]>([]);
   const [sentimentTimeline, setSentimentTimeline] = useState<any[]>([]);
   const [sentimentSources, setSentimentSources] = useState<any[]>([]);
   const [entitiesData, setEntitiesData] = useState<any[]>([]);
   const [trendingKeywords, setTrendingKeywords] = useState<any[]>([]);
 
-  // Fetch REST API Data
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const [overview, trending, articlesRes, sentDist, sentTime, sentSrc, entRes, trendKw] = await Promise.all([
-          fetch(`${API_BASE}/overview`).then(res => res.json()),
-          fetch(`${API_BASE}/trending?time_range=24h`).then(res => res.json()),
-          fetch(`${API_BASE}/articles?page_size=20`).then(res => res.json()),
-          fetch(`${API_BASE}/sentiment/distribution`).then(res => res.json()),
-          fetch(`${API_BASE}/sentiment/timeline`).then(res => res.json()),
-          fetch(`${API_BASE}/sentiment/sources`).then(res => res.json()),
-          fetch(`${API_BASE}/entities`).then(res => res.json()),
-          fetch(`${API_BASE}/trending/keywords`).then(res => res.json())
-        ]);
-        
-        setOverviewData(overview);
-        setTrendingData(trending);
-        setArticles(articlesRes.data || []);
-        
-        setSentimentDist(sentDist.data || []);
-        setSentimentTimeline(sentTime.data || []);
-        setSentimentSources(sentSrc.data || []);
-        setEntitiesData(entRes || []);
-        setTrendingKeywords(trendKw || []);
-      } catch (error) {
-        console.error("Error fetching REST data:", error);
-      }
-    };
-    
-    // Initial fetch
-    fetchDashboardData();
-    
-    // Poll every 10 seconds
-    const intervalId = setInterval(fetchDashboardData, 10000);
-    return () => clearInterval(intervalId);
+  const sseRef = useRef<EventSource | null>(null);
+  const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Smart fetch: only load data relevant to the active tab
+  const fetchOverview = useCallback(async () => {
+    const result = await safeFetch(`${API_BASE}/overview`);
+    setOverviewData(result);
   }, []);
 
-  // Connect to SSE Stream
-  useEffect(() => {
-    const eventSource = new EventSource(`${API_BASE}/stream/`);
-    eventSource.onopen = () => setIsConnected(true);
-    eventSource.addEventListener('update', (event) => {
-      try {
-        const newEvent = JSON.parse(event.data);
-        setFeed((prev) => [newEvent, ...prev].slice(0, 50));
-      } catch (error) {
-        console.error('Failed to parse SSE data:', error);
-      }
-    });
-    eventSource.onerror = (error) => {
-      setIsConnected(false);
-      eventSource.close();
-    };
-    return () => eventSource.close();
+  const fetchSentiment = useCallback(async () => {
+    const results = await Promise.allSettled([
+      safeFetch(`${API_BASE}/sentiment/distribution`),
+      safeFetch(`${API_BASE}/sentiment/timeline`),
+      safeFetch(`${API_BASE}/sentiment/sources`),
+    ]);
+    if (results[0].status === 'fulfilled') setSentimentDist(results[0].value.data || []);
+    if (results[1].status === 'fulfilled') setSentimentTimeline(results[1].value.data || []);
+    if (results[2].status === 'fulfilled') setSentimentSources(results[2].value.data || []);
   }, []);
 
-  // Format data for Recharts
-  const chartData = overviewData?.articles_by_hour ? overviewData.articles_by_hour.map((row: any) => ({
+  const fetchEntities = useCallback(async () => {
+    const results = await Promise.allSettled([
+      safeFetch(`${API_BASE}/entities`),
+      safeFetch(`${API_BASE}/trending/keywords`),
+    ]);
+    if (results[0].status === 'fulfilled') setEntitiesData(results[0].value || []);
+    if (results[1].status === 'fulfilled') setTrendingKeywords(results[1].value || []);
+  }, []);
+
+  const fetchArticles = useCallback(async (p: number) => {
+    const result = await safeFetch(`${API_BASE}/articles?page=${p}&page_size=20`);
+    setArticles(result.data || []);
+    setArticlesMeta(result);
+  }, []);
+
+  // Tab-aware polling
+  useEffect(() => {
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        if (activeTab === 'overview') await fetchOverview();
+        else if (activeTab === 'sentiment') await fetchSentiment();
+        else if (activeTab === 'entities') await fetchEntities();
+        else if (activeTab === 'articles') await fetchArticles(page);
+        if (!cancelled) setApiError(null);
+      } catch (err: any) {
+        if (!cancelled) setApiError('Mất kết nối tới API server');
+      }
+    };
+
+    poll();
+    const intervalId = setInterval(poll, 15000);
+    return () => { cancelled = true; clearInterval(intervalId); };
+  }, [activeTab, page, fetchOverview, fetchSentiment, fetchEntities, fetchArticles]);
+
+  // SSE with auto-reconnect
+  useEffect(() => {
+    const connectSSE = () => {
+      if (sseRef.current) sseRef.current.close();
+
+      const es = new EventSource(`${API_BASE}/stream/`);
+      sseRef.current = es;
+
+      es.onopen = () => setIsConnected(true);
+      es.addEventListener('update', (event) => {
+        try {
+          const newEvent = JSON.parse(event.data);
+          setFeed((prev) => [newEvent, ...prev].slice(0, 50));
+        } catch {}
+      });
+      es.onerror = () => {
+        setIsConnected(false);
+        es.close();
+        reconnectTimer.current = setTimeout(connectSSE, 5000);
+      };
+    };
+
+    connectSSE();
+    return () => {
+      sseRef.current?.close();
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+    };
+  }, []);
+
+  // Auto-hide error toast after 5 seconds
+  useEffect(() => {
+    if (!apiError) return;
+    const t = setTimeout(() => setApiError(null), 5000);
+    return () => clearTimeout(t);
+  }, [apiError]);
+
+  const chartData = overviewData?.articles_by_hour?.map((row: any) => ({
     time: `${row.hour}:00`,
     count: row.count
-  })) : [];
+  })) || [];
 
-  const sourceData = overviewData?.category_distribution ? overviewData.category_distribution.map((row: any) => ({
-    name: row.category, 
+  const sourceData = overviewData?.category_distribution?.map((row: any) => ({
+    name: row.category,
     count: row.count
-  })) : [];
+  })) || [];
 
   return (
     <div className="container">
@@ -116,7 +171,7 @@ export default function Home() {
         <button className={`tab-btn ${activeTab === 'entities' ? 'active' : ''}`} onClick={() => setActiveTab('entities')}>
           <Hash size={18} /> Entities & NLP
         </button>
-        <button className={`tab-btn ${activeTab === 'articles' ? 'active' : ''}`} onClick={() => setActiveTab('articles')}>
+        <button className={`tab-btn ${activeTab === 'articles' ? 'active' : ''}`} onClick={() => { setActiveTab('articles'); setPage(1); }}>
           <BookOpen size={18} /> Articles
         </button>
         <button className={`tab-btn ${activeTab === 'stream' ? 'active' : ''}`} onClick={() => setActiveTab('stream')}>
@@ -156,7 +211,7 @@ export default function Home() {
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} />
                       <YAxis stroke="#94a3b8" fontSize={12} />
-                      <Tooltip 
+                      <Tooltip
                         contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }}
                         itemStyle={{ color: '#fff' }}
                       />
@@ -182,7 +237,7 @@ export default function Home() {
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
                       <YAxis stroke="#94a3b8" fontSize={12} />
-                      <Tooltip 
+                      <Tooltip
                         cursor={{fill: 'rgba(255,255,255,0.05)'}}
                         contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }}
                       />
@@ -207,37 +262,49 @@ export default function Home() {
               <div className="panel-title"><ThumbsUp size={20} /> Overall Sentiment</div>
             </div>
             <div style={{ height: 300, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={sentimentDist} dataKey="count" nameKey="sentiment_label" cx="50%" cy="50%" outerRadius={100} label>
-                    {sentimentDist.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.sentiment_label.toLowerCase() === 'positive' ? 'var(--accent-green)' : entry.sentiment_label.toLowerCase() === 'negative' ? '#ef4444' : '#94a3b8'} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} itemStyle={{ color: '#fff' }}/>
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              {sentimentDist.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={sentimentDist} dataKey="count" nameKey="sentiment_label" cx="50%" cy="50%" outerRadius={100} label>
+                      {sentimentDist.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.sentiment_label === 'Positive' ? 'var(--accent-green)' : entry.sentiment_label === 'Negative' ? '#ef4444' : '#94a3b8'} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} itemStyle={{ color: '#fff' }}/>
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                  No sentiment data available
+                </div>
+              )}
             </div>
           </div>
-          
+
           <div className="glass-panel">
             <div className="panel-header">
               <div className="panel-title"><BarChart2 size={20} /> Sentiment by Source</div>
             </div>
             <div style={{ height: 300, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sentimentSources}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
-                  <YAxis stroke="#94a3b8" fontSize={12} />
-                  <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
-                  <Legend />
-                  <Bar dataKey="Positive" stackId="a" fill="var(--accent-green)" />
-                  <Bar dataKey="Neutral" stackId="a" fill="#94a3b8" />
-                  <Bar dataKey="Negative" stackId="a" fill="#ef4444" />
-                </BarChart>
-              </ResponsiveContainer>
+              {sentimentSources.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sentimentSources}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} />
+                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <Legend />
+                    <Bar dataKey="Positive" stackId="a" fill="var(--accent-green)" />
+                    <Bar dataKey="Neutral" stackId="a" fill="#94a3b8" />
+                    <Bar dataKey="Negative" stackId="a" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                  No source sentiment data available
+                </div>
+              )}
             </div>
           </div>
 
@@ -246,18 +313,24 @@ export default function Home() {
               <div className="panel-title"><Activity size={20} /> Sentiment Timeline</div>
             </div>
             <div style={{ height: 300, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={sentimentTimeline}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} />
-                  <YAxis stroke="#94a3b8" fontSize={12} />
-                  <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="Positive" stroke="var(--accent-green)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="Neutral" stroke="#94a3b8" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              {sentimentTimeline.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={sentimentTimeline}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} />
+                    <YAxis stroke="#94a3b8" fontSize={12} />
+                    <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="Positive" stroke="var(--accent-green)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="Neutral" stroke="#94a3b8" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                  No timeline data available
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -270,15 +343,21 @@ export default function Home() {
               <div className="panel-title"><Users size={20} /> Top Entities</div>
             </div>
             <div style={{ height: 400, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={entitiesData} layout="vertical" margin={{ left: 50 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={true} vertical={false} />
-                  <XAxis type="number" stroke="#94a3b8" fontSize={12} />
-                  <YAxis type="category" dataKey="entity_name" stroke="#94a3b8" fontSize={12} width={100} />
-                  <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
-                  <Bar dataKey="mention_count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {entitiesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={entitiesData} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={true} vertical={false} />
+                    <XAxis type="number" stroke="#94a3b8" fontSize={12} />
+                    <YAxis type="category" dataKey="entity_name" stroke="#94a3b8" fontSize={11} width={150} />
+                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <Bar dataKey="mention_count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                  No entity data available
+                </div>
+              )}
             </div>
           </div>
 
@@ -287,15 +366,21 @@ export default function Home() {
               <div className="panel-title"><MessageSquare size={20} /> Trending Keywords</div>
             </div>
             <div style={{ height: 400, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={trendingKeywords} layout="vertical" margin={{ left: 50 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={true} vertical={false} />
-                  <XAxis type="number" stroke="#94a3b8" fontSize={12} />
-                  <YAxis type="category" dataKey="keyword" stroke="#94a3b8" fontSize={12} width={100} />
-                  <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
-                  <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {trendingKeywords.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={trendingKeywords} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={true} vertical={false} />
+                    <XAxis type="number" stroke="#94a3b8" fontSize={12} />
+                    <YAxis type="category" dataKey="keyword" stroke="#94a3b8" fontSize={11} width={150} />
+                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                  No keyword data available
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -312,7 +397,7 @@ export default function Home() {
                 <th>Title</th>
                 <th>Source</th>
                 <th>Category</th>
-                <th>Published At</th>
+                <th>Published</th>
                 <th>Sentiment</th>
               </tr>
             </thead>
@@ -325,10 +410,10 @@ export default function Home() {
                     </a>
                   </td>
                   <td>
-                    <span className={`tag ${a.source.toLowerCase()}`}>{a.source}</span>
+                    <span className={`tag ${a.source?.toLowerCase()}`}>{a.source}</span>
                   </td>
                   <td>{a.category || '-'}</td>
-                  <td>{new Date(a.publish_date).toLocaleString()}</td>
+                  <td>{a.publish_date ? timeAgo(a.publish_date) : '-'}</td>
                   <td>
                     <span style={{ color: a.sentiment_score > 0 ? 'var(--accent-green)' : a.sentiment_score < 0 ? '#ef4444' : 'var(--text-muted)' }}>
                       {a.sentiment_score?.toFixed(2) || '0.00'}
@@ -345,6 +430,13 @@ export default function Home() {
               )}
             </tbody>
           </table>
+          {articlesMeta.total_pages > 1 && (
+            <div className="pagination">
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Previous</button>
+              <span className="page-info">Page {page} / {articlesMeta.total_pages}</span>
+              <button disabled={page >= articlesMeta.total_pages} onClick={() => setPage(p => p + 1)}>Next →</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -355,7 +447,7 @@ export default function Home() {
             <div className="status-indicator">
               <div className="pulse-dot" style={{ backgroundColor: isConnected ? 'var(--accent-green)' : '#ef4444' }}></div>
               <span style={{ color: isConnected ? 'var(--accent-green)' : '#ef4444' }}>
-                {isConnected ? 'Connected to Stream' : 'Disconnected'}
+                {isConnected ? 'Connected to Stream' : 'Reconnecting...'}
               </span>
             </div>
           </div>
@@ -380,6 +472,13 @@ export default function Home() {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {apiError && (
+        <div className="error-toast">
+          <AlertTriangle size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.5rem' }} />
+          {apiError}
         </div>
       )}
     </div>

@@ -1,9 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from datetime import date
 
-from api.services.crud import get_articles, get_article_detail, delete_article
+from api.services.crud import get_articles, get_article_detail
 
 router = APIRouter(prefix="/articles", tags=["Articles"])
 
@@ -20,18 +19,11 @@ async def list_articles(
         entity: Optional[str] = Query(default=None, description="Filter by entity"),
         keyword: Optional[str] = Query(default=None, description="Filter by keyword"),
 ):
-    result = get_articles(
-        page=page,
-        page_size=page_size,
-        q=q,
-        source=source,
-        category=category,
-        date_from=date_from,
-        date_to=date_to,
-        entity=entity,
-        keyword=keyword,
+    return get_articles(
+        page=page, page_size=page_size, q=q, source=source,
+        category=category, date_from=date_from, date_to=date_to,
+        entity=entity, keyword=keyword,
     )
-    return result
 
 
 @router.get("/{article_id}")
@@ -40,11 +32,3 @@ async def get_article(article_id: str):
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     return article
-
-
-@router.delete("/{article_id}")
-async def remove_article(article_id: str):
-    deleted = delete_article(article_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Article not found")
-    return {"message": "Article deleted", "article_id": article_id}

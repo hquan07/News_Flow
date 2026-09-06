@@ -10,7 +10,7 @@ from scrapy.exceptions import DropItem
 
 logger = logging.getLogger(__name__)
 
-# 1. Dedup
+
 class DedupPipeline:
     def __init__(self):
         self._seen: set[str] = set()
@@ -22,9 +22,8 @@ class DedupPipeline:
         self._seen.add(url_hash)
         return item
 
-# 2. Clean text
-class CleanTextPipeline:
 
+class CleanTextPipeline:
     _TAG_RE = re.compile(r"<[^>]+>")
     _MULTI_SPACE = re.compile(r"\s+")
 
@@ -42,12 +41,10 @@ class CleanTextPipeline:
 
         if not adapter.get("title"):
             raise DropItem("Article has no title")
-
         return item
 
-# 3. MinIO
-class MinIOPipeline:
 
+class MinIOPipeline:
     def __init__(self, endpoint, access_key, secret_key, bucket_name):
         self.endpoint = endpoint
         self.access_key = access_key
@@ -74,7 +71,7 @@ class MinIOPipeline:
         try:
             self.s3_client.create_bucket(Bucket=self.bucket_name)
         except Exception:
-            pass  # Bucket might already exist
+            pass
 
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
@@ -88,16 +85,14 @@ class MinIOPipeline:
                     Bucket=self.bucket_name,
                     Key=object_name,
                     Body=raw_html.encode("utf-8"),
-                    ContentType="text/html"
+                    ContentType="text/html",
                 )
-                logger.debug("Uploaded raw HTML to MinIO: %s", object_name)
             except Exception as e:
                 logger.error("Failed to upload to MinIO: %s", e)
         return item
 
-# 4. MongoDB
-class MongoPipeline:
 
+class MongoPipeline:
     def __init__(self, mongo_uri: str, mongo_db: str):
         self.mongo_uri = mongo_uri
         self.mongo_db = mongo_db
@@ -115,7 +110,6 @@ class MongoPipeline:
         self.client = MongoClient(self.mongo_uri)
         db = self.client[self.mongo_db]
         self.collection = db["articles_raw"]
-        # Unique index on URL for cross-session dedup
         self.collection.create_index([("url", ASCENDING)], unique=True)
         self.collection.create_index([("crawl_time", ASCENDING)])
         self.collection.create_index([("source", ASCENDING), ("category", ASCENDING)])
@@ -129,23 +123,19 @@ class MongoPipeline:
         doc = adapter.asdict()
         try:
             self.collection.insert_one(doc)
-            logger.debug("Saved to MongoDB: %s", doc.get("url"))
         except DuplicateKeyError:
-            logger.debug("Already in MongoDB: %s", doc.get("url"))
+            pass
         return item
 
-# 4. Kafka
-class KafkaPipeline:
 
+class KafkaPipeline:
     def __init__(self, bootstrap_servers: str):
         self.bootstrap_servers = bootstrap_servers
         self.producer = None
 
     @classmethod
     def from_crawler(cls, crawler):
-        return cls(
-            bootstrap_servers=crawler.settings.get("KAFKA_BOOTSTRAP_SERVERS"),
-        )
+        return cls(bootstrap_servers=crawler.settings.get("KAFKA_BOOTSTRAP_SERVERS"))
 
     def open_spider(self, spider):
         from kafka_utils.producer import ArticleProducer
