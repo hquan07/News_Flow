@@ -178,3 +178,50 @@ def get_sentiment_by_source(time_range="7d"):
         if label in ("Positive", "Negative", "Neutral"):
             sources[src][label] = row["count"]
     return list(sources.values())
+
+
+def get_entity_type_distribution(time_range="7d"):
+    where = _resolve_time_range(time_range, "loaded_at")
+    return _query(
+        f"SELECT entity_type, count() AS count "
+        f"FROM newspulse.raw_article_entities "
+        f"WHERE {where} "
+        f"GROUP BY entity_type "
+        f"ORDER BY count DESC"
+    )
+
+
+def get_entity_sentiment(time_range="7d", limit=15):
+    where = _resolve_time_range(time_range, "e.loaded_at")
+    top_entities_where = _resolve_time_range(time_range, "loaded_at")
+    
+    top_entities_sql = f"""
+        SELECT entity
+        FROM newspulse.raw_article_entities
+        WHERE {top_entities_where}
+        GROUP BY entity
+        ORDER BY count() DESC
+        LIMIT {limit}
+    """
+    
+    query = f"""
+        SELECT e.entity AS entity, s.sentiment_label AS sentiment, count() AS count
+        FROM newspulse.raw_article_entities e
+        JOIN newspulse.raw_article_sentiment s ON e.url_hash = s.url_hash
+        WHERE e.entity IN ({top_entities_sql}) AND {where} AND s.sentiment_label != ''
+        GROUP BY entity, sentiment
+    """
+    rows = _query(query)
+    
+    entities_data = {}
+    for row in rows:
+        ent = row["entity"]
+        if ent not in entities_data:
+            entities_data[ent] = {"entity": ent, "Positive": 0, "Negative": 0, "Neutral": 0, "total": 0}
+        label = row["sentiment"].capitalize()
+        if label in ("Positive", "Negative", "Neutral"):
+            entities_data[ent][label] = row["count"]
+            entities_data[ent]["total"] += row["count"]
+            
+    sorted_entities = sorted(list(entities_data.values()), key=lambda x: x["total"], reverse=True)
+    return sorted_entities

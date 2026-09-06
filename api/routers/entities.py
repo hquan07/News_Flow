@@ -22,3 +22,18 @@ def top_entities(
         time_range=time_range.value, entity_type=type_val,
         limit=limit, source=source, category=category,
     )
+
+
+@router.get("/type-distribution")
+def entity_type_distribution(time_range: TimeRangeEnum = Query(default=TimeRangeEnum.week)):
+    from api.services.analytics import get_entity_type_distribution
+    return get_entity_type_distribution(time_range=time_range.value)
+
+
+@router.get("/sentiment")
+def entity_sentiment(
+        time_range: TimeRangeEnum = Query(default=TimeRangeEnum.week),
+        limit: int = Query(default=15, ge=1, le=50)
+):
+    from api.services.analytics import get_entity_sentiment
+    return get_entity_sentiment(time_range=time_range.value, limit=limit)
