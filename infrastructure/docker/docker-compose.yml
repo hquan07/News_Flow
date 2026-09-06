@@ -259,7 +259,7 @@ services:
   # ==================== API + DASHBOARD ====================
   api:
     build:
-      context: ..
+      context: ../..
       dockerfile: Dockerfile
     container_name: newspulse-api
     ports:
@@ -295,7 +295,9 @@ services:
 
 
   spark-master:
-    image: apache/spark:3.5.3-python3
+    build:
+      context: spark
+      dockerfile: Dockerfile
     container_name: newspulse-spark-master
     entrypoint: ["/usr/bin/tini", "-s", "--"]
     command:
@@ -327,7 +329,9 @@ services:
       start_period: 30s
 
   spark-worker:
-    image: apache/spark:3.5.3-python3
+    build:
+      context: spark
+      dockerfile: Dockerfile
     container_name: newspulse-spark-worker
     entrypoint: ["/usr/bin/tini", "-s", "--"]
     command:

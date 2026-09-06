@@ -43,19 +43,13 @@ def get_settings() -> Settings:
     return Settings()
 
 
-_ch_client = None
-
-
 def get_ch_client():
-    """Singleton ClickHouse client to prevent file descriptor exhaustion."""
-    global _ch_client
-    if _ch_client is None:
-        s = get_settings()
-        _ch_client = clickhouse_connect.get_client(
-            host=s.CLICKHOUSE_HOST,
-            port=s.CLICKHOUSE_PORT,
-            username=s.CLICKHOUSE_USER,
-            password=s.CLICKHOUSE_PASSWORD,
-            database=s.CLICKHOUSE_DB,
-        )
-    return _ch_client
+    """Return a new ClickHouse client instance per request to avoid concurrency errors."""
+    s = get_settings()
+    return clickhouse_connect.get_client(
+        host=s.CLICKHOUSE_HOST,
+        port=s.CLICKHOUSE_PORT,
+        username=s.CLICKHOUSE_USER,
+        password=s.CLICKHOUSE_PASSWORD,
+        database=s.CLICKHOUSE_DB,
+    )

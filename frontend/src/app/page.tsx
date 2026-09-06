@@ -55,6 +55,8 @@ export default function Home() {
   const sseRef = useRef<EventSource | null>(null);
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
 
+  const [activeCard, setActiveCard] = useState<number | null>(null);
+
   // Smart fetch: only load data relevant to the active tab
   const fetchOverview = useCallback(async () => {
     const result = await safeFetch(`${API_BASE}/overview`);
@@ -182,12 +184,82 @@ export default function Home() {
       {activeTab === 'overview' && (
         <>
           <div className="overview-grid">
-            {overviewData?.kpi_cards?.map((kpi: any, i: number) => (
-              <div key={i} className="glass-panel metric-card">
-                <div className="metric-label">{kpi.label}</div>
-                <div className="metric-value">{kpi.value}</div>
-              </div>
-            ))}
+            {overviewData?.kpi_cards?.map((kpi: any, i: number) => {
+              let details = null;
+              if (i === 0 && overviewData.source_speed) {
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.source_speed.map((s: any) => (
+                      <li key={s.source}>
+                        <span style={{ textTransform: 'capitalize' }}>{s.source}</span>
+                        <strong>{s.article_count}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              } else if (i === 1 && overviewData.source_speed) {
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.source_speed.map((s: any) => (
+                      <li key={s.source}>
+                        <span style={{ textTransform: 'capitalize' }}>{s.source}</span>
+                        <span style={{ color: 'var(--accent-green)', fontSize: '0.8rem' }}>● Hoạt động</span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              } else if (i === 2 && overviewData.category_distribution) {
+                const total = overviewData.category_distribution.reduce((acc: number, c: any) => acc + c.count, 0) || 1;
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.category_distribution.slice(0, 5).map((c: any) => (
+                      <li key={c.category}>
+                        <span style={{ textTransform: 'capitalize' }}>{c.category}</span>
+                        <span>
+                          <strong>{c.count}</strong>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '6px' }}>
+                            ({Math.round((c.count / total) * 100)}%)
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              } else if (i === 3 && overviewData.source_speed) {
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.source_speed.filter((s: any) => s.avg_latency_min > 0).map((s: any) => (
+                      <li key={s.source}>
+                        <span style={{ textTransform: 'capitalize' }}>{s.source}</span>
+                        <strong>{s.avg_latency_min.toFixed(1)} min</strong>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+
+              return (
+                <div 
+                  key={i} 
+                  className={`glass-panel metric-card ${activeCard === i ? 'expanded' : ''}`}
+                  onClick={() => setActiveCard(activeCard === i ? null : i)}
+                >
+                  <div className="metric-content" style={{ display: activeCard === i ? 'none' : 'block' }}>
+                    <div className="metric-label">{kpi.label}</div>
+                    <div className="metric-value">{kpi.value}</div>
+                    <div className="metric-hint">Click để xem chi tiết</div>
+                  </div>
+                  {activeCard === i && (
+                    <div className="metric-details">
+                      <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+                        {kpi.label} (Chi tiết)
+                      </div>
+                      {details}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             {!overviewData?.kpi_cards && (
               <div style={{ color: 'var(--text-muted)' }}>Loading metrics...</div>
             )}

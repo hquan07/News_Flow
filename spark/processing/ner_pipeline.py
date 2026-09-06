@@ -31,8 +31,6 @@ def _get_pipeline():
             import os
             os.environ["HF_HOME"] = "/tmp/hf_cache"
             os.environ["TRANSFORMERS_CACHE"] = "/tmp/hf_cache"
-            # Attempt to use ONNX runtime via optimum if available and model is exported
-            from optimum.onnxruntime import ORTModelForTokenClassification
             from transformers import AutoTokenizer, pipeline
             
             model_id = "NlpHUST/ner-vietnamese-electra-base" # using an electra/phobert based NER
@@ -63,19 +61,22 @@ def extract_entities(text: str) -> List[Dict[str, str]]:
         logger.error(f"NER extraction error: {e}")
         return []
 
+    import sys
+    print(f"DEBUG NER RESULTS: {results}", file=sys.stderr)
     unique_entities = []
     seen = set()
     for ent in results:
-        # ent looks like {'entity_group': 'PER', 'score': 0.99, 'word': 'Nguyễn Văn A', 'start': 0, 'end': 12}
+        # ent looks like {'entity_group': 'PERSON', 'score': 0.99, 'word': 'Nguyễn Văn A', 'start': 0, 'end': 12}
         label = ent.get("entity_group", "")
-        if label not in ["PER", "LOC", "ORG"]:
+        # The model uses PERSON, LOCATION, ORGANIZATION instead of PER, LOC, ORG
+        if label not in ["PERSON", "LOCATION", "ORGANIZATION"]:
             continue
             
         entity_text = ent.get("word", "").replace("@@", "").replace("_", " ").strip()
         if not entity_text:
             continue
             
-        entity_type = "person" if label == "PER" else "location" if label == "LOC" else "organization"
+        entity_type = "person" if label == "PERSON" else "location" if label == "LOCATION" else "organization"
         
         key = (entity_text.lower(), entity_type)
         if key not in seen:
@@ -86,6 +87,7 @@ def extract_entities(text: str) -> List[Dict[str, str]]:
                 "label": label
             })
 
+    print(f"DEBUG UNIQUE ENTITIES: {unique_entities}", file=sys.stderr)
     return unique_entities
 
 

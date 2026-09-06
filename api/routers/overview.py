@@ -23,7 +23,7 @@ def overview(
     total_latency_sum = 0.0
     sources = set()
     category_counts = defaultdict(int)
-    source_latencies = defaultdict(lambda: {"total_latency": 0.0, "count": 0})
+    source_latencies = defaultdict(lambda: {"total_latency": 0.0, "count": 0, "latency_count": 0})
 
     for row in daily_data:
         count = row.get("article_count", 0)
@@ -32,12 +32,15 @@ def overview(
         sources.add(src)
         category_counts[row.get("category")] += count
 
+        if src:
+            source_latencies[src]["count"] += count
+
         latency = row.get("avg_crawl_latency")
         if latency and count:
             total_latency_sum += float(latency) * count
             if src:
                 source_latencies[src]["total_latency"] += float(latency) * count
-                source_latencies[src]["count"] += count
+                source_latencies[src]["latency_count"] += count
 
     top_cat = max(category_counts.items(), key=lambda x: x[1])[0] if category_counts else "N/A"
     avg_latency = round(total_latency_sum / total_articles, 1) if total_articles > 0 else 0.0
@@ -61,7 +64,7 @@ def overview(
     source_speed = [
         {
             "source": src,
-            "avg_latency_min": round(vals["total_latency"] / vals["count"], 1) if vals["count"] > 0 else 0,
+            "avg_latency_min": round(vals["total_latency"] / vals["latency_count"], 1) if vals.get("latency_count", 0) > 0 else 0,
             "article_count": vals["count"],
         }
         for src, vals in source_latencies.items()

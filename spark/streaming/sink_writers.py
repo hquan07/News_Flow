@@ -66,7 +66,7 @@ def create_clickhouse_streaming_writer(df: DataFrame, table: str = "raw_articles
             F.col("title_clean").alias("title"),
             F.col("content_clean").alias("content"),
             F.col("author"),
-            F.col("publish_timestamp").alias("publish_time"),
+            F.coalesce(F.col("publish_timestamp"), F.col("crawled_timestamp"), F.current_timestamp()).alias("publish_time"),
             F.col("source"),
             F.lit("").alias("source_domain"),
             F.col("category_normalized").alias("category"),
@@ -74,9 +74,21 @@ def create_clickhouse_streaming_writer(df: DataFrame, table: str = "raw_articles
             F.col("keyword_count"),
             F.col("publish_hour"),
             F.col("crawl_latency_minutes"),
-            F.col("crawled_timestamp").alias("crawled_at"),
+            F.coalesce(F.col("crawled_timestamp"), F.current_timestamp()).alias("crawled_at"),
             F.current_timestamp().alias("loaded_at"),
-        ).fillna({"author": "", "content": "", "category": ""})
+        ).fillna({
+            "author": "", 
+            "content": "", 
+            "category": "",
+            "title": "",
+            "url": "",
+            "url_hash": "",
+            "source": "",
+            "word_count": 0,
+            "keyword_count": 0,
+            "publish_hour": 0,
+            "crawl_latency_minutes": 0.0
+        })
 
         write_to_clickhouse_batch(output_df, table)
         logger.info(f"[ClickHouse] Batch {batch_id}: wrote {output_df.count()} records to {table}")

@@ -36,6 +36,17 @@ class LaoDongSpider(BaseNewsSpider):
     }
 
     def parse(self, response: Response):
+        if "document.cookie=\"D1N=" in response.text:
+            import re
+            match = re.search(r'D1N=([^"]+)', response.text)
+            if match:
+                cookie_val = match.group(1)
+                request = response.request.copy()
+                request.cookies["D1N"] = cookie_val
+                request.dont_filter = True
+                yield request
+            return
+
         response.selector.remove_namespaces()
         items = response.xpath("//item")
 
@@ -56,6 +67,17 @@ class LaoDongSpider(BaseNewsSpider):
                 )
 
     def parse_article(self, response: Response) -> ArticleItem:
+        if "document.cookie=\"D1N=" in response.text:
+            import re
+            match = re.search(r'D1N=([^"]+)', response.text)
+            if match:
+                cookie_val = match.group(1)
+                request = response.request.copy()
+                request.cookies["D1N"] = cookie_val
+                request.dont_filter = True
+                yield request
+            return
+
         title = response.css("h1.title::text").get("") or response.css("title::text").get("")
         description = response.css("p.abs::text").get("") or response.meta.get("rss_description", "")
         
@@ -71,7 +93,7 @@ class LaoDongSpider(BaseNewsSpider):
         
         thumbnail = response.css("meta[property='og:image']::attr(content)").get("")
 
-        return self._build_item(
+        yield self._build_item(
             response=response,
             title=title,
             content=content,

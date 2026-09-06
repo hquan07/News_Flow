@@ -1,6 +1,7 @@
 import sys
 import signal
 from loguru import logger
+from pyspark.sql import functions as F
 
 from spark.utils.spark_session import create_spark_session
 from spark.streaming.kafka_consumer import create_kafka_stream
@@ -31,30 +32,68 @@ def main():
     enriched_stream = apply_ner_extraction(with_keywords)
     enriched_stream = apply_sentiment_analysis(enriched_stream)
 
-    clickhouse_query = create_clickhouse_streaming_writer(enriched_stream)
-    logger.info("ClickHouse streaming writer started")
-
-    def _write_nlp_batch(batch_df, batch_id):
+    def _write_all_batch(batch_df, batch_id):
         if batch_df.isEmpty():
             return
+        
+        # Persist to avoid recomputing the entire NLP pipeline for each write
+        batch_df.persist()
+        
+        # Write to raw_articles
+        output_df = batch_df.select(
+            F.col("url_hash"),
+            F.col("url"),
+            F.col("title_clean").alias("title"),
+            F.col("content_clean").alias("content"),
+            F.col("author"),
+            F.coalesce(F.col("publish_timestamp"), F.col("crawled_timestamp"), F.current_timestamp()).alias("publish_time"),
+            F.col("source"),
+            F.lit("").alias("source_domain"),
+            F.col("category_normalized").alias("category"),
+            F.col("word_count"),
+            F.col("keyword_count"),
+            F.col("publish_hour"),
+            F.col("crawl_latency_minutes"),
+            F.coalesce(F.col("crawled_timestamp"), F.current_timestamp()).alias("crawled_at"),
+            F.current_timestamp().alias("loaded_at"),
+        ).fillna({
+            "author": "", 
+            "content": "", 
+            "category": "",
+            "title": "",
+            "url": "",
+            "url_hash": "",
+            "source": "",
+            "word_count": 0,
+            "keyword_count": 0,
+            "publish_hour": 0,
+            "crawl_latency_minutes": 0.0
+        })
+        
+        from spark.streaming.sink_writers import write_to_clickhouse_batch
+        write_to_clickhouse_batch(output_df, "raw_articles")
+        logger.info(f"[ClickHouse] Batch {batch_id}: wrote {output_df.count()} records to raw_articles")
+
+        # Write to NLP tables
         kw_count = write_keywords_to_clickhouse(batch_df)
         ent_count = write_entities_to_clickhouse(batch_df)
         sent_count = write_sentiment_to_clickhouse(batch_df)
         logger.info(f"[NLP] Batch {batch_id}: {kw_count} keywords, {ent_count} entities, {sent_count} sentiment records")
+        
+        batch_df.unpersist()
 
-    nlp_query = (
+    main_query = (
         enriched_stream.writeStream
-        .foreachBatch(_write_nlp_batch)
+        .foreachBatch(_write_all_batch)
         .outputMode("append")
-        .option("checkpointLocation", "/tmp/spark-checkpoints/nlp")
+        .option("checkpointLocation", "/tmp/spark-checkpoints/main")
         .start()
     )
-    logger.info("NLP streaming writer started")
+    logger.info("Main streaming writer started")
 
     def shutdown(signum, frame):
         logger.warning(f"Received signal {signum}, shutting down...")
-        nlp_query.stop()
-        clickhouse_query.stop()
+        main_query.stop()
         spark.stop()
         logger.info("Streaming job stopped gracefully")
         sys.exit(0)

@@ -69,10 +69,10 @@ def get_hourly_distribution(time_range="7d", source=None, category=None):
 def get_trending_keywords(time_range="7d", limit=20, source=None, category=None):
     where = _resolve_time_range(time_range, "loaded_at")
     return _query(
-        f"SELECT keyword, count() as mention_count "
+        f"SELECT keyword, count() as count "
         f"FROM newspulse.raw_article_keywords "
         f"WHERE {where} "
-        f"GROUP BY keyword ORDER BY mention_count DESC LIMIT {limit}"
+        f"GROUP BY keyword ORDER BY count DESC LIMIT {limit}"
     )
 
 
@@ -114,7 +114,7 @@ def get_entity_stats(time_range="7d", entity_type=None, limit=20, source=None, c
         where += " AND entity_type = {entity_type:String}"
         params["entity_type"] = entity_type
     return _query(
-        f"SELECT entity, entity_type, "
+        f"SELECT entity AS entity_name, entity_type, "
         f"uniq(url_hash) AS article_count, "
         f"count() AS mention_count "
         f"FROM newspulse.raw_article_entities "

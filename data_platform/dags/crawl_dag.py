@@ -11,7 +11,7 @@ default_args = {
     "execution_timeout": timedelta(minutes=20),
 }
 
-SPIDERS = ["vnexpress","tuoitre", "thanhnien"]
+SPIDERS = ["vnexpress", "tuoitre", "thanhnien", "tienphong", "dantri", "laodong"]
 
 SCRAPY_CMD = (
     "cd /opt/airflow/crawlers && "

@@ -153,12 +153,6 @@ h1 {
 }
 
 /* Metrics */
-.metric-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
 .metric-label {
   color: var(--text-muted);
   font-size: 0.9rem;
@@ -171,6 +165,48 @@ h1 {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+.metric-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-top: 0.5rem;
+}
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.metric-card:hover .metric-hint {
+  opacity: 1;
+}
+.metric-details {
+  width: 100%;
+  text-align: left;
+  animation: fadeIn 0.3s ease-out;
+}
+.metric-details-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.metric-details-list li {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px dashed rgba(255,255,255,0.05);
+}
+.metric-details-list li:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 /* Table */
