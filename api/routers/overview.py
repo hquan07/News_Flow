@@ -51,8 +51,24 @@ def overview(
         hour_counts[h] += row["total_count"]
         
     articles_by_hour = [{"hour": f"{h:02d}", "count": hour_counts.get(h, 0)} for h in range(24)]
-    
-    # Get sentiment distribution
+    source_latencies = defaultdict(lambda: {"total_latency": 0.0, "count": 0})
+    for row in daily_data:
+        src = row.get("source")
+        latency = row.get("avg_crawl_latency")
+        cnt = row.get("article_count", 0)
+        if src and latency and cnt:
+            source_latencies[src]["total_latency"] += float(latency) * cnt
+            source_latencies[src]["count"] += cnt
+
+    source_speed = [
+        {
+            "source": src,
+            "avg_latency_min": round(vals["total_latency"] / vals["count"], 1) if vals["count"] > 0 else 0,
+            "article_count": vals["count"],
+        }
+        for src, vals in source_latencies.items()
+    ]
+
     from api.services.analytics import get_sentiment_distribution
     sentiment_data = get_sentiment_distribution(time_range=time_range.value, source=source, category=category)
     sentiment_dist = [{"sentiment": row["sentiment_label"], "count": row["count"]} for row in sentiment_data]
@@ -61,6 +77,6 @@ def overview(
         kpi_cards=kpi_cards,
         articles_by_hour=articles_by_hour,
         category_distribution=cat_dist,
-        source_speed=[],
+        source_speed=source_speed,
         sentiment_distribution=sentiment_dist
     )

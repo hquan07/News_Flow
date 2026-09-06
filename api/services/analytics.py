@@ -144,13 +144,16 @@ def get_entities_by_category(category=None, limit=20):
 def get_sentiment_distribution(time_range="7d", source=None, category=None):
     where = _resolve_time_range(time_range, "loaded_at")
     params = {}
-    return _query(
+    rows = _query(
         f"SELECT sentiment_label, count() AS count "
         f"FROM newspulse.raw_article_sentiment "
         f"WHERE {where} AND sentiment_label != '' "
         f"GROUP BY sentiment_label",
         params,
     )
+    for row in rows:
+        row["sentiment_label"] = row["sentiment_label"].capitalize()
+    return rows
 
 def get_entity_network(time_range="7d", limit=50):
     return {"nodes": [], "links": []}
