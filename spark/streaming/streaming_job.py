@@ -6,12 +6,12 @@ from spark.utils.spark_session import create_spark_session
 from spark.streaming.kafka_consumer import create_kafka_stream
 from spark.streaming.sink_writers import (
     create_mongodb_streaming_writer,
-    create_postgres_streaming_writer,
+    create_clickhouse_streaming_writer,
 )
 from spark.streaming.nlp_writers import (
-    write_keywords_to_postgres,
-    write_entities_to_postgres,
-    write_sentiment_to_postgres,
+    write_keywords_to_clickhouse,
+    write_entities_to_clickhouse,
+    write_sentiment_to_clickhouse,
 )
 from spark.processing.text_processor import apply_text_cleaning
 from spark.processing.keyword_extractor import apply_keyword_extraction
@@ -45,7 +45,7 @@ def main():
     with_keywords = apply_keyword_extraction(cleaned_stream)
 
     # Step 4: Apply NER and Sentiment
-    logger.info("Setting up NER pipeline (underthesea)...")
+    logger.info("Setting up NER pipeline (PhoBERT)...")
     enriched_stream = apply_ner_extraction(with_keywords)
     
     logger.info("Setting up Sentiment pipeline...")
@@ -58,17 +58,17 @@ def main():
     # mongo_query = create_mongodb_streaming_writer(enriched_stream)
     # logger.info("MongoDB streaming writer started")
 
-    # PostgreSQL sink (structured columns only) - DISABLED (handled by Airflow mongo_to_raw)
-    # postgres_query = create_postgres_streaming_writer(enriched_stream)
-    # logger.info("PostgreSQL streaming writer started")
+    # ClickHouse sink (structured columns only)
+    clickhouse_query = create_clickhouse_streaming_writer(enriched_stream)
+    logger.info("ClickHouse streaming writer started")
 
     # Keywords + Entities + Sentiment sink (write to raw.article_*)
     def _write_nlp_batch(batch_df, batch_id):
         if batch_df.isEmpty():
             return
-        kw_count = write_keywords_to_postgres(batch_df)
-        ent_count = write_entities_to_postgres(batch_df)
-        sent_count = write_sentiment_to_postgres(batch_df)
+        kw_count = write_keywords_to_clickhouse(batch_df)
+        ent_count = write_entities_to_clickhouse(batch_df)
+        sent_count = write_sentiment_to_clickhouse(batch_df)
         logger.info(
             f"[NLP] Batch {batch_id}: {kw_count} keywords, {ent_count} entities, {sent_count} sentiment records"
         )
@@ -86,6 +86,7 @@ def main():
     def shutdown(signum, frame):
         logger.warning(f"Received signal {signum}, shutting down...")
         nlp_query.stop()
+        clickhouse_query.stop()
         spark.stop()
         logger.info("Streaming job stopped gracefully")
         sys.exit(0)

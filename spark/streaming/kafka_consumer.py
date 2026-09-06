@@ -44,7 +44,7 @@ def create_kafka_stream(spark: SparkSession) -> DataFrame:
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("subscribe", ",".join(KAFKA_TOPICS))
-        .option("startingOffsets", "latest")
+        .option("startingOffsets", "earliest")
         .option("failOnDataLoss", "false")
         .option("maxOffsetsPerTrigger", 500)
         .load()

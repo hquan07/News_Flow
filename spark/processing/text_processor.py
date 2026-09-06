@@ -115,9 +115,7 @@ def apply_text_cleaning(df: DataFrame) -> DataFrame:
         .withColumn(
             "publish_timestamp",
             F.coalesce(
-                F.to_timestamp(F.col("publish_time"), "yyyy-MM-dd'T'HH:mm:ssXXX"),
-                F.to_timestamp(F.col("publish_time"), "yyyy-MM-dd'T'HH:mm:ss"),
-                F.to_timestamp(F.col("publish_time"), "yyyy-MM-dd HH:mm:ss"),
+                F.to_timestamp(F.col("publish_time")),
                 F.to_timestamp(F.col("publish_time"), "dd/MM/yyyy HH:mm"),
             )
         )
@@ -126,11 +124,7 @@ def apply_text_cleaning(df: DataFrame) -> DataFrame:
         # Parse crawl_time (field name from Phase 1, not crawled_at)
         .withColumn(
             "crawled_timestamp",
-            F.coalesce(
-                F.to_timestamp(F.col("crawl_time"), "yyyy-MM-dd'T'HH:mm:ssXXX"),
-                F.to_timestamp(F.col("crawl_time"), "yyyy-MM-dd'T'HH:mm:ss"),
-                F.to_timestamp(F.col("crawl_time"), "yyyy-MM-dd HH:mm:ss"),
-            )
+            F.to_timestamp(F.col("crawl_time"))
         )
         # Crawl latency in minutes
         .withColumn(
