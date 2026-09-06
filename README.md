@@ -32,7 +32,80 @@ A real-time news analysis platform that collects and processes articles from Vie
 
 ## Architecture
 
-![NewsPulse Architecture](news_pipeline_architecture.svg)
+```mermaid
+flowchart TD
+    subgraph "Data Sources (Crawlers)"
+        A[VnExpress]
+        B[Tuổi Trẻ]
+        C[Thanh Niên]
+        C1[Dân Trí]
+        C2[Lao Động]
+        C3[Tiền Phong]
+    end
+
+    subgraph "Orchestration"
+        O[Apache Airflow]
+    end
+
+    subgraph "Message Broker"
+        E[Apache Kafka]
+    end
+
+    subgraph "Stream Processing (NLP)"
+        F[Spark Structured Streaming]
+        G[PhoBERT NER]
+        H[Sentiment Analysis]
+        I[Keyword Extraction]
+    end
+
+    subgraph "Storage & Data Warehouse"
+        J[(ClickHouse OLAP)]
+        K[(MinIO - Raw HTML)]
+    end
+
+    subgraph "Serving & Dashboard"
+        L[FastAPI Backend]
+        M[Next.js Dashboard]
+    end
+
+    D[Scrapy Pipeline]
+
+    O -.->|Schedules| D
+    A --> D
+    B --> D
+    C --> D
+    C1 --> D
+    C2 --> D
+    C3 --> D
+    D -->|JSON Articles| E
+    D -->|Raw HTML| K
+    E -->|Stream Consumption| F
+    F --> G
+    F --> H
+    F --> I
+    G -->|Entities| J
+    H -->|Sentiment| J
+    I -->|Keywords| J
+    F -->|Cleaned Articles| J
+    J -->|SQL Analytics| L
+    L -->|REST API / SSE| M
+
+    classDef source fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px;
+    classDef broker fill:#fff3e0,stroke:#f57c00,stroke-width:2px;
+    classDef processing fill:#e8f5e9,stroke:#43a047,stroke-width:2px;
+    classDef storage fill:#fce4ec,stroke:#d81b60,stroke-width:2px;
+    classDef api fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px;
+    classDef frontend fill:#e0f7fa,stroke:#00acc1,stroke-width:2px;
+    classDef orchestrator fill:#fce4ec,stroke:#d81b60,stroke-width:2px;
+
+    class A,B,C,C1,C2,C3 source;
+    class E broker;
+    class D,F,G,H,I processing;
+    class J,K storage;
+    class L api;
+    class M frontend;
+    class O orchestrator;
+```
 
 ## Installation & Setup
 
