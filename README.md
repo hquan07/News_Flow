@@ -90,13 +90,13 @@ flowchart TD
     J -->|SQL Analytics| L
     L -->|REST API / SSE| M
 
-    classDef source fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px;
-    classDef broker fill:#fff3e0,stroke:#f57c00,stroke-width:2px;
-    classDef processing fill:#e8f5e9,stroke:#43a047,stroke-width:2px;
-    classDef storage fill:#fce4ec,stroke:#d81b60,stroke-width:2px;
-    classDef api fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px;
-    classDef frontend fill:#e0f7fa,stroke:#00acc1,stroke-width:2px;
-    classDef orchestrator fill:#fce4ec,stroke:#d81b60,stroke-width:2px;
+    classDef source fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px,color:#000;
+    classDef broker fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
+    classDef processing fill:#e8f5e9,stroke:#43a047,stroke-width:2px,color:#000;
+    classDef storage fill:#fce4ec,stroke:#d81b60,stroke-width:2px,color:#000;
+    classDef api fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#000;
+    classDef frontend fill:#e0f7fa,stroke:#00acc1,stroke-width:2px,color:#000;
+    classDef orchestrator fill:#fce4ec,stroke:#d81b60,stroke-width:2px,color:#000;
 
     class A,B,C,C1,C2,C3 source;
     class E broker;
