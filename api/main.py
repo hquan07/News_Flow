@@ -1,22 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
-import os
 
 from api.config import get_settings
 from api.database import lifespan_db
-from api.routers import (
-    articles,
-    overview,
-    trending,
-    sources,
-    alerts,
-    entities,
-    stream,
-    sentiment,
-)
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment
 
 settings = get_settings()
 
@@ -32,15 +20,13 @@ app = FastAPI(
     version=settings.APP_VERSION,
     description=(
         "NewsPulse — Realtime News Intelligence Platform API. "
-        "Provides analytics endpoints for Vietnamese news data "
-        "from VnExpress, Tuổi Trẻ, and Thanh Niên."
+        "Provides analytics endpoints for Vietnamese news data."
     ),
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# CORS — allow dashboard tools (Metabase, Superset) and local dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -49,7 +35,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routers
 prefix = settings.API_V1_PREFIX
 app.include_router(articles.router, prefix=prefix)
 app.include_router(overview.router, prefix=prefix)
@@ -76,5 +61,4 @@ async def root():
         "message": f"Welcome to {settings.APP_NAME}",
         "docs": "/docs",
         "health": "/health",
-        "stream": "/api/v1/stream",
     }

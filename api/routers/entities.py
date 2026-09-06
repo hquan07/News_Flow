@@ -1,24 +1,10 @@
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Query
 from typing import Optional
 
 from api.models.schemas import TimeRangeEnum, EntityTypeEnum
-from api.services.analytics import (
-    get_entity_stats,
-    get_entity_timeline,
-    get_entities_by_category,
-    get_entity_network,
-)
+from api.services.analytics import get_entity_stats
 
 router = APIRouter(prefix="/entities", tags=["Entity Intelligence"])
-
-@router.get("/network")
-def entity_network(
-        time_range: TimeRangeEnum = Query(default=TimeRangeEnum.week),
-        limit: int = Query(default=50, ge=10, le=200),
-):
-    return get_entity_network(time_range=time_range.value, limit=limit)
-
 
 
 @router.get("")
@@ -32,19 +18,7 @@ def top_entities(
         category: Optional[str] = Query(None),
 ):
     type_val = entity_type.value if entity_type else None
-    return get_entity_stats(time_range=time_range.value, entity_type=type_val, limit=limit, source=source, category=category)
-
-
-@router.get("/{entity_name}/timeline")
-def entity_timeline(
-        entity_name: str,
-        time_range: TimeRangeEnum = Query(default=TimeRangeEnum.month),
-):
-    return get_entity_timeline(entity=entity_name, days=30)
-
-
-@router.get("/by-category")
-def entities_by_category(
-        time_range: TimeRangeEnum = Query(default=TimeRangeEnum.week),
-):
-    return get_entities_by_category()
+    return get_entity_stats(
+        time_range=time_range.value, entity_type=type_val,
+        limit=limit, source=source, category=category,
+    )

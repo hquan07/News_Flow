@@ -1,12 +1,7 @@
 import hashlib
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    StringType,
-    ArrayType,
-)
+from pyspark.sql.types import StructType, StructField, StringType, ArrayType
 
 from config.spark_config import (
     KAFKA_BOOTSTRAP_SERVERS,
@@ -14,7 +9,6 @@ from config.spark_config import (
     KAFKA_CONSUMER_GROUP,
 )
 
-# Schema matching the Kafka message produced by Phase 1 crawlers
 ARTICLE_SCHEMA = StructType([
     StructField("url", StringType(), False),
     StructField("title", StringType(), False),
@@ -50,36 +44,20 @@ def create_kafka_stream(spark: SparkSession) -> DataFrame:
         .load()
     )
 
-    parsed_stream = (
+    return (
         raw_stream
         .select(
             F.col("topic").alias("kafka_topic"),
             F.col("partition").alias("kafka_partition"),
             F.col("offset").alias("kafka_offset"),
             F.col("timestamp").alias("kafka_timestamp"),
-            F.from_json(
-                F.col("value").cast("string"),
-                ARTICLE_SCHEMA,
-            ).alias("article"),
+            F.from_json(F.col("value").cast("string"), ARTICLE_SCHEMA).alias("article"),
         )
-        .select(
-            "kafka_topic",
-            "kafka_partition",
-            "kafka_offset",
-            "kafka_timestamp",
-            "article.*",
-        )
-        # Drop messages with missing required fields
-        .filter(
-            F.col("url").isNotNull()
-            & F.col("title").isNotNull()
-        )
+        .select("kafka_topic", "kafka_partition", "kafka_offset", "kafka_timestamp", "article.*")
+        .filter(F.col("url").isNotNull() & F.col("title").isNotNull())
         .withColumn("url_hash", md5_hash_udf(F.col("url")))
-        # Drop raw_html — not needed for processing, saves memory
         .drop("raw_html")
     )
-
-    return parsed_stream
 
 
 def create_kafka_batch(spark: SparkSession) -> DataFrame:
@@ -93,23 +71,15 @@ def create_kafka_batch(spark: SparkSession) -> DataFrame:
         .load()
     )
 
-    parsed_batch = (
+    return (
         raw_batch
         .select(
             F.col("topic").alias("kafka_topic"),
             F.col("timestamp").alias("kafka_timestamp"),
-            F.from_json(
-                F.col("value").cast("string"),
-                ARTICLE_SCHEMA,
-            ).alias("article"),
+            F.from_json(F.col("value").cast("string"), ARTICLE_SCHEMA).alias("article"),
         )
         .select("kafka_topic", "kafka_timestamp", "article.*")
-        .filter(
-            F.col("url").isNotNull()
-            & F.col("title").isNotNull()
-        )
+        .filter(F.col("url").isNotNull() & F.col("title").isNotNull())
         .withColumn("url_hash", md5_hash_udf(F.col("url")))
         .drop("raw_html")
     )
-
-    return parsed_batch

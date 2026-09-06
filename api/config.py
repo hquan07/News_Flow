@@ -1,31 +1,27 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-import os
+import clickhouse_connect
+
 
 class Settings(BaseSettings):
-    # App
     APP_NAME: str = "NewsPulse Insights Dashboard"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
 
-    # ClickHouse (warehouse)
     CLICKHOUSE_HOST: str = "clickhouse"
     CLICKHOUSE_PORT: int = 8123
     CLICKHOUSE_DB: str = "newspulse"
     CLICKHOUSE_USER: str = "admin"
     CLICKHOUSE_PASSWORD: str = "admin123"
 
-    # MongoDB (raw storage - for CRUD reads)
     MONGO_HOST: str = "localhost"
     MONGO_PORT: int = 27018
     MONGO_DB: str = "newspulse"
 
-    # Pagination defaults
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
-    # Spike detection
     SPIKE_THRESHOLD_MULTIPLIER: float = 2.0
     SPIKE_WINDOW_HOURS: int = 6
 
@@ -45,11 +41,13 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
-import clickhouse_connect
+
 
 _ch_client = None
 
+
 def get_ch_client():
+    """Singleton ClickHouse client to prevent file descriptor exhaustion."""
     global _ch_client
     if _ch_client is None:
         s = get_settings()
