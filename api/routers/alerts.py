@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.database import get_pg_session
 from api.services.analytics import get_alerts
 
 router = APIRouter(prefix="/alerts", tags=["Alerts & Anomalies"])

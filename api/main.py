@@ -7,7 +7,16 @@ import os
 
 from api.config import get_settings
 from api.database import lifespan_db
-from api.routers import articles, overview, trending, sources, alerts, entities
+from api.routers import (
+    articles,
+    overview,
+    trending,
+    sources,
+    alerts,
+    entities,
+    stream,
+    sentiment,
+)
 
 settings = get_settings()
 
@@ -48,6 +57,8 @@ app.include_router(trending.router, prefix=prefix)
 app.include_router(sources.router, prefix=prefix)
 app.include_router(alerts.router, prefix=prefix)
 app.include_router(entities.router, prefix=prefix)
+app.include_router(sentiment.router, prefix=prefix)
+app.include_router(stream.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])
@@ -61,29 +72,9 @@ async def health_check():
 
 @app.get("/", tags=["Root"])
 async def root():
-    # Serve dashboard if it exists
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path, media_type="text/html")
     return {
         "message": f"Welcome to {settings.APP_NAME}",
         "docs": "/docs",
         "health": "/health",
-        "dashboard": "/dashboard",
+        "stream": "/api/v1/stream",
     }
-
-
-# Mount static files for dashboard
-static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-
-@app.get("/dashboard", tags=["Dashboard"])
-async def dashboard():
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path, media_type="text/html")
-    return {"error": "Dashboard not found. Place index.html in /static/"}

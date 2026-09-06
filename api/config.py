@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
 
 class Settings(BaseSettings):
     # App
@@ -8,12 +9,12 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
 
-    # PostgreSQL (warehouse)
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str = "newspulse"
-    POSTGRES_USER: str = "newspulse"
-    POSTGRES_PASSWORD: str = "newspulse"
+    # ClickHouse (warehouse)
+    CLICKHOUSE_HOST: str = "clickhouse"
+    CLICKHOUSE_PORT: int = 8123
+    CLICKHOUSE_DB: str = "newspulse"
+    CLICKHOUSE_USER: str = "admin"
+    CLICKHOUSE_PASSWORD: str = "admin123"
 
     # MongoDB (raw storage - for CRUD reads)
     MONGO_HOST: str = "localhost"
@@ -29,18 +30,8 @@ class Settings(BaseSettings):
     SPIKE_WINDOW_HOURS: int = 6
 
     @property
-    def postgres_url(self) -> str:
-        return (
-            f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
-
-    @property
-    def postgres_async_url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+    def clickhouse_url(self) -> str:
+        return f"http://{self.CLICKHOUSE_HOST}:{self.CLICKHOUSE_PORT}"
 
     @property
     def mongo_url(self) -> str:
@@ -54,27 +45,19 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
-import psycopg2
+import clickhouse_connect
 
-def get_pg_connection():
-    s = get_settings()
-    return psycopg2.connect(
-        host=s.POSTGRES_HOST,
-        port=s.POSTGRES_PORT,
-        dbname=s.POSTGRES_DB,
-        user=s.POSTGRES_USER,
-        password=s.POSTGRES_PASSWORD,
-    )
+_ch_client = None
 
-
-import psycopg2
-
-def get_pg_connection():
-    s = get_settings()
-    return psycopg2.connect(
-        host=s.POSTGRES_HOST,
-        port=s.POSTGRES_PORT,
-        dbname=s.POSTGRES_DB,
-        user=s.POSTGRES_USER,
-        password=s.POSTGRES_PASSWORD,
-    )
+def get_ch_client():
+    global _ch_client
+    if _ch_client is None:
+        s = get_settings()
+        _ch_client = clickhouse_connect.get_client(
+            host=s.CLICKHOUSE_HOST,
+            port=s.CLICKHOUSE_PORT,
+            username=s.CLICKHOUSE_USER,
+            password=s.CLICKHOUSE_PASSWORD,
+            database=s.CLICKHOUSE_DB,
+        )
+    return _ch_client

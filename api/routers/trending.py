@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from api.database import get_pg_session
 from api.models.schemas import TimeRangeEnum
 from api.services.analytics import (
     get_trending_keywords,
