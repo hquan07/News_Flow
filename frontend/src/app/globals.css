@@ -46,6 +46,7 @@ h1 {
   font-weight: 700;
   background: linear-gradient(to right, #60a5fa, #a78bfa);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 0.5rem;
 }
@@ -120,8 +121,8 @@ h1 {
 /* Panels */
 .glass-panel {
   background: var(--panel-bg);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 1.5rem;
@@ -168,6 +169,7 @@ h1 {
   font-weight: 700;
   background: linear-gradient(135deg, #fff, #94a3b8);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -297,6 +299,7 @@ h1 {
   bottom: 2rem;
   right: 2rem;
   background: rgba(239, 68, 68, 0.9);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   color: #fff;
   padding: 1rem 1.5rem;
