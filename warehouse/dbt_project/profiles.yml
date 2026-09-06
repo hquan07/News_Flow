@@ -1,0 +1,10 @@
+newspulse:
+  target: dev
+  outputs:
+    dev:
+      type: clickhouse
+      schema: newspulse
+      host: clickhouse
+      port: 8123
+      user: admin
+      password: admin123

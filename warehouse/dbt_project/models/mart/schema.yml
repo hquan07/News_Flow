@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: fact_article_metrics
+    description: "Combined fact table of articles with their sentiment and entity stats."

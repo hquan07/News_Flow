@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: newspulse
+    tables:
+      - name: raw_articles
+      - name: raw_article_keywords
+      - name: raw_article_entities
+      - name: raw_article_sentiment
