@@ -225,3 +225,52 @@ def get_entity_sentiment(time_range="7d", limit=15):
             
     sorted_entities = sorted(list(entities_data.values()), key=lambda x: x["total"], reverse=True)
     return sorted_entities
+
+def get_entity_knowledge_graph(time_range="7d", limit=30):
+    where = _resolve_time_range(time_range, "loaded_at")
+
+    top_entities_sql = f"""
+        SELECT entity AS id, any(entity_type) AS group, count() AS val
+        FROM newspulse.raw_article_entities
+        WHERE {where}
+        GROUP BY entity
+        ORDER BY val DESC
+        LIMIT {limit}
+    """
+    nodes_raw = _query(top_entities_sql)
+
+    if not nodes_raw:
+        return {"nodes": [], "links": []}
+        
+    where_e1 = where.replace("loaded_at", "e1.loaded_at").replace("publish_time", "e1.publish_time")
+    where_e2 = where.replace("loaded_at", "e2.loaded_at").replace("publish_time", "e2.publish_time")
+
+    edge_query = f"""
+        WITH top_entities AS (
+            SELECT entity FROM newspulse.raw_article_entities
+            WHERE {where}
+            GROUP BY entity ORDER BY count() DESC LIMIT {limit}
+        )
+        SELECT
+            e1.entity AS source,
+            e2.entity AS target,
+            count(DISTINCT e1.url_hash) AS weight
+        FROM newspulse.raw_article_entities e1
+        JOIN newspulse.raw_article_entities e2 ON e1.url_hash = e2.url_hash
+        WHERE {where_e1}
+          AND {where_e2}
+          AND e1.entity IN (SELECT entity FROM top_entities)
+          AND e2.entity IN (SELECT entity FROM top_entities)
+          AND e1.entity < e2.entity
+        GROUP BY source, target
+        HAVING weight > 0
+        ORDER BY weight DESC
+        LIMIT 100
+    """
+    links_raw = _query(edge_query)
+
+    nodes = [{"id": n["id"], "name": n["id"], "val": n["val"], "group": n["group"]} for n in nodes_raw]
+    links = [{"source": l["source"], "target": l["target"], "weight": l["weight"]} for l in links_raw]
+
+    return {"nodes": nodes, "links": links}
+

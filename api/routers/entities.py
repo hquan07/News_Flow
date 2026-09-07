@@ -37,3 +37,11 @@ def entity_sentiment(
 ):
     from api.services.analytics import get_entity_sentiment
     return get_entity_sentiment(time_range=time_range.value, limit=limit)
+
+@router.get("/knowledge-graph")
+def entity_knowledge_graph(
+        time_range: TimeRangeEnum = Query(default=TimeRangeEnum.week),
+        limit: int = Query(default=30, ge=1, le=100)
+):
+    from api.services.analytics import get_entity_knowledge_graph
+    return get_entity_knowledge_graph(time_range=time_range.value, limit=limit)

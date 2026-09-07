@@ -5,7 +5,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { Activity, BookOpen, BarChart2, Radio, ThumbsUp, Hash, Users, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Activity, BookOpen, BarChart2, Radio, ThumbsUp, Hash, Users, MessageSquare, AlertTriangle, Share2 } from 'lucide-react';
+import KnowledgeGraph from '@/components/KnowledgeGraph';
 
 const API_BASE = 'http://localhost:8001/api/v1';
 
@@ -53,6 +54,7 @@ export default function Home() {
   const [trendingKeywords, setTrendingKeywords] = useState<any[]>([]);
   const [entityTypeDist, setEntityTypeDist] = useState<any[]>([]);
   const [entitySentiment, setEntitySentiment] = useState<any[]>([]);
+  const [knowledgeGraph, setKnowledgeGraph] = useState<any>({nodes: [], links: []});
 
   const sseRef = useRef<EventSource | null>(null);
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
@@ -89,6 +91,11 @@ export default function Home() {
     if (results[3].status === 'fulfilled') setEntitySentiment(results[3].value || []);
   }, []);
 
+  const fetchNetwork = useCallback(async () => {
+    const result = await safeFetch(`${API_BASE}/entities/knowledge-graph`);
+    setKnowledgeGraph(result);
+  }, []);
+
   const fetchArticles = useCallback(async (p: number) => {
     const result = await safeFetch(`${API_BASE}/articles?page=${p}&page_size=20`);
     setArticles(result.data || []);
@@ -104,6 +111,7 @@ export default function Home() {
         if (activeTab === 'overview') await fetchOverview();
         else if (activeTab === 'sentiment') await fetchSentiment();
         else if (activeTab === 'entities') await fetchEntities();
+        else if (activeTab === 'network') await fetchNetwork();
         else if (activeTab === 'articles') await fetchArticles(page);
         if (!cancelled) setApiError(null);
       } catch (err: any) {
@@ -114,7 +122,7 @@ export default function Home() {
     poll();
     const intervalId = setInterval(poll, 15000);
     return () => { cancelled = true; clearInterval(intervalId); };
-  }, [activeTab, page, fetchOverview, fetchSentiment, fetchEntities, fetchArticles]);
+  }, [activeTab, page, fetchOverview, fetchSentiment, fetchEntities, fetchNetwork, fetchArticles]);
 
   // SSE with auto-reconnect
   useEffect(() => {
@@ -178,6 +186,9 @@ export default function Home() {
         </button>
         <button className={`tab-btn ${activeTab === 'entities' ? 'active' : ''}`} onClick={() => setActiveTab('entities')}>
           <Hash size={18} /> Entities & NLP
+        </button>
+        <button className={`tab-btn ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>
+          <Share2 size={18} /> Network
         </button>
         <button className={`tab-btn ${activeTab === 'articles' ? 'active' : ''}`} onClick={() => { setActiveTab('articles'); setPage(1); }}>
           <BookOpen size={18} /> Articles
@@ -529,6 +540,17 @@ export default function Home() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'network' && (
+        <div className="glass-panel" style={{ height: '700px', display: 'flex', flexDirection: 'column' }}>
+          <div className="panel-header">
+            <div className="panel-title"><Share2 size={20} /> Entity Knowledge Graph</div>
+          </div>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <KnowledgeGraph data={knowledgeGraph} />
           </div>
         </div>
       )}
