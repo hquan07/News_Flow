@@ -47,3 +47,21 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_sentiment (
     loaded_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(loaded_at)
 ORDER BY (url_hash);
+
+-- Raw AI Summaries (Groq LLM)
+CREATE TABLE IF NOT EXISTS newspulse.raw_article_summaries (
+    url_hash String,
+    summary String,
+    model_name String,
+    processed_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(processed_at)
+ORDER BY (url_hash);
+
+-- Raw AI Embeddings (Sentence Transformers)
+CREATE TABLE IF NOT EXISTS newspulse.raw_article_embeddings (
+    url_hash String,
+    embedding Array(Float32),
+    model_name String,
+    processed_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(processed_at)
+ORDER BY (url_hash);
