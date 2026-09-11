@@ -9,6 +9,7 @@ def _resolve_time_range(time_range, date_column="publish_time"):
         "7d": f"{date_column} >= now() - INTERVAL 7 DAY",
         "30d": f"{date_column} >= now() - INTERVAL 30 DAY",
         "90d": f"{date_column} >= now() - INTERVAL 90 DAY",
+        "all": "1 = 1",
     }
     return mapping.get(time_range, mapping["7d"])
 
@@ -21,6 +22,9 @@ def _query(sql, params=None):
     except Exception as e:
         print(f"ClickHouse Query Error: {e}")
         return []
+    finally:
+        if hasattr(client, 'close'):
+            client.close()
 
 
 def _query_one(sql, params=None):

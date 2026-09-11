@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from api.config import get_settings
 from api.database import lifespan_db
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, chat
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment
 
 settings = get_settings()
 
@@ -44,7 +44,7 @@ app.include_router(alerts.router, prefix=prefix)
 app.include_router(entities.router, prefix=prefix)
 app.include_router(sentiment.router, prefix=prefix)
 app.include_router(stream.router, prefix=prefix)
-app.include_router(chat.router, prefix=prefix)
+
 
 
 @app.get("/health", tags=["Health"])
