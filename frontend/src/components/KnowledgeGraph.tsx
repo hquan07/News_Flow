@@ -50,7 +50,9 @@ export default function KnowledgeGraph({ data }: GraphProps) {
       graphRef.current.d3Force('center').strength(0.05);
 
       setTimeout(() => {
-        graphRef.current.zoomToFit(400, 50);
+        if (graphRef.current) {
+          graphRef.current.zoomToFit(400, 50);
+        }
       }, 800);
     }
   }, [data]);
@@ -104,7 +106,8 @@ export default function KnowledgeGraph({ data }: GraphProps) {
     
     // Draw node circle
     const color = COLOR_MAP[node.group?.toUpperCase()] || COLOR_MAP.default;
-    const radius = Math.sqrt(node.val) * 1.5 + 2; 
+    // Use logarithmic scaling to prevent extremely large nodes
+    const radius = Math.min(Math.max(Math.log2(node.val + 1) * 3, 3), 30);
     
     ctx.beginPath();
     ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);

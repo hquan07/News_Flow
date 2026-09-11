@@ -11,7 +11,7 @@ router = APIRouter(prefix="/overview", tags=["Overview"])
 @router.get("", response_model=OverviewResponse)
 def overview(
         time_range: TimeRangeEnum = Query(
-            default=TimeRangeEnum.today,
+            default=TimeRangeEnum.week,
             description="Time range: today, 7d, 30d, all",
         ),
         source: Optional[str] = Query(None, description="Filter by source"),

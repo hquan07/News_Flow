@@ -28,4 +28,9 @@ RUN pip install --no-cache-dir \
     scrapy==2.11.2 \
     fake-useragent==1.5.1 \
     feedparser==6.0.11 \
-    itemadapter>=0.8.0
+    itemadapter>=0.8.0 \
+    clickhouse-connect==0.7.0 \
+    groq>=0.9.0 \
+    sentence-transformers==2.5.1 \
+    "httpx>=0.25.0,<0.28.0" \
+    "numpy<2.0.0"

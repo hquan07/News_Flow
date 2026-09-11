@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { Activity, BookOpen, BarChart2, Radio, ThumbsUp, Hash, Users, MessageSquare, AlertTriangle, Share2 } from 'lucide-react';
 import KnowledgeGraph from '@/components/KnowledgeGraph';
+import AlertsPanel from '@/components/AlertsPanel';
 
 const API_BASE = 'http://localhost:8001/api/v1';
 
@@ -63,7 +64,7 @@ export default function Home() {
 
   // Smart fetch: only load data relevant to the active tab
   const fetchOverview = useCallback(async () => {
-    const result = await safeFetch(`${API_BASE}/overview`);
+    const result = await safeFetch(`${API_BASE}/overview?time_range=all`);
     setOverviewData(result);
   }, []);
 
@@ -195,6 +196,9 @@ export default function Home() {
         </button>
         <button className={`tab-btn ${activeTab === 'stream' ? 'active' : ''}`} onClick={() => setActiveTab('stream')}>
           <Radio size={18} /> Live Stream
+        </button>
+        <button className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
+          <AlertTriangle size={18} /> Alerts
         </button>
       </div>
 
@@ -642,6 +646,12 @@ export default function Home() {
             )}
           </div>
         </div>
+      )}
+
+
+
+      {activeTab === 'alerts' && (
+        <AlertsPanel />
       )}
 
       {apiError && (

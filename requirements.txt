@@ -24,7 +24,7 @@ pydantic-settings>=2.0.0
 loguru==0.7.3
 motor==3.6.0
 asyncpg>=0.29.0
-httpx>=0.25.0
+httpx>=0.25.0,<0.28.0
 itemadapter>=0.8.0
 pytest==8.3.3
 pytest-asyncio==0.24.0
