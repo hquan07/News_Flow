@@ -12,8 +12,10 @@ A real-time news analysis platform that collects and processes articles from Vie
 - **Streaming Pipeline** with Kafka → Spark Structured Streaming.
 - **Vietnamese NLP** — keyword extraction, Named Entity Recognition (PhoBERT), and sentiment analysis.
 - **Real-time Data Warehouse** powered by **ClickHouse**, offering sub-second query performance for analytics.
+- **Data Quality & Alerting** — automated Airflow DAGs using Great Expectations for validation, with Telegram bot integration for anomaly detection.
+- **Historical Backfilling Tools** — Optimized offline scripts for fast ingestion of massive historical dumps to ClickHouse and batch NLP extraction using multiprocessing.
 - **REST API** powered by FastAPI serving analytics endpoints.
-- **Custom Dashboard** built with **Next.js**, React, Recharts, and TailwindCSS (optional) for real-time visualization — tracking trends, source comparisons, entity networks, and volume spikes.
+- **Custom Dashboard** built with **Next.js**, React, Recharts, and TailwindCSS (optional) for real-time visualization — tracking trends, source comparisons, entity networks, volume spikes, and system alerts.
 - **Monitoring** — Docker healthchecks and Python-based monitoring scripts.
 - **100% Containerized** — a single `start.sh` or `docker compose up -d` brings up the entire infrastructure.
 
@@ -43,8 +45,10 @@ flowchart TD
         C3[Tiền Phong]
     end
 
-    subgraph "Orchestration"
+    subgraph "Orchestration & Data Quality"
         O[Apache Airflow]
+        GX[Great Expectations]
+        AL[Anomaly Alerting]
     end
 
     subgraph "Message Broker"
@@ -67,10 +71,20 @@ flowchart TD
         L[FastAPI Backend]
         M[Next.js Dashboard]
     end
+    
+    subgraph "Monitoring"
+        T[Telegram Bot]
+    end
 
     D[Scrapy Pipeline]
 
     O -.->|Schedules| D
+    O -.->|Triggers| GX
+    O -.->|Triggers| AL
+    GX -.->|Validates Data| J
+    AL -.->|Queries Metrics| J
+    AL -->|Push Notifications| T
+
     A --> D
     B --> D
     C --> D
@@ -97,6 +111,7 @@ flowchart TD
     classDef api fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#000;
     classDef frontend fill:#e0f7fa,stroke:#00acc1,stroke-width:2px,color:#000;
     classDef orchestrator fill:#fce4ec,stroke:#d81b60,stroke-width:2px,color:#000;
+    classDef monitor fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
 
     class A,B,C,C1,C2,C3 source;
     class E broker;
@@ -104,7 +119,8 @@ flowchart TD
     class J,K storage;
     class L api;
     class M frontend;
-    class O orchestrator;
+    class O,GX,AL orchestrator;
+    class T monitor;
 ```
 
 ## Installation & Setup
@@ -176,7 +192,7 @@ News_Flow/
 
 ## Dashboard
 
-The Next.js dashboard includes 4 primary views:
+The Next.js dashboard includes 5 primary views:
 
 | Page | Content |
 |-------|---------|
@@ -184,6 +200,7 @@ The Next.js dashboard includes 4 primary views:
 | **Trending** | Top trending keywords, temporal trends, and keyword co-occurrences |
 | **Sources** | Source composition by category and article ingestion speed |
 | **Entities** | People, Locations, and Organizations tracking |
+| **Alerts** | Active system alerts, data anomaly detection history, and automated Telegram notifications |
 
 ## Monitoring
 
@@ -192,6 +209,8 @@ The Next.js dashboard includes 4 primary views:
 | Docker Healthchecks | Integrated health checks for all services (Kafka, ClickHouse, Spark, API) |
 | `/health` | FastAPI endpoint for deep-checking the API |
 | `health_monitor.py` | CLI tool for system validation returning standard exit codes (0/1) |
+| Telegram Bot | Push notifications for data pipeline anomalies and latency spikes |
+| Great Expectations | Automated data quality validation suites running in Airflow |
 
 ## Performance Tuning
 

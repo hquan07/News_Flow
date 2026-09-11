@@ -29,4 +29,6 @@ logs/
 
 # OS
 .DS_Store
-Thumbs.dbdata_platform/warehouse/articles_dump.json
+Thumbs.db
+
+data_platform/warehouse/articles_dump.json
