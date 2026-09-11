@@ -42,6 +42,29 @@ def alerting_pipeline():
             
             alerts = []
             
+            # 0. Phát hiện Volume Spike (Bão tin tức)
+            volume_query = """
+                WITH hourly AS (
+                    SELECT toStartOfHour(publish_time) AS hour_slot, count() AS cnt 
+                    FROM newspulse.raw_articles 
+                    WHERE publish_time >= now() - INTERVAL 7 DAY GROUP BY hour_slot
+                ), stats AS (
+                    SELECT avg(cnt) AS avg_cnt, stddevPop(cnt) AS std_cnt FROM hourly
+                ) 
+                SELECT h.hour_slot, h.cnt AS article_count, toInt32(s.avg_cnt) AS avg_count 
+                FROM hourly h, stats s 
+                WHERE h.cnt > s.avg_cnt + 2.0 * s.std_cnt 
+                  AND h.hour_slot >= toStartOfHour(now() - INTERVAL 2 HOUR)
+                ORDER BY h.hour_slot DESC
+            """
+            volume_results = client.query_df(volume_query)
+            if not volume_results.empty:
+                vol_msg = "🌪 <b>BÃO TIN TỨC (VOLUME SPIKE)</b>:\n"
+                for _, row in volume_results.iterrows():
+                    surge = round(row['article_count'] / max(row['avg_count'], 1), 1)
+                    vol_msg += f"- Khung giờ <b>{row['hour_slot'].strftime('%H:%M %d/%m')}</b>: {row['article_count']} tin (Tăng <b>{surge}x</b> so với TB {row['avg_count']})\n"
+                alerts.append(vol_msg)
+
             # 1. Phát hiện Trending Spike (Z-Score > 2.0 cho Keyword)
             # Truy vấn số lượng keyword xuất hiện trong 1 giờ qua so với trung bình 24h
             trend_query = """
