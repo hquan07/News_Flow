@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_articles (
     keyword_count Int32,
     publish_hour Int16,
     crawl_latency_minutes Float32,
+    clickbait_score Float32 DEFAULT 0.0,
     crawled_at DateTime,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(loaded_at)
@@ -66,7 +67,7 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_embeddings (
 ) ENGINE = ReplacingMergeTree(processed_at)
 ORDER BY (url_hash);
 
--- Social Sentiment Metrics
+-- Social Sentiment Metrics (Mạng xã hội)
 CREATE TABLE IF NOT EXISTS newspulse.social_sentiment_metrics (
     post_id String,
     source String,
@@ -78,8 +79,21 @@ CREATE TABLE IF NOT EXISTS newspulse.social_sentiment_metrics (
     sentiment_score Float32,
     sentiment_label String,
     publish_time DateTime,
-    crawled_at DateTime,
+    crawled_at DateTime DEFAULT now(),
     loaded_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(loaded_at)
-ORDER BY (post_id);
+PARTITION BY toYYYYMM(publish_time)
+ORDER BY (source, publish_time, post_id);
 
+-- Event Clusters (Topic Modeling)
+CREATE TABLE IF NOT EXISTS newspulse.event_clusters (
+    cluster_id String,
+    cluster_name String,
+    top_keywords Array(String),
+    article_count Int32,
+    avg_sentiment Float32,
+    start_time DateTime,
+    end_time DateTime,
+    created_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (start_time, cluster_id);

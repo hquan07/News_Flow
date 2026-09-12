@@ -15,6 +15,7 @@ from spark.processing.text_processor import apply_text_cleaning
 from spark.processing.keyword_extractor import apply_keyword_extraction
 from spark.processing.ner_pipeline import apply_ner_extraction
 from spark.processing.sentiment_pipeline import apply_sentiment_analysis, apply_social_sentiment_analysis
+from spark.processing.clickbait_detector import apply_clickbait_detection
 from config.spark_config import STREAMING_TRIGGER_INTERVAL
 
 
@@ -31,6 +32,7 @@ def main():
     with_keywords = apply_keyword_extraction(cleaned_stream)
     enriched_stream = apply_ner_extraction(with_keywords)
     enriched_stream = apply_sentiment_analysis(enriched_stream)
+    enriched_stream = apply_clickbait_detection(enriched_stream)
 
     def _write_all_batch(batch_df, batch_id):
         if batch_df.isEmpty():
@@ -54,6 +56,7 @@ def main():
             F.col("keyword_count"),
             F.col("publish_hour"),
             F.col("crawl_latency_minutes"),
+            F.col("clickbait_score"),
             F.coalesce(F.col("crawled_timestamp"), F.current_timestamp()).alias("crawled_at"),
             F.current_timestamp().alias("loaded_at"),
         ).fillna({
@@ -67,7 +70,8 @@ def main():
             "word_count": 0,
             "keyword_count": 0,
             "publish_hour": 0,
-            "crawl_latency_minutes": 0.0
+            "crawl_latency_minutes": 0.0,
+            "clickbait_score": 0.0
         })
         
         from spark.streaming.sink_writers import write_to_clickhouse_batch
