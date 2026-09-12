@@ -39,6 +39,8 @@ async function safeFetch(url: string): Promise<any> {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [dashboardMode, setDashboardMode] = useState<'news' | 'social'>('news');
+  const [selectedSource, setSelectedSource] = useState<string>('');
   const [feed, setFeed] = useState<FeedEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -64,20 +66,27 @@ export default function Home() {
 
   // Smart fetch: only load data relevant to the active tab
   const fetchOverview = useCallback(async () => {
-    const result = await safeFetch(`${API_BASE}/overview?time_range=all`);
-    setOverviewData(result);
-  }, []);
+    const sourceParam = selectedSource ? `&source=${selectedSource}` : '';
+    if (dashboardMode === 'news') {
+      const result = await safeFetch(`${API_BASE}/overview?time_range=all${sourceParam}`);
+      setOverviewData(result);
+    } else {
+      const result = await safeFetch(`${API_BASE}/social/overview?time_range=all${sourceParam}`);
+      setOverviewData(result);
+    }
+  }, [dashboardMode, selectedSource]);
 
   const fetchSentiment = useCallback(async () => {
+    const sourceParam = selectedSource ? `?source=${selectedSource}` : '';
     const results = await Promise.allSettled([
-      safeFetch(`${API_BASE}/sentiment/distribution`),
-      safeFetch(`${API_BASE}/sentiment/timeline`),
-      safeFetch(`${API_BASE}/sentiment/sources`),
+      safeFetch(`${API_BASE}/sentiment/distribution${sourceParam}`),
+      safeFetch(`${API_BASE}/sentiment/timeline${sourceParam}`),
+      safeFetch(`${API_BASE}/sentiment/sources${sourceParam}`),
     ]);
     if (results[0].status === 'fulfilled') setSentimentDist(results[0].value.data || []);
     if (results[1].status === 'fulfilled') setSentimentTimeline(results[1].value.data || []);
     if (results[2].status === 'fulfilled') setSentimentSources(results[2].value.data || []);
-  }, []);
+  }, [selectedSource, dashboardMode]);
 
   const fetchEntities = useCallback(async () => {
     const results = await Promise.allSettled([
@@ -90,18 +99,18 @@ export default function Home() {
     if (results[1].status === 'fulfilled') setTrendingKeywords(results[1].value || []);
     if (results[2].status === 'fulfilled') setEntityTypeDist(results[2].value || []);
     if (results[3].status === 'fulfilled') setEntitySentiment(results[3].value || []);
-  }, []);
+  }, [selectedSource, dashboardMode]);
 
   const fetchNetwork = useCallback(async () => {
     const result = await safeFetch(`${API_BASE}/entities/knowledge-graph`);
     setKnowledgeGraph(result);
-  }, []);
+  }, [selectedSource, dashboardMode]);
 
   const fetchArticles = useCallback(async (p: number) => {
     const result = await safeFetch(`${API_BASE}/articles?page=${p}&page_size=20`);
     setArticles(result.data || []);
     setArticlesMeta(result);
-  }, []);
+  }, [selectedSource, dashboardMode]);
 
   // Tab-aware polling
   useEffect(() => {
@@ -152,7 +161,7 @@ export default function Home() {
       sseRef.current?.close();
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
     };
-  }, []);
+  }, [selectedSource, dashboardMode]);
 
   // Auto-hide error toast after 5 seconds
   useEffect(() => {
@@ -173,12 +182,52 @@ export default function Home() {
 
   return (
     <div className="container">
-      <header>
-        <h1>NewsPulse Intelligence</h1>
-        <p className="subtitle">Real-time Data Pipeline Dashboard</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1>NewsPulse Intelligence</h1>
+          <p className="subtitle">Real-time Data Pipeline Dashboard</p>
+        </div>
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <div className="mode-toggle" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', padding: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <button 
+              onClick={() => { setDashboardMode('news'); setSelectedSource(''); setActiveTab('overview'); }}
+              style={{ padding: '6px 16px', border: 'none', background: dashboardMode === 'news' ? '#3b82f6' : 'transparent', color: 'white', borderRadius: '16px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.3s' }}
+            >
+              📰 Official News
+            </button>
+            <button 
+              onClick={() => { setDashboardMode('social'); setSelectedSource(''); setActiveTab('overview'); }}
+              style={{ padding: '6px 16px', border: 'none', background: dashboardMode === 'social' ? '#8b5cf6' : 'transparent', color: 'white', borderRadius: '16px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.3s' }}
+            >
+              💬 Social Media
+            </button>
+          </div>
+          <select 
+            value={selectedSource} 
+            onChange={(e) => setSelectedSource(e.target.value)}
+            style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', outline: 'none', cursor: 'pointer' }}
+          >
+            <option value="">All Sources</option>
+            {dashboardMode === 'news' ? (
+              <>
+                <option value="vnexpress">VnExpress</option>
+                <option value="tuoitre">Tuổi Trẻ</option>
+                <option value="thanhnien">Thanh Niên</option>
+                <option value="dantri">Dân Trí</option>
+                <option value="vietnamnet">VietnamNet</option>
+              </>
+            ) : (
+              <>
+                <option value="voz">Voz Forum</option>
+                <option value="reddit_vn">Reddit VN</option>
+                <option value="youtube_comments">YouTube Comments</option>
+              </>
+            )}
+          </select>
+        </div>
       </header>
 
-      <div className="tabs">
+      <div className="tabs" style={{ display: dashboardMode === 'social' ? 'none' : 'flex' }}>
         <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
           <Activity size={18} /> Overview
         </button>
@@ -202,7 +251,7 @@ export default function Home() {
         </button>
       </div>
 
-      {activeTab === 'overview' && (
+      {activeTab === 'overview' && dashboardMode === 'news' && (
         <>
           <div className="overview-grid">
             {overviewData?.kpi_cards?.map((kpi: any, i: number) => {
@@ -347,6 +396,114 @@ export default function Home() {
           </div>
         </>
       )}
+      {activeTab === 'overview' && dashboardMode === 'social' && (
+        <>
+          <div className="overview-grid">
+            {overviewData?.kpi_cards?.map((kpi: any, i: number) => (
+              <div key={i} className="glass-panel metric-card">
+                <div className="metric-content">
+                  <div className="metric-label">{kpi.label}</div>
+                  <div className="metric-value">{kpi.value}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="charts-grid">
+            <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
+              <div className="panel-header">
+                <div className="panel-title"><MessageSquare size={20} /> Top Social Debates</div>
+              </div>
+              <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Post/Video Title</th>
+                      <th>Source</th>
+                      <th>Engagement</th>
+                      <th>Sentiment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overviewData?.top_debates?.map((a: any, i: number) => (
+                      <tr key={i}>
+                        <td style={{ maxWidth: '400px', whiteSpace: 'normal' }}>
+                          <strong>{a.title}</strong>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            {a.content?.substring(0, 100)}...
+                          </div>
+                        </td>
+                        <td><span className={`tag ${a.source}`}>{a.source}</span></td>
+                        <td>
+                          <div style={{ fontSize: '0.9rem' }}>👍 {a.like_count || 0}</div>
+                          <div style={{ fontSize: '0.9rem', color: '#8b5cf6' }}>💬 {a.reply_count || 0} replies</div>
+                        </td>
+                        <td>
+                          <span style={{ color: a.sentiment_score > 0 ? 'var(--accent-green)' : a.sentiment_score < 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: 'bold' }}>
+                            {a.sentiment_score?.toFixed(2) || '0.00'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="glass-panel">
+              <div className="panel-header">
+                <div className="panel-title"><ThumbsUp size={20} /> Sentiment Comparison</div>
+              </div>
+              <div style={{ height: 300, width: '100%' }}>
+                {overviewData?.sentiment_distribution?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={overviewData.sentiment_distribution} dataKey="count" nameKey="sentiment" cx="50%" cy="50%" outerRadius={100} label>
+                        {overviewData.sentiment_distribution.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={entry.sentiment === 'positive' ? 'var(--accent-green)' : entry.sentiment === 'negative' ? '#ef4444' : '#94a3b8'} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} itemStyle={{ color: '#fff' }}/>
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                    No sentiment data available
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="glass-panel">
+              <div className="panel-header">
+                <div className="panel-title"><Activity size={20} /> Sentiment Timeline</div>
+              </div>
+              <div style={{ height: 300, width: '100%' }}>
+                {overviewData?.sentiment_timeline?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={overviewData.sentiment_timeline}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                      <Legend />
+                      <Line type="monotone" dataKey="Positive" stroke="var(--accent-green)" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Neutral" stroke="#94a3b8" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                    No timeline data available
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
 
       {activeTab === 'sentiment' && (
         <div className="charts-grid">

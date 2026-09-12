@@ -65,3 +65,21 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_embeddings (
     processed_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(processed_at)
 ORDER BY (url_hash);
+
+-- Social Sentiment Metrics
+CREATE TABLE IF NOT EXISTS newspulse.social_sentiment_metrics (
+    post_id String,
+    source String,
+    title String,
+    content String,
+    like_count Int32,
+    upvote_ratio Float32,
+    reply_count Int32,
+    sentiment_score Float32,
+    sentiment_label String,
+    publish_time DateTime,
+    crawled_at DateTime,
+    loaded_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(loaded_at)
+ORDER BY (post_id);
+
