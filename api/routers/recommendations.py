@@ -31,7 +31,7 @@ def get_recommendations(user: dict = Depends(get_current_user)):
     if not interacted_data:
         # Fallback: Just return trending articles
         articles = _query(
-            "SELECT url_hash, url, title, content, author, source, category, publish_time, clickbait_score "
+            "SELECT url_hash, url, title, content, author, source, category, publish_time "
             "FROM newspulse.raw_articles ORDER BY publish_time DESC LIMIT 20"
         )
     else:
@@ -41,7 +41,7 @@ def get_recommendations(user: dict = Depends(get_current_user)):
         hash_list_str = "','".join(hashes)
         
         articles = _query(
-            f"SELECT url_hash, url, title, content, author, source, category, publish_time, clickbait_score "
+            f"SELECT url_hash, url, title, content, author, source, category, publish_time "
             f"FROM newspulse.raw_articles "
             f"WHERE url_hash NOT IN ('{hash_list_str}') "
             f"ORDER BY publish_time DESC LIMIT 20"

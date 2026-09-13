@@ -49,6 +49,8 @@ def social_overview(
 
     # Source distribution
     source_dist = [{"source": row["source"], "count": row["post_count"]} for row in daily_data]
+    likes_dist = [{"source": row["source"], "count": row["total_likes"]} for row in daily_data]
+    replies_dist = [{"source": row["source"], "count": row["total_replies"]} for row in daily_data]
 
     return {
         "kpi_cards": [
@@ -58,7 +60,9 @@ def social_overview(
             {"label": "Active Platforms", "value": len(daily_data)}
         ],
         "engagement_timeline": engagement_timeline,
-        "source_distribution": source_dist
+        "source_distribution": source_dist,
+        "likes_distribution": likes_dist,
+        "replies_distribution": replies_dist
     }
 
 @router.get("/sentiment")
@@ -79,7 +83,7 @@ def social_sentiment(
         f"GROUP BY sentiment_label",
         params,
     )
-    sentiment_dist = [{"sentiment": row["sentiment_label"], "count": row["count"]} for row in sentiment_data]
+    sentiment_dist = [{"sentiment_label": row["sentiment_label"].capitalize(), "count": row["count"]} for row in sentiment_data]
     
     # Timeline
     timeline_data = _query(

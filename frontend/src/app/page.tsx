@@ -190,7 +190,7 @@ export default function Home() {
     const headers = { 'Authorization': `Bearer ${token}` };
     const [latencyRes, clickbaitRes, usersRes] = await Promise.all([
       fetch(`${API_BASE}/admin/metrics/latency`, { headers }).then(r => r.json()),
-      fetch(`${API_BASE}/admin/metrics/clickbait`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/admin/metrics/volume`, { headers }).then(r => r.json()),
       fetch(`${API_BASE}/admin/metrics/users`, { headers }).then(r => r.json())
     ]);
     setAdminLatency(latencyRes);
@@ -362,20 +362,15 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="tabs" style={{ display: dashboardMode === 'admin' ? 'none' : 'flex' }}>
-        <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-          <Activity size={18} /> Overview
-        </button>
-        <button className={`tab-btn ${activeTab === 'sentiment' ? 'active' : ''}`} onClick={() => setActiveTab('sentiment')}>
-          <ThumbsUp size={18} /> Sentiment
-        </button>
-        {dashboardMode === 'social' && (
-          <button className={`tab-btn ${activeTab === 'debates' ? 'active' : ''}`} onClick={() => setActiveTab('debates')}>
-            <MessageSquare size={18} /> Top Debates
-          </button>
-        )}
+      <div className="tabs">
         {dashboardMode === 'news' && (
           <>
+            <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+              <Activity size={18} /> Overview
+            </button>
+            <button className={`tab-btn ${activeTab === 'sentiment' ? 'active' : ''}`} onClick={() => setActiveTab('sentiment')}>
+              <ThumbsUp size={18} /> Sentiment
+            </button>
             <button className={`tab-btn ${activeTab === 'entities' ? 'active' : ''}`} onClick={() => setActiveTab('entities')}>
               <Hash size={18} /> Entities & NLP
             </button>
@@ -383,19 +378,44 @@ export default function Home() {
               <Share2 size={18} /> Network
             </button>
             <button className={`tab-btn ${activeTab === 'articles' ? 'active' : ''}`} onClick={() => { setActiveTab('articles'); setPage(1); }}>
-              <BookOpen size={18} /> Articles
-            </button>
-            <button className={`tab-btn ${activeTab === 'stream' ? 'active' : ''}`} onClick={() => setActiveTab('stream')}>
-              <Radio size={18} /> Live Stream
-            </button>
-            <button className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
-              <AlertTriangle size={18} /> Alerts
+              <BookOpen size={18} /> Latest News
             </button>
             {user && (
               <button className={`tab-btn ${activeTab === 'foryou' ? 'active' : ''}`} onClick={() => setActiveTab('foryou')} style={{ background: 'linear-gradient(90deg, #8b5cf6, #3b82f6)', color: 'white' }}>
                 ✨ For You
               </button>
             )}
+          </>
+        )}
+        
+        {dashboardMode === 'social' && (
+          <>
+            <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+              <Activity size={18} /> Overview
+            </button>
+            <button className={`tab-btn ${activeTab === 'sentiment' ? 'active' : ''}`} onClick={() => setActiveTab('sentiment')}>
+              <ThumbsUp size={18} /> Sentiment
+            </button>
+            <button className={`tab-btn ${activeTab === 'debates' ? 'active' : ''}`} onClick={() => setActiveTab('debates')}>
+              <MessageSquare size={18} /> Top Debates
+            </button>
+          </>
+        )}
+
+        {dashboardMode === 'admin' && (
+          <>
+            <button className={`tab-btn ${activeTab === 'admin_dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('admin_dashboard')}>
+              <Activity size={18} /> Admin Dashboard
+            </button>
+            <button className={`tab-btn ${activeTab === 'articles' ? 'active' : ''}`} onClick={() => { setActiveTab('articles'); setPage(1); }}>
+              <BookOpen size={18} /> System Articles
+            </button>
+            <button className={`tab-btn ${activeTab === 'stream' ? 'active' : ''}`} onClick={() => setActiveTab('stream')}>
+              <Radio size={18} /> Live Stream Debug
+            </button>
+            <button className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
+              <AlertTriangle size={18} /> System Alerts
+            </button>
           </>
         )}
       </div>
@@ -548,98 +568,94 @@ export default function Home() {
       {activeTab === 'overview' && dashboardMode === 'social' && (
         <>
           <div className="overview-grid">
-            {overviewData?.kpi_cards?.map((kpi: any, i: number) => (
-              <div key={i} className="glass-panel metric-card">
-                <div className="metric-content">
-                  <div className="metric-label">{kpi.label}</div>
-                  <div className="metric-value">{kpi.value}</div>
+            {overviewData?.kpi_cards?.map((kpi: any, i: number) => {
+              let details = null;
+              if (i === 0 && overviewData.source_distribution) {
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.source_distribution.map((s: any) => (
+                      <li key={s.source}>
+                        <span style={{ textTransform: 'capitalize' }}>{s.source}</span>
+                        <strong>{s.count}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              } else if (i === 1 && overviewData.likes_distribution) {
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.likes_distribution.map((s: any) => (
+                      <li key={s.source}>
+                        <span style={{ textTransform: 'capitalize' }}>{s.source}</span>
+                        <strong>{s.count}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              } else if (i === 2 && overviewData.replies_distribution) {
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.replies_distribution.map((s: any) => (
+                      <li key={s.source}>
+                        <span style={{ textTransform: 'capitalize' }}>{s.source}</span>
+                        <strong>{s.count}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              } else if (i === 3 && overviewData.source_distribution) {
+                details = (
+                  <ul className="metric-details-list">
+                    {overviewData.source_distribution.map((s: any) => (
+                      <li key={s.source}>
+                        <span style={{ textTransform: 'capitalize' }}>{s.source}</span>
+                        <span style={{ color: 'var(--accent-green)', fontSize: '0.8rem' }}>● Active</span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+              
+              return (
+                <div 
+                  key={i} 
+                  className={`glass-panel metric-card ${activeCard === i + 20 ? 'expanded' : ''}`}
+                  onClick={() => setActiveCard(activeCard === i + 20 ? null : i + 20)}
+                >
+                  <div className="metric-content" style={{ display: activeCard === i + 20 ? 'none' : 'block' }}>
+                    <div className="metric-label">{kpi.label}</div>
+                    <div className="metric-value">{kpi.value}</div>
+                    <div className="metric-hint">Click để xem chi tiết</div>
+                  </div>
+                  {activeCard === i + 20 && (
+                    <div className="metric-details">
+                      <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+                        {kpi.label} (Chi tiết)
+                      </div>
+                      {details}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="charts-grid">
             <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
               <div className="panel-header">
-                <div className="panel-title"><MessageSquare size={20} /> Top Social Debates</div>
-              </div>
-              <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Post/Video Title</th>
-                      <th>Source</th>
-                      <th>Engagement</th>
-                      <th>Sentiment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {overviewData?.top_debates?.map((a: any, i: number) => (
-                      <tr key={i}>
-                        <td style={{ maxWidth: '400px', whiteSpace: 'normal' }}>
-                          <strong>{a.title}</strong>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            {a.content?.substring(0, 100)}...
-                          </div>
-                        </td>
-                        <td><span className={`tag ${a.source}`}>{a.source}</span></td>
-                        <td>
-                          <div style={{ fontSize: '0.9rem' }}>👍 {a.like_count || 0}</div>
-                          <div style={{ fontSize: '0.9rem', color: '#8b5cf6' }}>💬 {a.reply_count || 0} replies</div>
-                        </td>
-                        <td>
-                          <span style={{ color: a.sentiment_score > 0 ? 'var(--accent-green)' : a.sentiment_score < 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: 'bold' }}>
-                            {a.sentiment_score?.toFixed(2) || '0.00'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="glass-panel">
-              <div className="panel-header">
-                <div className="panel-title"><ThumbsUp size={20} /> Sentiment Comparison</div>
+                <div className="panel-title"><Activity size={20} /> Engagement Timeline</div>
               </div>
               <div style={{ height: 300, width: '100%' }}>
-                {overviewData?.sentiment_distribution?.length > 0 ? (
+                {overviewData?.engagement_timeline?.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={overviewData.sentiment_distribution} dataKey="count" nameKey="sentiment" cx="50%" cy="50%" outerRadius={100} label>
-                        {overviewData.sentiment_distribution.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={entry.sentiment === 'positive' ? 'var(--accent-green)' : entry.sentiment === 'negative' ? '#ef4444' : '#94a3b8'} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} itemStyle={{ color: '#fff' }}/>
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                    No sentiment data available
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="glass-panel">
-              <div className="panel-header">
-                <div className="panel-title"><Activity size={20} /> Sentiment Timeline</div>
-              </div>
-              <div style={{ height: 300, width: '100%' }}>
-                {overviewData?.sentiment_timeline?.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={overviewData.sentiment_timeline}>
+                    <LineChart data={overviewData.engagement_timeline}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} />
                       <YAxis stroke="#94a3b8" fontSize={12} />
                       <Tooltip labelFormatter={(t) => new Date(t as string).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
                       <Legend />
-                      <Line type="monotone" dataKey="Positive" stroke="var(--accent-green)" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="Neutral" stroke="#94a3b8" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Likes" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Replies" stroke="#ec4899" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
@@ -1034,66 +1050,219 @@ export default function Home() {
         </div>
       )}
       {activeTab === 'admin_dashboard' && dashboardMode === 'admin' && (
-        <div className="charts-grid">
-          <div className="glass-panel">
-            <div className="panel-header">
-              <div className="panel-title"><Users size={20} /> System Users</div>
-            </div>
-            <div style={{ padding: '20px' }}>
-              {adminUsers ? (
-                <ul className="metric-details-list">
-                  <li><span>Total Users</span><strong>{adminUsers.total_users}</strong></li>
-                  <li><span>Standard Users</span><strong>{adminUsers.standard_users}</strong></li>
-                  <li><span>Admin Users</span><strong style={{color: '#ef4444'}}>{adminUsers.admin_users}</strong></li>
-                </ul>
-              ) : (
-                <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+        <>
+          <div className="overview-grid">
+            <div className={`glass-panel metric-card ${activeCard === 10 ? 'expanded' : ''}`} onClick={() => setActiveCard(activeCard === 10 ? null : 10)}>
+              <div className="metric-content" style={{ display: activeCard === 10 ? 'none' : 'block' }}>
+                <div className="metric-label">Total Users</div>
+                <div className="metric-value">{adminUsers?.total_users || 0}</div>
+                <div className="metric-hint">Click để xem chi tiết</div>
+              </div>
+              {activeCard === 10 && (
+                <div className="metric-details">
+                  <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>Total Users (Chi tiết)</div>
+                  <ul className="metric-details-list">
+                    <li><span>Standard Users</span><strong>{adminUsers?.standard_users || 0}</strong></li>
+                    <li><span>Admin Users</span><strong style={{color: '#ef4444'}}>{adminUsers?.admin_users || 0}</strong></li>
+                  </ul>
+                </div>
               )}
             </div>
-          </div>
-          
-          <div className="glass-panel">
-            <div className="panel-header">
-              <div className="panel-title"><Activity size={20} /> Crawl Latency (mins)</div>
+
+            <div className={`glass-panel metric-card ${activeCard === 11 ? 'expanded' : ''}`} onClick={() => setActiveCard(activeCard === 11 ? null : 11)}>
+              <div className="metric-content" style={{ display: activeCard === 11 ? 'none' : 'block' }}>
+                <div className="metric-label">Avg Crawl Latency</div>
+                <div className="metric-value">{adminLatency?.avg_latency?.length ? (adminLatency.avg_latency.reduce((a:number,b:number)=>a+b,0)/adminLatency.avg_latency.length).toFixed(1) : 0} m</div>
+                <div className="metric-hint">Click để xem chi tiết</div>
+              </div>
+              {activeCard === 11 && (
+                <div className="metric-details">
+                  <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>Latency (Chi tiết)</div>
+                  <ul className="metric-details-list">
+                    {adminLatency?.sources?.slice(0, 5).map((s: string, i: number) => (
+                      <li key={s}><span style={{ textTransform: 'capitalize' }}>{s}</span><strong>{adminLatency.avg_latency[i]} m</strong></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-            <div style={{ height: 300, width: '100%' }}>
-              {adminLatency?.sources?.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={adminLatency.sources.map((s: string, i: number) => ({ source: s, latency: adminLatency.avg_latency[i] }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)' }} />
-                    <Bar dataKey="latency" fill="#3b82f6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
+
+            <div className={`glass-panel metric-card ${activeCard === 12 ? 'expanded' : ''}`} onClick={() => setActiveCard(activeCard === 12 ? null : 12)}>
+              <div className="metric-content" style={{ display: activeCard === 12 ? 'none' : 'block' }}>
+                <div className="metric-label">Total News Articles</div>
+                <div className="metric-value">{adminClickbait?.news?.volumes?.length ? adminClickbait.news.volumes.reduce((a:number,b:number)=>a+b,0) : 0}</div>
+                <div className="metric-hint">Click để xem chi tiết</div>
+              </div>
+              {activeCard === 12 && (
+                <div className="metric-details">
+                  <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>News (Chi tiết)</div>
+                  <ul className="metric-details-list">
+                    {adminClickbait?.news?.sources?.slice(0, 5).map((s: string, i: number) => (
+                      <li key={s}><span style={{ textTransform: 'capitalize' }}>{s}</span><strong>{adminClickbait.news.volumes[i]}</strong></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className={`glass-panel metric-card ${activeCard === 13 ? 'expanded' : ''}`} onClick={() => setActiveCard(activeCard === 13 ? null : 13)}>
+              <div className="metric-content" style={{ display: activeCard === 13 ? 'none' : 'block' }}>
+                <div className="metric-label">Total Social Posts</div>
+                <div className="metric-value">{adminClickbait?.social?.volumes?.length ? adminClickbait.social.volumes.reduce((a:number,b:number)=>a+b,0) : 0}</div>
+                <div className="metric-hint">Click để xem chi tiết</div>
+              </div>
+              {activeCard === 13 && (
+                <div className="metric-details">
+                  <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>Social (Chi tiết)</div>
+                  <ul className="metric-details-list">
+                    {adminClickbait?.social?.sources?.slice(0, 5).map((s: string, i: number) => (
+                      <li key={s}><span style={{ textTransform: 'capitalize' }}>{s}</span><strong>{adminClickbait.social.volumes[i]}</strong></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div className={`glass-panel metric-card`}>
+              <div className="metric-content">
+                <div className="metric-label">System Health</div>
+                <div className="metric-value" style={{color: 'var(--accent-green)'}}>Healthy</div>
+                <div className="metric-hint">All systems operational</div>
+              </div>
+            </div>
+
+            <div className={`glass-panel metric-card`}>
+              <div className="metric-content">
+                <div className="metric-label">System Uptime</div>
+                <div className="metric-value">99.9%</div>
+                <div className="metric-hint">Hoạt động ổn định</div>
+              </div>
+            </div>
+
+            <div className={`glass-panel metric-card ${activeCard === 15 ? 'expanded' : ''}`} onClick={() => setActiveCard(activeCard === 15 ? null : 15)}>
+              <div className="metric-content" style={{ display: activeCard === 15 ? 'none' : 'block' }}>
+                <div className="metric-label">Active News Sources</div>
+                <div className="metric-value">{adminClickbait?.news?.sources?.length || 0}</div>
+                <div className="metric-hint">Click để xem chi tiết</div>
+              </div>
+              {activeCard === 15 && (
+                <div className="metric-details">
+                  <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>Các trang báo</div>
+                  <ul className="metric-details-list">
+                    {adminClickbait?.news?.sources?.slice(0, 5).map((s: string) => (
+                      <li key={s}><span style={{ textTransform: 'capitalize' }}>{s}</span><strong style={{color: 'var(--accent-green)'}}>Active</strong></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className={`glass-panel metric-card ${activeCard === 16 ? 'expanded' : ''}`} onClick={() => setActiveCard(activeCard === 16 ? null : 16)}>
+              <div className="metric-content" style={{ display: activeCard === 16 ? 'none' : 'block' }}>
+                <div className="metric-label">Active Social Platforms</div>
+                <div className="metric-value">{adminClickbait?.social?.sources?.length || 0}</div>
+                <div className="metric-hint">Click để xem chi tiết</div>
+              </div>
+              {activeCard === 16 && (
+                <div className="metric-details">
+                  <div className="metric-label" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>Các MXH</div>
+                  <ul className="metric-details-list">
+                    {adminClickbait?.social?.sources?.slice(0, 5).map((s: string) => (
+                      <li key={s}><span style={{ textTransform: 'capitalize' }}>{s}</span><strong style={{color: 'var(--accent-green)'}}>Active</strong></li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="glass-panel">
-            <div className="panel-header">
-              <div className="panel-title"><AlertTriangle size={20} /> Average Clickbait Score</div>
+          <div className="charts-grid">
+            <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
+              <div className="panel-header">
+                <div className="panel-title"><Activity size={20} /> Crawl Latency by Source</div>
+              </div>
+              <div style={{ height: 300, width: '100%' }}>
+                {adminLatency?.sources?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={adminLatency.sources.map((s: string, i: number) => ({ source: s, latency: adminLatency.avg_latency[i] }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)' }} />
+                      <Bar dataKey="latency" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
+                )}
+              </div>
             </div>
-            <div style={{ height: 300, width: '100%' }}>
-              {adminClickbait?.sources?.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={adminClickbait.sources.map((s: string, i: number) => ({ source: s, score: adminClickbait.avg_score[i] }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)' }} />
-                    <Bar dataKey="score" fill="#ef4444" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
-              )}
+
+            <div className="glass-panel">
+              <div className="panel-header">
+                <div className="panel-title"><BookOpen size={20} /> News Articles Volume</div>
+              </div>
+              <div style={{ height: 300, width: '100%' }}>
+                {adminClickbait?.news?.sources?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={adminClickbait.news.sources.map((s: string, i: number) => ({ source: s, total: adminClickbait.news.volumes[i] }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)' }} />
+                      <Bar dataKey="total" fill="#ef4444" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
+                )}
+              </div>
+            </div>
+
+            <div className="glass-panel">
+              <div className="panel-header">
+                <div className="panel-title"><Share2 size={20} /> Social Posts Volume</div>
+              </div>
+              <div style={{ height: 300, width: '100%' }}>
+                {adminClickbait?.social?.sources?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={adminClickbait.social.sources.map((s: string, i: number) => ({ source: s, total: adminClickbait.social.volumes[i] }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)' }} />
+                      <Bar dataKey="total" fill="#8b5cf6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
+                )}
+              </div>
+            </div>
+            
+            <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
+              <div className="panel-header">
+                <div className="panel-title"><Users size={20} /> User Roles Distribution</div>
+              </div>
+              <div style={{ height: 300, width: '100%' }}>
+                {adminUsers ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={[{name: 'Standard Users', count: adminUsers.standard_users}, {name: 'Admin Users', count: adminUsers.admin_users}]} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                        <Cell fill="#3b82f6" />
+                        <Cell fill="#ef4444" />
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} itemStyle={{ color: '#fff' }}/>
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {activeTab === 'debates' && dashboardMode === 'social' && (

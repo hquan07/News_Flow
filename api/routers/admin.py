@@ -34,31 +34,42 @@ def get_crawl_latency(user: dict = Depends(get_admin_user)):
         ORDER BY avg_latency DESC
     """
     df = _query(query)
-    if df is None or df.empty:
+    if not df:
         return {"sources": [], "avg_latency": []}
         
     return {
-        "sources": df['source'].tolist(),
-        "avg_latency": [round(float(v), 2) for v in df['avg_latency']]
+        "sources": [row['source'] for row in df],
+        "avg_latency": [round(float(row['avg_latency']), 2) for row in df]
     }
 
-@router.get("/metrics/clickbait")
-def get_clickbait_scores(user: dict = Depends(get_admin_user)):
-    """Lấy điểm số giật tít trung bình theo nguồn."""
-    query = """
-        SELECT source, avg(clickbait_score) as avg_score
+@router.get("/metrics/volume")
+def get_article_volume(user: dict = Depends(get_admin_user)):
+    """Lấy tổng số bài viết theo nguồn, bao gồm cả News và Social."""
+    query_news = """
+        SELECT source, count(*) as total_articles
         FROM raw_articles
-        WHERE clickbait_score IS NOT NULL
         GROUP BY source
-        ORDER BY avg_score DESC
+        ORDER BY total_articles DESC
     """
-    df = _query(query)
-    if df is None or df.empty:
-        return {"sources": [], "avg_score": []}
-        
+    df_news = _query(query_news)
+    
+    query_social = """
+        SELECT source, count(*) as total_articles
+        FROM social_sentiment_metrics
+        GROUP BY source
+        ORDER BY total_articles DESC
+    """
+    df_social = _query(query_social)
+    
     return {
-        "sources": df['source'].tolist(),
-        "avg_score": [round(float(v), 2) for v in df['avg_score']]
+        "news": {
+            "sources": [row['source'] for row in df_news] if df_news else [],
+            "volumes": [int(row['total_articles']) for row in df_news] if df_news else []
+        },
+        "social": {
+            "sources": [row['source'] for row in df_social] if df_social else [],
+            "volumes": [int(row['total_articles']) for row in df_social] if df_social else []
+        }
     }
 
 @router.get("/metrics/users")
