@@ -111,6 +111,50 @@ def get_alerts(threshold=2.0, limit=10):
     )
 
 
+def get_social_debates(time_range="7d", limit=10, source=None, category=None):
+    where = _resolve_time_range(time_range, "loaded_at")
+    params = {}
+    if source:
+        where += " AND source = {source:String}"
+        params["source"] = source
+    return _query(
+        f"SELECT title AS topic, reply_count AS comments_count, "
+        f"round((reply_count * 1.5 + like_count) / 100, 1) AS controversy_score "
+        f"FROM newspulse.social_sentiment_metrics "
+        f"WHERE {where} AND reply_count > 0 "
+        f"ORDER BY controversy_score DESC LIMIT {limit}",
+        params
+    )
+
+
+def get_social_crisis_alerts(negative_pct_threshold=30.0, min_posts=10):
+    """Detect sources with high negative sentiment in the last hour."""
+    return _query(
+        f"SELECT source, "
+        f"count() as total_posts, "
+        f"countIf(sentiment_label = 'negative') as negative_posts, "
+        f"round((countIf(sentiment_label = 'negative') / count()) * 100, 1) as negative_pct "
+        f"FROM newspulse.social_sentiment_metrics "
+        f"WHERE publish_time >= now() - INTERVAL 1 HOUR "
+        f"GROUP BY source "
+        f"HAVING negative_pct > {negative_pct_threshold} AND total_posts >= {min_posts} "
+        f"ORDER BY negative_pct DESC"
+    )
+
+
+def get_viral_post_alerts(interaction_threshold=50):
+    """Detect individual social posts with high interactions in the last hour."""
+    return _query(
+        f"SELECT post_id, source, title, "
+        f"(like_count + reply_count) as interactions, "
+        f"sentiment_label "
+        f"FROM newspulse.social_sentiment_metrics "
+        f"WHERE publish_time >= now() - INTERVAL 1 HOUR "
+        f"AND (like_count + reply_count) >= {interaction_threshold} "
+        f"ORDER BY interactions DESC LIMIT 10"
+    )
+
+
 def get_entity_stats(time_range="7d", entity_type=None, limit=20, source=None, category=None):
     where = _resolve_time_range(time_range, "loaded_at")
     params = {}
