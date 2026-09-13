@@ -97,3 +97,14 @@ CREATE TABLE IF NOT EXISTS newspulse.event_clusters (
     created_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(created_at)
 ORDER BY (start_time, cluster_id);
+
+-- User Interactions (Personalization)
+CREATE TABLE IF NOT EXISTS newspulse.user_interactions (
+    user_id String,
+    article_hash String,
+    interaction_type String, -- 'click', 'like', 'share', 'read_complete'
+    interaction_weight Float32 DEFAULT 1.0,
+    timestamp DateTime DEFAULT now()
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (user_id, timestamp, article_hash);

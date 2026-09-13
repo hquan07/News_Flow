@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PyTorch (CPU version to keep image size small) and other NLP/Kafka dependencies
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir uv && \
+    uv pip install --system --no-cache-dir \
     networkx==3.1 \
     torch==2.1.2+cpu \
     -f https://download.pytorch.org/whl/torch_stable.html \

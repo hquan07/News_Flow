@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from api.config import get_settings
 from api.database import lifespan_db
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations
 
 settings = get_settings()
 
@@ -45,6 +45,8 @@ app.include_router(entities.router, prefix=prefix)
 app.include_router(sentiment.router, prefix=prefix)
 app.include_router(stream.router, prefix=prefix)
 app.include_router(social.router, prefix=prefix)
+app.include_router(auth.router, prefix=prefix)
+app.include_router(recommendations.router, prefix=prefix)
 
 
 

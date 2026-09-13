@@ -29,9 +29,14 @@ itemadapter>=0.8.0
 pytest==8.3.3
 pytest-asyncio==0.24.0
 praw
-google-api-python-client
+google-api-python-client==2.118.0
 
 scikit-learn==1.4.0
-pandas==2.2.0
+pandas==2.1.4
 
 groq==0.4.2
+
+PyJWT==2.8.0
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+email-validator
