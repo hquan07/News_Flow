@@ -39,7 +39,7 @@ async function safeFetch(url: string): Promise<any> {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardMode, setDashboardMode] = useState<'news' | 'social'>('news');
+  const [dashboardMode, setDashboardMode] = useState<'news' | 'social' | 'admin'>('news');
   const [selectedSource, setSelectedSource] = useState<string>('');
   const [feed, setFeed] = useState<FeedEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -49,6 +49,10 @@ export default function Home() {
   const [articles, setArticles] = useState<any[]>([]);
   const [articlesMeta, setArticlesMeta] = useState<any>({});
   const [page, setPage] = useState(1);
+
+  const [adminLatency, setAdminLatency] = useState<any>(null);
+  const [adminClickbait, setAdminClickbait] = useState<any>(null);
+  const [adminUsers, setAdminUsers] = useState<any>(null);
 
   const [sentimentDist, setSentimentDist] = useState<any[]>([]);
   const [sentimentTimeline, setSentimentTimeline] = useState<any[]>([]);
@@ -136,9 +140,7 @@ export default function Home() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      // In a real app we'd validate the token and get user info. 
-      // For now we just mock a logged-in state if token exists.
-      setUser({ email: 'user@example.com' }); 
+      setUser(JSON.parse(localStorage.getItem('user_cache') || '{"email": "user@example.com"}')); 
     }
   }, []);
 
@@ -149,7 +151,7 @@ export default function Home() {
     if (dashboardMode === 'news') {
       const result = await safeFetch(`${API_BASE}/overview?time_range=all${sourceParam}`);
       setOverviewData(result);
-    } else {
+    } else if (dashboardMode === 'social') {
       const result = await safeFetch(`${API_BASE}/social/overview?time_range=all${sourceParam}`);
       setOverviewData(result);
     }
@@ -157,15 +159,44 @@ export default function Home() {
 
   const fetchSentiment = useCallback(async () => {
     const sourceParam = selectedSource ? `?source=${selectedSource}` : '';
-    const results = await Promise.allSettled([
-      safeFetch(`${API_BASE}/sentiment/distribution${sourceParam}`),
-      safeFetch(`${API_BASE}/sentiment/timeline${sourceParam}`),
-      safeFetch(`${API_BASE}/sentiment/sources${sourceParam}`),
-    ]);
-    if (results[0].status === 'fulfilled') setSentimentDist(results[0].value.data || []);
-    if (results[1].status === 'fulfilled') setSentimentTimeline(results[1].value.data || []);
-    if (results[2].status === 'fulfilled') setSentimentSources(results[2].value.data || []);
+    if (dashboardMode === 'news') {
+      const results = await Promise.allSettled([
+        safeFetch(`${API_BASE}/sentiment/distribution${sourceParam}`),
+        safeFetch(`${API_BASE}/sentiment/timeline${sourceParam}`),
+        safeFetch(`${API_BASE}/sentiment/sources${sourceParam}`),
+      ]);
+      if (results[0].status === 'fulfilled') setSentimentDist(results[0].value.data || []);
+      if (results[1].status === 'fulfilled') setSentimentTimeline(results[1].value.data || []);
+      if (results[2].status === 'fulfilled') setSentimentSources(results[2].value.data || []);
+    } else if (dashboardMode === 'social') {
+      const result = await safeFetch(`${API_BASE}/social/sentiment${sourceParam.replace('?', '&time_range=all&').replace(/^&/, '?')}`);
+      setSentimentDist(result.sentiment_distribution || []);
+      setSentimentTimeline(result.sentiment_timeline || []);
+      setSentimentSources(result.sentiment_by_source || []);
+    }
   }, [selectedSource, dashboardMode]);
+
+  const fetchDebates = useCallback(async () => {
+    const sourceParam = selectedSource ? `&source=${selectedSource}` : '';
+    if (dashboardMode === 'social') {
+      const result = await safeFetch(`${API_BASE}/social/debates?time_range=all${sourceParam}`);
+      setOverviewData((prev: any) => ({ ...prev, top_debates: result.top_debates }));
+    }
+  }, [selectedSource, dashboardMode]);
+
+  const fetchAdmin = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const headers = { 'Authorization': `Bearer ${token}` };
+    const [latencyRes, clickbaitRes, usersRes] = await Promise.all([
+      fetch(`${API_BASE}/admin/metrics/latency`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/admin/metrics/clickbait`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/admin/metrics/users`, { headers }).then(r => r.json())
+    ]);
+    setAdminLatency(latencyRes);
+    setAdminClickbait(clickbaitRes);
+    setAdminUsers(usersRes);
+  }, []);
 
   const fetchEntities = useCallback(async () => {
     const results = await Promise.allSettled([
@@ -203,6 +234,8 @@ export default function Home() {
         else if (activeTab === 'network') await fetchNetwork();
         else if (activeTab === 'articles') await fetchArticles(page);
         else if (activeTab === 'foryou') await fetchForYou();
+        else if (activeTab === 'debates') await fetchDebates();
+        else if (activeTab === 'admin_dashboard') await fetchAdmin();
         if (!cancelled) setApiError(null);
       } catch (err: any) {
         if (!cancelled) setApiError('Mất kết nối tới API server');
@@ -212,7 +245,7 @@ export default function Home() {
     poll();
     const intervalId = setInterval(poll, 15000);
     return () => { cancelled = true; clearInterval(intervalId); };
-  }, [activeTab, page, fetchOverview, fetchSentiment, fetchEntities, fetchNetwork, fetchArticles, fetchForYou]);
+  }, [activeTab, page, fetchOverview, fetchSentiment, fetchEntities, fetchNetwork, fetchArticles, fetchForYou, fetchDebates, fetchAdmin]);
 
   // SSE with auto-reconnect
   useEffect(() => {
@@ -281,6 +314,14 @@ export default function Home() {
             >
               💬 Social Media
             </button>
+            {user?.role === 'admin' && (
+              <button 
+                onClick={() => { setDashboardMode('admin'); setSelectedSource(''); setActiveTab('admin_dashboard'); }}
+                style={{ padding: '6px 16px', border: 'none', background: dashboardMode === 'admin' ? '#ef4444' : 'transparent', color: 'white', borderRadius: '16px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.3s' }}
+              >
+                ⚙️ Admin
+              </button>
+            )}
           </div>
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -321,32 +362,41 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="tabs" style={{ display: dashboardMode === 'social' ? 'none' : 'flex' }}>
+      <div className="tabs" style={{ display: dashboardMode === 'admin' ? 'none' : 'flex' }}>
         <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
           <Activity size={18} /> Overview
         </button>
         <button className={`tab-btn ${activeTab === 'sentiment' ? 'active' : ''}`} onClick={() => setActiveTab('sentiment')}>
           <ThumbsUp size={18} /> Sentiment
         </button>
-        <button className={`tab-btn ${activeTab === 'entities' ? 'active' : ''}`} onClick={() => setActiveTab('entities')}>
-          <Hash size={18} /> Entities & NLP
-        </button>
-        <button className={`tab-btn ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>
-          <Share2 size={18} /> Network
-        </button>
-        <button className={`tab-btn ${activeTab === 'articles' ? 'active' : ''}`} onClick={() => { setActiveTab('articles'); setPage(1); }}>
-          <BookOpen size={18} /> Articles
-        </button>
-        <button className={`tab-btn ${activeTab === 'stream' ? 'active' : ''}`} onClick={() => setActiveTab('stream')}>
-          <Radio size={18} /> Live Stream
-        </button>
-        <button className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
-          <AlertTriangle size={18} /> Alerts
-        </button>
-        {user && (
-          <button className={`tab-btn ${activeTab === 'foryou' ? 'active' : ''}`} onClick={() => setActiveTab('foryou')} style={{ background: 'linear-gradient(90deg, #8b5cf6, #3b82f6)', color: 'white' }}>
-            ✨ For You
+        {dashboardMode === 'social' && (
+          <button className={`tab-btn ${activeTab === 'debates' ? 'active' : ''}`} onClick={() => setActiveTab('debates')}>
+            <MessageSquare size={18} /> Top Debates
           </button>
+        )}
+        {dashboardMode === 'news' && (
+          <>
+            <button className={`tab-btn ${activeTab === 'entities' ? 'active' : ''}`} onClick={() => setActiveTab('entities')}>
+              <Hash size={18} /> Entities & NLP
+            </button>
+            <button className={`tab-btn ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>
+              <Share2 size={18} /> Network
+            </button>
+            <button className={`tab-btn ${activeTab === 'articles' ? 'active' : ''}`} onClick={() => { setActiveTab('articles'); setPage(1); }}>
+              <BookOpen size={18} /> Articles
+            </button>
+            <button className={`tab-btn ${activeTab === 'stream' ? 'active' : ''}`} onClick={() => setActiveTab('stream')}>
+              <Radio size={18} /> Live Stream
+            </button>
+            <button className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
+              <AlertTriangle size={18} /> Alerts
+            </button>
+            {user && (
+              <button className={`tab-btn ${activeTab === 'foryou' ? 'active' : ''}`} onClick={() => setActiveTab('foryou')} style={{ background: 'linear-gradient(90deg, #8b5cf6, #3b82f6)', color: 'white' }}>
+                ✨ For You
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -585,7 +635,7 @@ export default function Home() {
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} />
                       <YAxis stroke="#94a3b8" fontSize={12} />
-                      <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                      <Tooltip labelFormatter={(t) => new Date(t as string).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
                       <Legend />
                       <Line type="monotone" dataKey="Positive" stroke="var(--accent-green)" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={2} dot={false} />
@@ -668,7 +718,7 @@ export default function Home() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                     <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} />
                     <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <Tooltip labelFormatter={(t) => new Date(t as string).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)', border: '1px solid rgba(255,255,255,0.1)' }} />
                     <Legend />
                     <Line type="monotone" dataKey="Positive" stroke="var(--accent-green)" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={2} dot={false} />
@@ -983,6 +1033,100 @@ export default function Home() {
           </div>
         </div>
       )}
+      {activeTab === 'admin_dashboard' && dashboardMode === 'admin' && (
+        <div className="charts-grid">
+          <div className="glass-panel">
+            <div className="panel-header">
+              <div className="panel-title"><Users size={20} /> System Users</div>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {adminUsers ? (
+                <ul className="metric-details-list">
+                  <li><span>Total Users</span><strong>{adminUsers.total_users}</strong></li>
+                  <li><span>Standard Users</span><strong>{adminUsers.standard_users}</strong></li>
+                  <li><span>Admin Users</span><strong style={{color: '#ef4444'}}>{adminUsers.admin_users}</strong></li>
+                </ul>
+              ) : (
+                <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+              )}
+            </div>
+          </div>
+          
+          <div className="glass-panel">
+            <div className="panel-header">
+              <div className="panel-title"><Activity size={20} /> Crawl Latency (mins)</div>
+            </div>
+            <div style={{ height: 300, width: '100%' }}>
+              {adminLatency?.sources?.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={adminLatency.sources.map((s: string, i: number) => ({ source: s, latency: adminLatency.avg_latency[i] }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} />
+                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)' }} />
+                    <Bar dataKey="latency" fill="#3b82f6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
+              )}
+            </div>
+          </div>
+
+          <div className="glass-panel">
+            <div className="panel-header">
+              <div className="panel-title"><AlertTriangle size={20} /> Average Clickbait Score</div>
+            </div>
+            <div style={{ height: 300, width: '100%' }}>
+              {adminClickbait?.sources?.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={adminClickbait.sources.map((s: string, i: number) => ({ source: s, score: adminClickbait.avg_score[i] }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} />
+                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.9)' }} />
+                    <Bar dataKey="score" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No Data</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'debates' && dashboardMode === 'social' && (
+        <div className="glass-panel" style={{ marginTop: '20px' }}>
+          <div className="panel-header">
+            <div className="panel-title"><MessageSquare size={20} /> Top Debates</div>
+          </div>
+          <div className="stream-container">
+            {overviewData?.top_debates?.map((post: any) => (
+              <div key={post.post_id} className="feed-item" style={{ borderLeft: `4px solid ${post.sentiment_score > 0.1 ? 'var(--accent-green)' : post.sentiment_score < -0.1 ? '#ef4444' : '#94a3b8'}` }}>
+                <div className="feed-header">
+                  <span className="feed-type" style={{background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa'}}>{post.source}</span>
+                  <span className="feed-time">{new Date(post.publish_time).toLocaleString()}</span>
+                </div>
+                <div className="feed-message">
+                  <strong>{post.title}</strong>
+                  <p style={{ margin: '8px 0', fontSize: '0.9rem', color: '#cbd5e1' }}>{post.content.substring(0, 150)}...</p>
+                </div>
+                <div style={{ display: 'flex', gap: '15px', marginTop: '10px', fontSize: '0.85rem', color: '#94a3b8' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><ThumbsUp size={14}/> {post.like_count}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MessageSquare size={14}/> {post.reply_count} replies</span>
+                </div>
+              </div>
+            ))}
+            {!overviewData?.top_debates?.length && (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No debate data available
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

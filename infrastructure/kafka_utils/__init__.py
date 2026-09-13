@@ -56,6 +56,8 @@ CATEGORY_TOPIC_MAP: dict[str, str] = {
     "pháp luật": f"{PREFIX}.law",
     "phap-luat": f"{PREFIX}.law",
     "law": f"{PREFIX}.law",
+
+    "social_news": "social_posts",
 }
 
 # Default topic for unmapped categories

@@ -16,12 +16,16 @@ logger = logging.getLogger(__name__)
 class ArticleSchema(BaseModel):
     url: str
     title: str = Field(..., min_length=5)
-    content: str = Field(..., min_length=100)
+    content: str = Field(..., min_length=10)
     author: Optional[str] = None
     publish_time: Optional[str] = None
     crawled_time: Optional[str] = None
     source: str
     category: str
+
+    model_config = {
+        "extra": "allow"
+    }
 
 class ArticleProducer:
     def __init__(self, bootstrap_servers: str = "kafka:9092", schema_registry_url: str = "http://schema-registry:8081"):

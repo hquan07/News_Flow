@@ -44,6 +44,7 @@ async def register(user: UserCreate):
     user_dict = user.model_dump()
     user_dict["password"] = get_password_hash(user_dict["password"])
     user_dict["created_at"] = datetime.utcnow()
+    user_dict["role"] = "user"
     
     result = await db.users.insert_one(user_dict)
     return {"message": "User created successfully", "user_id": str(result.inserted_id)}
@@ -55,13 +56,15 @@ async def login(user: UserLogin):
     if not db_user or not verify_password(user.password, db_user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
         
-    access_token = create_access_token(data={"sub": str(db_user["_id"]), "email": db_user["email"]})
+    role = db_user.get("role", "user")
+    access_token = create_access_token(data={"sub": str(db_user["_id"]), "email": db_user["email"], "role": role})
     return {
         "access_token": access_token, 
         "token_type": "bearer", 
         "user": {
             "email": db_user["email"], 
             "full_name": db_user.get("full_name", ""), 
-            "id": str(db_user["_id"])
+            "id": str(db_user["_id"]),
+            "role": role
         }
     }
