@@ -26,6 +26,7 @@ RUN pip install --no-cache-dir \
     beautifulsoup4==4.12.3 \
     lxml==5.3.0 \
     scrapy==2.11.2 \
+    "Twisted<24.3.0" \
     fake-useragent==1.5.1 \
     feedparser==6.0.11 \
     itemadapter>=0.8.0 \
