@@ -8,16 +8,17 @@ A real-time news analysis platform that collects and processes articles from Vie
 
 ## Key Features
 
-- **Automated Crawling** from VnExpress, Tuổi Trẻ, and Thanh Niên via Scrapy crawlers.
+- **Automated Crawling** from Top 6 Vietnam Newspapers and Social Media (Reddit VN, Facebook, YouTube, TikTok, Twitter, Voz).
 - **Streaming Pipeline** with Kafka → Spark Structured Streaming.
 - **Vietnamese NLP** — keyword extraction, Named Entity Recognition (PhoBERT), and sentiment analysis.
 - **Real-time Data Warehouse** powered by **ClickHouse**, offering sub-second query performance for analytics.
-- **Data Quality & Alerting** — automated Airflow DAGs using Great Expectations for validation, with Telegram bot integration for anomaly detection.
+- **Data Quality & Alerting** — automated Airflow DAGs using Great Expectations for validation, with Telegram bot integration for Crisis Detection, Volume Spikes, and Daily Reports.
 - **Historical Backfilling Tools** — Optimized offline scripts for fast ingestion of massive historical dumps to ClickHouse and batch NLP extraction using multiprocessing.
-- **REST API** powered by FastAPI serving analytics endpoints.
-- **Custom Dashboard** built with **Next.js**, React, Recharts, and TailwindCSS (optional) for real-time visualization — tracking trends, source comparisons, entity networks, volume spikes, and system alerts.
+- **REST API** powered by FastAPI serving analytics endpoints and Server-Sent Events (SSE).
+- **Custom Dashboard** built with **Next.js 16**, React, Recharts, and TailwindCSS for real-time visualization — tracking trends, source comparisons, entity networks, volume spikes, and system alerts.
+- **Nginx Reverse Proxy** — unified entrypoint for frontend and backend API.
 - **Monitoring** — Docker healthchecks and Python-based monitoring scripts.
-- **100% Containerized** — a single `start.sh` or `docker compose up -d` brings up the entire infrastructure.
+- **100% Containerized** — a single `docker-compose up -d --build` brings up the entire infrastructure in Standalone Mode.
 
 ## Tech Stack
 
@@ -36,19 +37,15 @@ A real-time news analysis platform that collects and processes articles from Vie
 
 ```mermaid
 flowchart TD
-    subgraph "Data Sources (Crawlers)"
-        A[VnExpress]
-        B[Tuổi Trẻ]
-        C[Thanh Niên]
-        C1[Dân Trí]
-        C2[Lao Động]
-        C3[Tiền Phong]
+    subgraph "Data Sources (Crawlers & APIs)"
+        A[News Sites: VnExpress, Tuoi Tre, Thanh Nien, Dan Tri, Lao Dong, Tien Phong]
+        SM[Social Media: Reddit VN, Facebook, YouTube, TikTok, Twitter, Voz]
     end
 
     subgraph "Orchestration & Data Quality"
         O[Apache Airflow]
-        GX[Great Expectations]
-        AL[Anomaly Alerting]
+        AL[Anomaly & Crisis Alerting]
+        TR[Telegram Reporter]
     end
 
     subgraph "Message Broker"
@@ -64,34 +61,31 @@ flowchart TD
 
     subgraph "Storage & Data Warehouse"
         J[(ClickHouse OLAP)]
-        K[(MinIO - Raw HTML)]
+        K[(MinIO - Raw HTML/JSON)]
     end
 
     subgraph "Serving & Dashboard"
+        NX[Nginx Reverse Proxy]
         L[FastAPI Backend]
         M[Next.js Dashboard]
     end
     
     subgraph "Monitoring"
-        T[Telegram Bot]
+        T[Telegram Bot / Admin Alerts]
     end
 
-    D[Scrapy Pipeline]
+    D[Scrapy & API Pipelines]
 
     O -.->|Schedules| D
-    O -.->|Triggers| GX
     O -.->|Triggers| AL
-    GX -.->|Validates Data| J
+    O -.->|Daily Reports| TR
     AL -.->|Queries Metrics| J
     AL -->|Push Notifications| T
+    TR -->|Push Reports| T
 
     A --> D
-    B --> D
-    C --> D
-    C1 --> D
-    C2 --> D
-    C3 --> D
-    D -->|JSON Articles| E
+    SM --> D
+    D -->|JSON Articles/Posts| E
     D -->|Raw HTML| K
     E -->|Stream Consumption| F
     F --> G
@@ -100,9 +94,11 @@ flowchart TD
     G -->|Entities| J
     H -->|Sentiment| J
     I -->|Keywords| J
-    F -->|Cleaned Articles| J
+    F -->|Cleaned Data| J
     J -->|SQL Analytics| L
-    L -->|REST API / SSE| M
+    L -->|REST API / SSE| NX
+    M -->|Static/Client Fetch| NX
+    NX -->|Client Access| User((User))
 
     classDef source fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px,color:#000;
     classDef broker fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
@@ -113,13 +109,14 @@ flowchart TD
     classDef orchestrator fill:#fce4ec,stroke:#d81b60,stroke-width:2px,color:#000;
     classDef monitor fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
 
-    class A,B,C,C1,C2,C3 source;
+    class A,SM source;
     class E broker;
     class D,F,G,H,I processing;
     class J,K storage;
     class L api;
     class M frontend;
-    class O,GX,AL orchestrator;
+    class NX api;
+    class O,AL,TR orchestrator;
     class T monitor;
 ```
 
