@@ -8,7 +8,7 @@ class RedditVnSpider(scrapy.Spider):
     start_urls = ["https://www.reddit.com/r/VietNam/hot.json?limit=20"]
 
     custom_settings = {
-        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 NewsPulse/1.0',
+        'USER_AGENT': 'python:newspulse:v1.0 (by /u/hquan07)',
         'ROBOTSTXT_OBEY': False
     }
 
