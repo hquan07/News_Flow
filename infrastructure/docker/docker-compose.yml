@@ -100,6 +100,7 @@ services:
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.health
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.education
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.world
+        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic social_posts
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.law
         echo 'Done!' && kafka-topics --list --bootstrap-server kafka:9092
       "
@@ -268,7 +269,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname) 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $$(hostname) 2>/dev/null || exit 1"]
       interval: 60s
       timeout: 30s
       retries: 3
@@ -371,6 +372,29 @@ services:
       - ../../config:/opt/spark-apps/config
       - ../../data_platform/warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: newspulse-frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:alpine
+    container_name: newspulse-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - api
+    restart: unless-stopped
 
 
 volumes:

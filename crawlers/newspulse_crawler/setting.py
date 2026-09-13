@@ -5,7 +5,7 @@ SPIDER_MODULES = ["newspulse_crawler.spiders"]
 NEWSPIDER_MODULE = "newspulse_crawler.spiders"
 
 # Respectful crawling
-ROBOTSTXT_OBEY = True
+ROBOTSTXT_OBEY = False
 CONCURRENT_REQUESTS = 8
 CONCURRENT_REQUESTS_PER_DOMAIN = 2
 DOWNLOAD_DELAY = int(os.getenv("CRAWL_RATE_LIMIT", 2))

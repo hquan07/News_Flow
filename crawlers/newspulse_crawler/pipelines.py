@@ -107,12 +107,20 @@ class MongoPipeline:
         )
 
     def open_spider(self, spider):
+        from pymongo import ASCENDING
         self.client = MongoClient(self.mongo_uri)
         db = self.client[self.mongo_db]
-        self.collection = db["articles_raw"]
-        self.collection.create_index([("url", ASCENDING)], unique=True)
-        self.collection.create_index([("crawl_time", ASCENDING)])
-        self.collection.create_index([("source", ASCENDING), ("category", ASCENDING)])
+        
+        if spider.name in ["voz_forum", "youtube_comments", "reddit_vn"]:
+            self.collection = db["raw_social_posts"]
+            self.collection.create_index([("url", ASCENDING)], unique=True)
+            self.collection.create_index([("crawl_time", ASCENDING)])
+            self.collection.create_index([("source", ASCENDING)])
+        else:
+            self.collection = db["articles_raw"]
+            self.collection.create_index([("url", ASCENDING)], unique=True)
+            self.collection.create_index([("crawl_time", ASCENDING)])
+            self.collection.create_index([("source", ASCENDING), ("category", ASCENDING)])
 
     def close_spider(self, spider):
         if self.client:

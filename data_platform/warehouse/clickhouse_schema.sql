@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_articles (
     keyword_count Int32,
     publish_hour Int16,
     crawl_latency_minutes Float32,
+    clickbait_score Float32 DEFAULT 0.0,
     crawled_at DateTime,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(loaded_at)
@@ -65,3 +66,45 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_embeddings (
     processed_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(processed_at)
 ORDER BY (url_hash);
+
+-- Social Sentiment Metrics (Mạng xã hội)
+CREATE TABLE IF NOT EXISTS newspulse.social_sentiment_metrics (
+    post_id String,
+    source String,
+    title String,
+    content String,
+    like_count Int32,
+    upvote_ratio Float32,
+    reply_count Int32,
+    sentiment_score Float32,
+    sentiment_label String,
+    publish_time DateTime,
+    crawled_at DateTime DEFAULT now(),
+    loaded_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(loaded_at)
+PARTITION BY toYYYYMM(publish_time)
+ORDER BY (source, publish_time, post_id);
+
+-- Event Clusters (Topic Modeling)
+CREATE TABLE IF NOT EXISTS newspulse.event_clusters (
+    cluster_id String,
+    cluster_name String,
+    top_keywords Array(String),
+    article_count Int32,
+    avg_sentiment Float32,
+    start_time DateTime,
+    end_time DateTime,
+    created_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (start_time, cluster_id);
+
+-- User Interactions (Personalization)
+CREATE TABLE IF NOT EXISTS newspulse.user_interactions (
+    user_id String,
+    article_hash String,
+    interaction_type String, -- 'click', 'like', 'share', 'read_complete'
+    interaction_weight Float32 DEFAULT 1.0,
+    timestamp DateTime DEFAULT now()
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (user_id, timestamp, article_hash);

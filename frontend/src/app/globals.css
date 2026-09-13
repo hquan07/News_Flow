@@ -543,3 +543,49 @@ h1 {
   font-size: 1.5rem;
   color: var(--text-main);
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Print Optimization for PDF Export */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    background-image: none !important;
+  }
+  
+  .print-hide, .tabs, .mode-toggle, header select, header button, .auth-modal {
+    display: none !important;
+  }
+  
+  .container {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  
+  .glass-panel, .metric-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 20px !important;
+  }
+  
+  h1, h2, h3, h4, .panel-title, .metric-label, .metric-value, .subtitle {
+    color: #000000 !important;
+  }
+  
+  /* Force charts to render cleanly on white bg */
+  .recharts-text {
+    fill: #000000 !important;
+  }
+  
+  .recharts-cartesian-grid-horizontal line, 
+  .recharts-cartesian-grid-vertical line {
+    stroke: #e2e8f0 !important;
+  }
+}
