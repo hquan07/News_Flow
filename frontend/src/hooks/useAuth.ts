@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API_BASE = "http://localhost:8001/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
 export function useAuth(setActiveTab: (tab: string) => void) {
   const [user, setUser] = useState<any>(null);
@@ -38,6 +38,7 @@ export function useAuth(setActiveTab: (tab: string) => void) {
 
       if (authMode === "login") {
         localStorage.setItem("token", data.access_token);
+        localStorage.setItem("user_cache", JSON.stringify(data.user));
         setUser(data.user);
         setShowAuth(false);
       } else {
@@ -51,6 +52,7 @@ export function useAuth(setActiveTab: (tab: string) => void) {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user_cache");
     setUser(null);
     setActiveTab("overview");
   };

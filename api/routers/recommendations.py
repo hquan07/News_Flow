@@ -1,22 +1,8 @@
-from fastapi import APIRouter, Header, HTTPException, Depends
-from typing import Optional, List
+from fastapi import APIRouter, HTTPException, Depends
 from api.services.analytics import _query
-import jwt
+from api.security import get_current_user
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
-
-SECRET_KEY = "newspulse_super_secret" 
-ALGORITHM = "HS256"
-
-def get_current_user(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    token = authorization.split(" ")[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.get("/")
 def get_recommendations(user: dict = Depends(get_current_user)):
@@ -24,8 +10,9 @@ def get_recommendations(user: dict = Depends(get_current_user)):
     
     # 1. Fetch user's top categories based on interaction
     interacted_data = _query(
-        f"SELECT article_hash FROM newspulse.user_interactions "
-        f"WHERE user_id = '{user_id}' ORDER BY timestamp DESC LIMIT 50"
+        "SELECT article_hash FROM newspulse.user_interactions "
+        "WHERE user_id = {user_id:String} ORDER BY timestamp DESC LIMIT 50",
+        {"user_id": user_id},
     )
     
     if not interacted_data:
@@ -37,14 +24,14 @@ def get_recommendations(user: dict = Depends(get_current_user)):
     else:
         # In a real app, we would join with raw_articles to find categories and recommend
         # For simplicity, we just fetch random fresh articles the user hasn't seen
-        hashes = [row['article_hash'] for row in interacted_data]
-        hash_list_str = "','".join(hashes)
+        hashes = [row["article_hash"] for row in interacted_data]
         
         articles = _query(
-            f"SELECT url_hash, url, title, content, author, source, category, publish_time "
-            f"FROM newspulse.raw_articles "
-            f"WHERE url_hash NOT IN ('{hash_list_str}') "
-            f"ORDER BY publish_time DESC LIMIT 20"
+            "SELECT url_hash, url, title, content, author, source, category, publish_time "
+            "FROM newspulse.raw_articles "
+            "WHERE url_hash NOT IN {hashes:Array(String)} "
+            "ORDER BY publish_time DESC LIMIT 20",
+            {"hashes": hashes},
         )
         
     return {"articles": articles}

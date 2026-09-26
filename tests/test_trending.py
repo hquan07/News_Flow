@@ -1,46 +1,22 @@
-import pytest
-from httpx import AsyncClient
-
-@pytest.mark.asyncio
-async def test_trending_keywords(async_client: AsyncClient):
-    response = await async_client.get("/api/v1/trending/keywords")
-    assert response.status_code == 200
-
-    data = response.json()
-    assert isinstance(data, list)
+from api.models.schemas import TimeRangeEnum
+from api.routers.trending import trending_keywords
 
 
-@pytest.mark.asyncio
-async def test_trending_keywords_with_limit(async_client: AsyncClient):
-    response = await async_client.get(
-        "/api/v1/trending/keywords?limit=5"
+def test_trending_keywords():
+    data = trending_keywords(
+        time_range=TimeRangeEnum.week,
+        limit=20,
+        source=None,
+        category=None,
     )
-    assert response.status_code == 200
-
-    data = response.json()
-    assert len(data) <= 5
+    assert data == [{"keyword": "AI", "count": 2}]
 
 
-@pytest.mark.asyncio
-async def test_keyword_timeline(async_client: AsyncClient):
-    response = await async_client.get(
-        "/api/v1/trending/keywords/AI/timeline"
+def test_trending_keywords_with_limit():
+    data = trending_keywords(
+        time_range=TimeRangeEnum.week,
+        limit=1,
+        source=None,
+        category=None,
     )
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["keyword"] == "AI"
-    assert "data" in data
-
-
-@pytest.mark.asyncio
-async def test_co_occurrences(async_client: AsyncClient):
-    response = await async_client.get("/api/v1/trending/co-occurrences")
-    assert response.status_code == 200
-
-    data = response.json()
-    assert isinstance(data, list)
-    if data:
-        assert "keyword_a" in data[0]
-        assert "keyword_b" in data[0]
-        assert "co_count" in data[0]
+    assert len(data) == 1

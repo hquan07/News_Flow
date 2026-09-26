@@ -1,9 +1,16 @@
-from pydantic_settings import BaseSettings
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 import clickhouse_connect
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     APP_NAME: str = "NewsPulse Insights Dashboard"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
@@ -19,6 +26,17 @@ class Settings(BaseSettings):
     MONGO_PORT: int = 27018
     MONGO_DB: str = "newspulse"
 
+    JWT_SECRET_KEY: str = Field(
+        min_length=16,
+        validation_alias=AliasChoices(
+            "JWT_SECRET_KEY",
+            "AIRFLOW__WEBSERVER__SECRET_KEY",
+        ),
+    )
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
+    CORS_ORIGINS: str = "http://localhost,http://localhost:3000"
+
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
@@ -33,9 +51,9 @@ class Settings(BaseSettings):
     def mongo_url(self) -> str:
         return f"mongodb://{self.MONGO_HOST}:{self.MONGO_PORT}"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 
 @lru_cache()

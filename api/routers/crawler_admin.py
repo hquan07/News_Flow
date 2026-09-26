@@ -4,10 +4,11 @@ Allows Admin to view crawler statuses, trigger crawls, and check data quality.
 """
 import httpx
 import logging
+import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
-from api.routers.admin import get_admin_user
+from api.security import get_admin_user
 from api.services.analytics import _query
 
 logger = logging.getLogger(__name__)
@@ -15,8 +16,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/crawlers", tags=["Crawler Management"])
 
 # Airflow REST API config (internal Docker network)
-AIRFLOW_BASE_URL = "http://airflow-webserver:8080/api/v1"
-AIRFLOW_AUTH = ("admin", "admin")
+AIRFLOW_BASE_URL = os.getenv("AIRFLOW_API_URL", "http://airflow-webserver:8080/api/v1")
+
+
+def _airflow_auth() -> tuple[str, str]:
+    username = os.getenv("AIRFLOW_API_USERNAME")
+    password = os.getenv("AIRFLOW_API_PASSWORD")
+    if not username or not password:
+        raise HTTPException(
+            status_code=503,
+            detail="Airflow API credentials are not configured",
+        )
+    return username, password
 
 # Map spider name -> readable info
 SPIDER_REGISTRY = {
@@ -36,7 +47,7 @@ async def _airflow_get(path: str) -> dict:
     """Helper to call Airflow REST API with basic auth."""
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
-            resp = await client.get(f"{AIRFLOW_BASE_URL}{path}", auth=AIRFLOW_AUTH)
+            resp = await client.get(f"{AIRFLOW_BASE_URL}{path}", auth=_airflow_auth())
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -53,7 +64,7 @@ async def _airflow_post(path: str, json_body: dict = None) -> dict:
         try:
             resp = await client.post(
                 f"{AIRFLOW_BASE_URL}{path}",
-                auth=AIRFLOW_AUTH,
+                auth=_airflow_auth(),
                 json=json_body or {},
             )
             resp.raise_for_status()

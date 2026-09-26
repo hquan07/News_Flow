@@ -54,7 +54,7 @@ import SentimentView from "@/components/views/SentimentView";
 import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
 
-const API_BASE = "http://localhost:8001/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
 type FeedEvent = {
   timestamp: string;
@@ -151,6 +151,7 @@ export default function Home() {
 
       if (authMode === "login") {
         localStorage.setItem("token", data.access_token);
+        localStorage.setItem("user_cache", JSON.stringify(data.user));
         setUser(data.user);
         setShowAuth(false);
       } else {
@@ -164,6 +165,7 @@ export default function Home() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user_cache");
     setUser(null);
     setActiveTab("overview");
   };

@@ -1,0 +1,12 @@
+fastapi==0.115.6
+uvicorn==0.34.0
+clickhouse-connect==0.7.0
+motor==3.6.0
+pymongo==4.9.2
+pydantic>=2.4.0,<2.11.0
+pydantic-settings>=2.0.0
+httpx>=0.25.0,<0.28.0
+PyJWT==2.8.0
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+email-validator

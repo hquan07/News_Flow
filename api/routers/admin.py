@@ -1,34 +1,16 @@
-from fastapi import APIRouter, Header, HTTPException, Depends
-from typing import Optional
+from fastapi import APIRouter, Depends
 from api.services.analytics import _query
 from api.database import get_mongo_db
-import jwt
+from api.security import get_admin_user
 
 router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
-
-SECRET_KEY = "newspulse_super_secret" 
-ALGORITHM = "HS256"
-
-def get_admin_user(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    token = authorization.split(" ")[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("role") != "admin":
-            raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
-        return payload
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.get("/metrics/latency")
 def get_crawl_latency(user: dict = Depends(get_admin_user)):
     """Lấy độ trễ trung bình khi cào dữ liệu (từ bài báo xuất bản đến lúc cào)."""
     query = """
         SELECT source, avg(crawl_latency_minutes) as avg_latency
-        FROM raw_articles
+        FROM newspulse.raw_articles
         WHERE crawl_latency_minutes IS NOT NULL
         GROUP BY source
         ORDER BY avg_latency DESC
@@ -47,7 +29,7 @@ def get_article_volume(user: dict = Depends(get_admin_user)):
     """Lấy tổng số bài viết theo nguồn, bao gồm cả News và Social."""
     query_news = """
         SELECT source, count(*) as total_articles
-        FROM raw_articles
+        FROM newspulse.raw_articles
         GROUP BY source
         ORDER BY total_articles DESC
     """
@@ -55,7 +37,7 @@ def get_article_volume(user: dict = Depends(get_admin_user)):
     
     query_social = """
         SELECT source, count(*) as total_articles
-        FROM social_sentiment_metrics
+        FROM newspulse.social_sentiment_metrics
         GROUP BY source
         ORDER BY total_articles DESC
     """

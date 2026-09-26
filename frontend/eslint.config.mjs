@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // The dashboard consumes heterogeneous analytics payloads. These will be
+      // tightened incrementally as API response contracts are generated.
+      "@typescript-eslint/no-explicit-any": "off",
+      // Initial state is intentionally hydrated from localStorage/API effects.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -1,11 +1,20 @@
-import requests
+import pytest
+from httpx import AsyncClient
 
-url = "http://localhost:8001/api/v1/auth/login"
-res = requests.post(url, json={"email": "admin@newspulse.com", "password": "admin"})
-token = res.json().get("access_token")
-print("Token:", token)
+from api.security import create_access_token
 
-headers = {"Authorization": f"Bearer {token}"}
-print("Latency:", requests.get("http://localhost:8001/api/v1/admin/metrics/latency", headers=headers).json())
-print("Clickbait:", requests.get("http://localhost:8001/api/v1/admin/metrics/clickbait", headers=headers).json())
-print("Users:", requests.get("http://localhost:8001/api/v1/admin/metrics/users", headers=headers).json())
+
+@pytest.mark.asyncio
+async def test_admin_metrics_require_auth(async_client: AsyncClient):
+    response = await async_client.get("/api/v1/admin/metrics/latency")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_admin_metrics_reject_non_admin(async_client: AsyncClient):
+    token = create_access_token({"sub": "user-1", "role": "user"})
+    response = await async_client.get(
+        "/api/v1/admin/metrics/latency",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
