@@ -1,5 +1,11 @@
+import logging
+import time
 from typing import Optional
+
 from api.config import get_ch_client
+
+
+logger = logging.getLogger("newspulse.analytics")
 
 
 def _resolve_time_range(time_range, date_column="publish_time"):
@@ -15,16 +21,35 @@ def _resolve_time_range(time_range, date_column="publish_time"):
 
 
 def _query(sql, params=None):
-    client = get_ch_client()
-    try:
-        result = client.query(sql, parameters=params or {})
-        return list(result.named_results())
-    except Exception as e:
-        print(f"ClickHouse Query Error: {e}")
-        return []
-    finally:
-        if hasattr(client, 'close'):
-            client.close()
+    from api.config import get_settings
+
+    settings = get_settings()
+    attempts = max(settings.CLICKHOUSE_QUERY_RETRIES, 1)
+    for attempt in range(1, attempts + 1):
+        client = None
+        try:
+            client = get_ch_client()
+            result = client.query(sql, parameters=params or {})
+            return list(result.named_results())
+        except Exception as exc:
+            if attempt == attempts:
+                logger.error(
+                    "ClickHouse query failed after %s attempts: %s",
+                    attempts,
+                    exc,
+                )
+                return []
+            delay = settings.RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+            logger.warning(
+                "ClickHouse query attempt %s/%s failed; retrying in %.2fs",
+                attempt,
+                attempts,
+                delay,
+            )
+            time.sleep(delay)
+        finally:
+            if client is not None and hasattr(client, "close"):
+                client.close()
 
 
 def _query_one(sql, params=None):
@@ -321,4 +346,3 @@ def get_entity_knowledge_graph(time_range="7d", limit=30):
     links = [{"source": l["source"], "target": l["target"], "weight": l["weight"]} for l in links_raw]
 
     return {"nodes": nodes, "links": links}
-

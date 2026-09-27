@@ -1,6 +1,8 @@
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 import clickhouse_connect
+import time
+from typing import List, Tuple
 from loguru import logger
 
 from config.spark_config import (
@@ -12,6 +14,11 @@ from config.spark_config import (
     CLICKHOUSE_DB,
     CLICKHOUSE_USER,
     CLICKHOUSE_PASSWORD,
+    CLICKHOUSE_INSERT_BATCH_SIZE,
+    CLICKHOUSE_WRITE_RETRIES,
+    RETRY_BASE_DELAY_SECONDS,
+    KAFKA_BOOTSTRAP_SERVERS,
+    KAFKA_DLQ_TOPIC,
 )
 
 
@@ -37,22 +44,67 @@ def write_to_mongodb_batch(df: DataFrame, collection: str = MONGO_PROCESSED_COLL
     )
 
 
+def _insert_chunk(table: str, columns: List[str], data: List[Tuple]) -> None:
+    for attempt in range(1, CLICKHOUSE_WRITE_RETRIES + 1):
+        client = None
+        try:
+            client = _get_clickhouse_client()
+            client.insert(table, data, column_names=columns)
+            return
+        except Exception:
+            if attempt == CLICKHOUSE_WRITE_RETRIES:
+                raise
+            time.sleep(RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)))
+        finally:
+            if client is not None:
+                client.close()
+
+
+def _write_partition(rows, table: str, columns: List[str]) -> None:
+    chunk = []
+    for row in rows:
+        chunk.append(tuple(row[column] for column in columns))
+        if len(chunk) >= CLICKHOUSE_INSERT_BATCH_SIZE:
+            _insert_chunk(table, columns, chunk)
+            chunk = []
+    if chunk:
+        _insert_chunk(table, columns, chunk)
+
+
 def write_to_clickhouse_batch(df: DataFrame, table: str):
+    """Insert one Spark partition at a time without collecting on the driver."""
     if df.isEmpty():
         return
+    columns = df.columns
+    df.foreachPartition(lambda rows: _write_partition(rows, table, columns))
 
-    rows = df.collect()
-    if not rows:
-        return
 
-    cols = df.columns
-    data = [tuple(row[c] for c in cols) for row in rows]
-
-    try:
-        client = _get_clickhouse_client()
-        client.insert(table, data, column_names=cols)
-    except Exception as e:
-        logger.error(f"Failed to write to ClickHouse table {table}: {e}")
+def create_dead_letter_writer(df: DataFrame, checkpoint_name: str):
+    payload = df.select(
+        F.concat_ws(
+            ":",
+            F.col("kafka_topic"),
+            F.col("kafka_partition"),
+            F.col("kafka_offset"),
+        ).cast("string").alias("key"),
+        F.to_json(F.struct(
+            F.col("parse_error").alias("reason"),
+            F.col("raw_payload").alias("payload"),
+            F.col("kafka_topic").alias("original_topic"),
+            F.col("kafka_partition").alias("original_partition"),
+            F.col("kafka_offset").alias("original_offset"),
+            F.col("kafka_timestamp").alias("original_timestamp"),
+        )).alias("value"),
+    )
+    return (
+        payload.writeStream
+        .format("kafka")
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
+        .option("topic", KAFKA_DLQ_TOPIC)
+        .option("checkpointLocation", f"/tmp/spark-checkpoints/{checkpoint_name}-dlq")
+        .outputMode("append")
+        .start()
+    )
 
 
 def create_clickhouse_streaming_writer(df: DataFrame, table: str = "raw_articles"):

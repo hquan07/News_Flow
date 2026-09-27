@@ -1,9 +1,12 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from api.config import get_settings
 from api.database import lifespan_db
+from api.middleware import RequestContextMiddleware
+from api.services.health import dependency_health
 from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin
 
 settings = get_settings()
@@ -33,7 +36,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+app.add_middleware(RequestContextMiddleware)
 
 prefix = settings.API_V1_PREFIX
 app.include_router(articles.router, prefix=prefix)
@@ -58,6 +63,19 @@ async def health_check():
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
     }
+
+
+@app.get("/health/ready", tags=["Health"])
+async def readiness_check():
+    result = await dependency_health()
+    return JSONResponse(
+        content={
+            **result,
+            "service": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+        },
+        status_code=200 if result["status"] == "healthy" else 503,
+    )
 
 
 @app.get("/", tags=["Root"])

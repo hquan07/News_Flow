@@ -1,7 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
 from api.config import get_settings
 
 settings = get_settings()
@@ -12,7 +10,14 @@ _mongo_client: AsyncIOMotorClient | None = None
 def get_mongo_client() -> AsyncIOMotorClient:
     global _mongo_client
     if _mongo_client is None:
-        _mongo_client = AsyncIOMotorClient(settings.mongo_url)
+        timeout_ms = int(settings.HEALTHCHECK_TIMEOUT_SECONDS * 1000)
+        _mongo_client = AsyncIOMotorClient(
+            settings.mongo_url,
+            serverSelectionTimeoutMS=timeout_ms,
+            connectTimeoutMS=timeout_ms,
+            retryReads=True,
+            retryWrites=True,
+        )
     return _mongo_client
 
 

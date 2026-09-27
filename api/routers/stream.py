@@ -1,43 +1,96 @@
 import asyncio
 import json
-from datetime import datetime
-from fastapi import APIRouter
+import logging
+import time
+from datetime import datetime, timezone
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from api.services.analytics import get_social_crisis_alerts, get_viral_post_alerts
 from api.routers.alerts import current_thresholds
+from api.config import get_settings
 
 router = APIRouter(prefix="/stream", tags=["Stream"])
+logger = logging.getLogger("newspulse.stream")
 
 
-async def event_generator():
-    """Mock SSE generator that also checks for real alerts."""
+class AlertCache:
+    def __init__(self):
+        self._lock = asyncio.Lock()
+        self._updated_at = 0.0
+        self._value = {"crisis": [], "viral": []}
+
+    async def get(self) -> dict:
+        ttl = get_settings().SSE_ALERT_CACHE_SECONDS
+        now = time.monotonic()
+        if now - self._updated_at < ttl:
+            return self._value
+
+        async with self._lock:
+            now = time.monotonic()
+            if now - self._updated_at < ttl:
+                return self._value
+
+            try:
+                crisis, viral = await asyncio.gather(
+                    asyncio.to_thread(
+                        get_social_crisis_alerts,
+                        current_thresholds.crisis_negative_pct,
+                        current_thresholds.crisis_min_posts,
+                    ),
+                    asyncio.to_thread(
+                        get_viral_post_alerts,
+                        current_thresholds.viral_interactions,
+                    ),
+                )
+            except Exception:
+                # Back off all connected clients together when a dependency is down.
+                self._updated_at = time.monotonic()
+                raise
+            self._value = {"crisis": crisis, "viral": viral}
+            self._updated_at = time.monotonic()
+            return self._value
+
+
+alert_cache = AlertCache()
+
+
+async def event_generator(request: Request):
+    """Stream shared alert snapshots and per-connection heartbeats."""
     while True:
         await asyncio.sleep(5)
-        
-        # Poll alerts
+        if await request.is_disconnected():
+            break
+
         try:
-            crisis = get_social_crisis_alerts(current_thresholds.crisis_negative_pct, current_thresholds.crisis_min_posts)
-            viral = get_viral_post_alerts(current_thresholds.viral_interactions)
-            
+            alerts = await alert_cache.get()
+            crisis = alerts["crisis"]
+            viral = alerts["viral"]
             if crisis or viral:
                 data = json.dumps({
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "type": "social_alerts",
                     "crisis": crisis,
                     "viral": viral,
-                })
+                }, default=str)
                 yield f"event: alert\ndata: {data}\n\n"
-        except Exception as e:
-            print(f"SSE Alert Error: {e}")
+        except Exception:
+            logger.exception("Failed to refresh SSE alerts")
             
         data = json.dumps({
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "type": "heartbeat",
         })
         yield f"event: update\ndata: {data}\n\n"
 
 
 @router.get("/")
-async def sse_stream():
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+async def sse_stream(request: Request):
+    return StreamingResponse(
+        event_generator(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

@@ -20,6 +20,8 @@ RUN pip3 install --no-cache-dir uv && \
     loguru==0.7.3 \
     kafka-python==2.0.2 \
     clickhouse-connect==0.6.8 \
+    groq==0.4.2 \
+    "httpx>=0.25.0,<0.28.0" \
     underthesea
 
 # Create directory for Hugging Face cache and set permissions so spark user can write to it
@@ -30,4 +32,3 @@ RUN mkdir -p /tmp/hf_cache && \
 USER spark
 
 ENV HF_HOME="/tmp/hf_cache"
-ENV TRANSFORMERS_CACHE="/tmp/hf_cache"

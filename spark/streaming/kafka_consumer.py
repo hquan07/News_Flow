@@ -44,17 +44,29 @@ def create_kafka_stream(spark: SparkSession) -> DataFrame:
         .load()
     )
 
-    return (
+    parsed = (
         raw_stream
         .select(
             F.col("topic").alias("kafka_topic"),
             F.col("partition").alias("kafka_partition"),
             F.col("offset").alias("kafka_offset"),
             F.col("timestamp").alias("kafka_timestamp"),
+            F.col("value").cast("string").alias("raw_payload"),
             F.from_json(F.col("value").cast("string"), ARTICLE_SCHEMA).alias("article"),
         )
-        .select("kafka_topic", "kafka_partition", "kafka_offset", "kafka_timestamp", "article.*")
-        .filter(F.col("url").isNotNull() & F.col("title").isNotNull())
+        .withColumn(
+            "parse_error",
+            F.when(F.col("article").isNull(), F.lit("invalid_json"))
+            .when(F.col("article.url").isNull(), F.lit("missing_url"))
+            .when(F.col("article.title").isNull(), F.lit("missing_title")),
+        )
+    )
+    return (
+        parsed
+        .select(
+            "kafka_topic", "kafka_partition", "kafka_offset",
+            "kafka_timestamp", "raw_payload", "parse_error", "article.*",
+        )
         .withColumn("url_hash", md5_hash_udf(F.col("url")))
         .drop("raw_html")
     )
@@ -88,17 +100,27 @@ def create_social_kafka_stream(spark: SparkSession) -> DataFrame:
         .load()
     )
 
-    return (
+    parsed = (
         raw_stream
         .select(
             F.col("topic").alias("kafka_topic"),
             F.col("partition").alias("kafka_partition"),
             F.col("offset").alias("kafka_offset"),
             F.col("timestamp").alias("kafka_timestamp"),
+            F.col("value").cast("string").alias("raw_payload"),
             F.from_json(F.col("value").cast("string"), SOCIAL_SCHEMA).alias("post"),
         )
-        .select("kafka_topic", "kafka_partition", "kafka_offset", "kafka_timestamp", "post.*")
-        .filter(F.col("post_id").isNotNull())
+        .withColumn(
+            "parse_error",
+            F.when(F.col("post").isNull(), F.lit("invalid_json"))
+            .when(F.col("post.post_id").isNull(), F.lit("missing_post_id")),
+        )
+    )
+    return (
+        parsed.select(
+            "kafka_topic", "kafka_partition", "kafka_offset",
+            "kafka_timestamp", "raw_payload", "parse_error", "post.*",
+        )
     )
 
 

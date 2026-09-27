@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
     CORS_ORIGINS: str = "http://localhost,http://localhost:3000"
+    CLICKHOUSE_QUERY_RETRIES: int = 3
+    RETRY_BASE_DELAY_SECONDS: float = 0.2
+    HEALTHCHECK_TIMEOUT_SECONDS: float = 3.0
+    SSE_ALERT_CACHE_SECONDS: float = 5.0
 
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
@@ -70,4 +74,6 @@ def get_ch_client():
         username=s.CLICKHOUSE_USER,
         password=s.CLICKHOUSE_PASSWORD,
         database=s.CLICKHOUSE_DB,
+        connect_timeout=s.HEALTHCHECK_TIMEOUT_SECONDS,
+        send_receive_timeout=10,
     )

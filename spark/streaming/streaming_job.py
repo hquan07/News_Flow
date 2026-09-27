@@ -5,7 +5,7 @@ from pyspark.sql import functions as F
 
 from spark.utils.spark_session import create_spark_session
 from spark.streaming.kafka_consumer import create_kafka_stream, create_social_kafka_stream
-from spark.streaming.sink_writers import create_clickhouse_streaming_writer
+from spark.streaming.sink_writers import create_dead_letter_writer
 from spark.streaming.nlp_writers import (
     write_keywords_to_clickhouse,
     write_entities_to_clickhouse,
@@ -27,7 +27,16 @@ def main():
     spark = create_spark_session(app_name="NewsPulse-Streaming", is_streaming=True)
     logger.info("SparkSession created successfully")
 
-    raw_stream = create_kafka_stream(spark)
+    article_input = create_kafka_stream(spark)
+    article_dlq_query = create_dead_letter_writer(
+        article_input.filter(F.col("parse_error").isNotNull()),
+        "articles",
+    )
+    raw_stream = (
+        article_input
+        .filter(F.col("parse_error").isNull())
+        .drop("raw_payload", "parse_error")
+    )
     cleaned_stream = apply_text_cleaning(raw_stream)
     with_keywords = apply_keyword_extraction(cleaned_stream)
     enriched_stream = apply_ner_extraction(with_keywords)
@@ -37,54 +46,52 @@ def main():
     def _write_all_batch(batch_df, batch_id):
         if batch_df.isEmpty():
             return
-        
-        # Persist to avoid recomputing the entire NLP pipeline for each write
-        batch_df.persist()
-        
-        # Write to raw_articles
-        output_df = batch_df.select(
-            F.col("url_hash"),
-            F.col("url"),
-            F.col("title_clean").alias("title"),
-            F.col("content_clean").alias("content"),
-            F.col("author"),
-            F.coalesce(F.col("publish_timestamp"), F.col("crawled_timestamp"), F.current_timestamp()).alias("publish_time"),
-            F.col("source"),
-            F.lit("").alias("source_domain"),
-            F.col("category_normalized").alias("category"),
-            F.col("word_count"),
-            F.col("keyword_count"),
-            F.col("publish_hour"),
-            F.col("crawl_latency_minutes"),
-            F.col("clickbait_score"),
-            F.coalesce(F.col("crawled_timestamp"), F.current_timestamp()).alias("crawled_at"),
-            F.current_timestamp().alias("loaded_at"),
-        ).fillna({
-            "author": "", 
-            "content": "", 
-            "category": "",
-            "title": "",
-            "url": "",
-            "url_hash": "",
-            "source": "",
-            "word_count": 0,
-            "keyword_count": 0,
-            "publish_hour": 0,
-            "crawl_latency_minutes": 0.0,
-            "clickbait_score": 0.0
-        })
-        
-        from spark.streaming.sink_writers import write_to_clickhouse_batch
-        write_to_clickhouse_batch(output_df, "raw_articles")
-        logger.info(f"[ClickHouse] Batch {batch_id}: wrote {output_df.count()} records to raw_articles")
 
-        # Write to NLP tables
-        kw_count = write_keywords_to_clickhouse(batch_df)
-        ent_count = write_entities_to_clickhouse(batch_df)
-        sent_count = write_sentiment_to_clickhouse(batch_df)
-        logger.info(f"[NLP] Batch {batch_id}: {kw_count} keywords, {ent_count} entities, {sent_count} sentiment records")
-        
-        batch_df.unpersist()
+        batch_df.persist()
+        try:
+            output_df = batch_df.select(
+                F.col("url_hash"),
+                F.col("url"),
+                F.col("title_clean").alias("title"),
+                F.col("content_clean").alias("content"),
+                F.col("author"),
+                F.coalesce(F.col("publish_timestamp"), F.col("crawled_timestamp"), F.current_timestamp()).alias("publish_time"),
+                F.col("source"),
+                F.lit("").alias("source_domain"),
+                F.col("category_normalized").alias("category"),
+                F.col("word_count"),
+                F.col("keyword_count"),
+                F.col("publish_hour"),
+                F.col("crawl_latency_minutes"),
+                F.col("clickbait_score"),
+                F.coalesce(F.col("crawled_timestamp"), F.current_timestamp()).alias("crawled_at"),
+                F.current_timestamp().alias("loaded_at"),
+            ).fillna({
+                "author": "",
+                "content": "",
+                "category": "",
+                "title": "",
+                "url": "",
+                "url_hash": "",
+                "source": "",
+                "word_count": 0,
+                "keyword_count": 0,
+                "publish_hour": 0,
+                "crawl_latency_minutes": 0.0,
+                "clickbait_score": 0.0,
+            }).dropDuplicates(["url_hash"])
+
+            from spark.streaming.sink_writers import write_to_clickhouse_batch
+            article_count = output_df.count()
+            write_to_clickhouse_batch(output_df, "raw_articles")
+            logger.info(f"[ClickHouse] Batch {batch_id}: wrote {article_count} records to raw_articles")
+
+            kw_count = write_keywords_to_clickhouse(batch_df)
+            ent_count = write_entities_to_clickhouse(batch_df)
+            sent_count = write_sentiment_to_clickhouse(batch_df)
+            logger.info(f"[NLP] Batch {batch_id}: {kw_count} keywords, {ent_count} entities, {sent_count} sentiment records")
+        finally:
+            batch_df.unpersist()
 
     main_query = (
         enriched_stream.writeStream
@@ -96,43 +103,53 @@ def main():
     logger.info("Main streaming writer started")
 
     # ================= SOCIAL STREAMING =================
-    social_stream = create_social_kafka_stream(spark)
+    social_input = create_social_kafka_stream(spark)
+    social_dlq_query = create_dead_letter_writer(
+        social_input.filter(F.col("parse_error").isNotNull()),
+        "social",
+    )
+    social_stream = (
+        social_input
+        .filter(F.col("parse_error").isNull())
+        .drop("raw_payload", "parse_error")
+    )
     social_enriched = apply_social_sentiment_analysis(social_stream)
 
     def _write_social_batch(batch_df, batch_id):
         if batch_df.isEmpty():
             return
-        
+
         batch_df.persist()
-        
-        output_df = batch_df.select(
-            F.col("post_id"),
-            F.col("source"),
-            F.col("title"),
-            F.col("content"),
-            F.col("like_count").cast("int"),
-            F.col("upvote_ratio").cast("float"),
-            F.col("reply_count").cast("int"),
-            F.col("sentiment_score").cast("float"),
-            F.col("sentiment_label"),
-            F.col("publish_time").cast("timestamp"),
-            F.coalesce(F.col("crawl_time").cast("timestamp"), F.current_timestamp()).alias("crawled_at"),
-            F.current_timestamp().alias("loaded_at"),
-        ).fillna({
-            "title": "",
-            "content": "",
-            "like_count": 0,
-            "upvote_ratio": 1.0,
-            "reply_count": 0,
-            "sentiment_score": 0.0,
-            "sentiment_label": "neutral"
-        })
-        
-        from spark.streaming.sink_writers import write_to_clickhouse_batch
-        write_to_clickhouse_batch(output_df, "social_sentiment_metrics")
-        logger.info(f"[ClickHouse] Batch {batch_id}: wrote {output_df.count()} records to social_sentiment_metrics")
-        
-        batch_df.unpersist()
+        try:
+            output_df = batch_df.select(
+                F.col("post_id"),
+                F.col("source"),
+                F.col("title"),
+                F.col("content"),
+                F.col("like_count").cast("int"),
+                F.col("upvote_ratio").cast("float"),
+                F.col("reply_count").cast("int"),
+                F.col("sentiment_score").cast("float"),
+                F.col("sentiment_label"),
+                F.col("publish_time").cast("timestamp"),
+                F.coalesce(F.col("crawl_time").cast("timestamp"), F.current_timestamp()).alias("crawled_at"),
+                F.current_timestamp().alias("loaded_at"),
+            ).fillna({
+                "title": "",
+                "content": "",
+                "like_count": 0,
+                "upvote_ratio": 1.0,
+                "reply_count": 0,
+                "sentiment_score": 0.0,
+                "sentiment_label": "neutral",
+            }).dropDuplicates(["post_id"])
+
+            from spark.streaming.sink_writers import write_to_clickhouse_batch
+            post_count = output_df.count()
+            write_to_clickhouse_batch(output_df, "social_sentiment_metrics")
+            logger.info(f"[ClickHouse] Batch {batch_id}: wrote {post_count} records to social_sentiment_metrics")
+        finally:
+            batch_df.unpersist()
 
     social_query = (
         social_enriched.writeStream
@@ -147,6 +164,8 @@ def main():
         logger.warning(f"Received signal {signum}, shutting down...")
         main_query.stop()
         social_query.stop()
+        article_dlq_query.stop()
+        social_dlq_query.stop()
         spark.stop()
         logger.info("Streaming job stopped gracefully")
         sys.exit(0)

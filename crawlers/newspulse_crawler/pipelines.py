@@ -1,11 +1,12 @@
 import hashlib
 import logging
 import re
+import time
 import boto3
 
 from itemadapter import ItemAdapter
 from pymongo import MongoClient, ASCENDING
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import AutoReconnect, NetworkTimeout
 from scrapy.exceptions import DropItem
 
 logger = logging.getLogger(__name__)
@@ -129,10 +130,20 @@ class MongoPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
         doc = adapter.asdict()
-        try:
-            self.collection.insert_one(doc)
-        except DuplicateKeyError:
-            pass
+        for attempt in range(1, 4):
+            try:
+                result = self.collection.update_one(
+                    {"url": doc["url"]},
+                    {"$setOnInsert": doc},
+                    upsert=True,
+                )
+                if result.upserted_id is None:
+                    logger.debug("Article already persisted; allowing Kafka retry: %s", doc["url"])
+                break
+            except (AutoReconnect, NetworkTimeout):
+                if attempt == 3:
+                    raise
+                time.sleep(0.25 * (2 ** (attempt - 1)))
         return item
 
 
@@ -157,5 +168,6 @@ class KafkaPipeline:
         adapter = ItemAdapter(item)
         article = adapter.asdict()
         article.pop("raw_html", None)
-        self.producer.send_article(article)
+        if not self.producer.send_article(article):
+            raise DropItem(f"Kafka publish failed: {article.get('url', 'unknown')}")
         return item

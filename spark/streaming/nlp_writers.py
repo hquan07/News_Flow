@@ -17,7 +17,7 @@ def write_keywords_to_clickhouse(df: DataFrame) -> int:
             F.col("url_hash"),
             F.col("kw.keyword"),
             F.col("kw.score")
-        )
+        ).dropDuplicates(["url_hash", "keyword"])
 
         if kw_df.isEmpty():
             return 0
@@ -26,7 +26,7 @@ def write_keywords_to_clickhouse(df: DataFrame) -> int:
         return kw_df.count()
     except Exception as e:
         logger.error(f"[Keywords] Failed to write: {e}")
-        return 0
+        raise
 
 
 def write_entities_to_clickhouse(df: DataFrame) -> int:
@@ -43,7 +43,7 @@ def write_entities_to_clickhouse(df: DataFrame) -> int:
             F.col("ent.entity"),
             F.col("ent.entity_type"),
             F.col("ent.label")
-        )
+        ).dropDuplicates(["url_hash", "entity", "entity_type"])
 
         if ent_df.isEmpty():
             return 0
@@ -52,7 +52,7 @@ def write_entities_to_clickhouse(df: DataFrame) -> int:
         return ent_df.count()
     except Exception as e:
         logger.error(f"[Entities] Failed to write: {e}")
-        return 0
+        raise
 
 
 def write_sentiment_to_clickhouse(df: DataFrame) -> int:
@@ -64,7 +64,7 @@ def write_sentiment_to_clickhouse(df: DataFrame) -> int:
             F.col("url_hash"),
             F.col("sentiment_score"),
             F.col("sentiment_label")
-        )
+        ).dropDuplicates(["url_hash"])
 
         if sentiment_df.isEmpty():
             return 0
@@ -73,4 +73,4 @@ def write_sentiment_to_clickhouse(df: DataFrame) -> int:
         return sentiment_df.count()
     except Exception as e:
         logger.error(f"[Sentiment] Failed to write: {e}")
-        return 0
+        raise

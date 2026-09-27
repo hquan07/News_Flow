@@ -102,6 +102,7 @@ services:
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.world
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic social_posts
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.law
+        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic newspulse.dlq
         echo 'Done!' && kafka-topics --list --bootstrap-server kafka:9092
       "
 
@@ -344,7 +345,7 @@ services:
       - "7077:7077"
       - "8082:8082"
     env_file:
-      - .env
+      - ../../.env
     environment:
       - PYTHONPATH=/opt/spark-apps
     volumes:
@@ -370,7 +371,7 @@ services:
       - org.apache.spark.deploy.worker.Worker
       - spark://spark-master:7077
     env_file:
-      - .env
+      - ../../.env
     environment:
       - SPARK_WORKER_MEMORY=4g
       - SPARK_WORKER_CORES=2

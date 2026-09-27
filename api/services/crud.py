@@ -1,6 +1,10 @@
 from typing import Optional
 from datetime import date
+import logging
 from api.config import get_ch_client
+
+
+logger = logging.getLogger("newspulse.crud")
 
 
 def get_articles(
@@ -43,7 +47,7 @@ def get_articles(
         ).first_row
         total = count_result[0] if count_result else 0
     except Exception as e:
-        print("Count Error:", e)
+        logger.exception("Failed to count articles")
         total = 0
 
     offset = (page - 1) * page_size
@@ -63,20 +67,22 @@ def get_articles(
         result = client.query(data_sql, parameters=params)
         rows = list(result.named_results())
     except Exception as e:
-        print("Data Error:", e)
+        logger.exception("Failed to list articles")
         rows = []
 
     # TODO: JOIN with raw_article_sentiment for real sentiment_score
     for row in rows:
         row["sentiment_score"] = 0.0
 
-    return {
+    response = {
         "total": total,
         "page": page,
         "page_size": page_size,
         "total_pages": (total + page_size - 1) // page_size if total else 0,
         "data": rows,
     }
+    client.close()
+    return response
 
 
 def get_article_detail(article_id: str) -> Optional[dict]:
@@ -109,5 +115,7 @@ def get_article_detail(article_id: str) -> Optional[dict]:
 
         return article
     except Exception as e:
-        print("Detail Error:", e)
+        logger.exception("Failed to load article detail article_id=%s", article_id)
         return None
+    finally:
+        client.close()

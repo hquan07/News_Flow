@@ -1,6 +1,7 @@
 import json
 import hashlib
 import logging
+import os
 import requests
 from datetime import datetime, timezone
 from typing import Optional
@@ -12,6 +13,7 @@ from pydantic import BaseModel, HttpUrl, Field, ValidationError
 from kafka_utils import get_topic
 
 logger = logging.getLogger(__name__)
+KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "newspulse.dlq")
 
 class ArticleSchema(BaseModel):
     url: str
@@ -96,10 +98,28 @@ class ArticleProducer:
             return True
         except ValidationError as ve:
             logger.error("Data Quality Error: Article failed schema validation %s: %s", article.get("url"), ve)
+            self._send_dead_letter(article, "schema_validation", str(ve))
             return False
         except KafkaError as e:
             logger.error("Failed to publish article %s: %s", article.get("url"), e)
             return False
+
+    def _send_dead_letter(self, article: dict, reason: str, error: str) -> None:
+        """Preserve invalid payloads that reached a healthy Kafka broker."""
+        try:
+            url = str(article.get("url", ""))
+            self._producer.send(
+                KAFKA_DLQ_TOPIC,
+                key=self._make_key(url) if url else None,
+                value={
+                    "reason": reason,
+                    "error": error,
+                    "payload": article,
+                    "failed_at": datetime.now(timezone.utc).isoformat(),
+                },
+            ).get(timeout=10)
+        except Exception:
+            logger.exception("Failed to publish invalid payload to DLQ")
 
     def flush(self):
         self._producer.flush()
