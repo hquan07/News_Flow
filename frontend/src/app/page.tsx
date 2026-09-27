@@ -53,6 +53,12 @@ async function safeFetch(url: string): Promise<any> {
   return res.json();
 }
 
+const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
+  overview: true,
+  sentiment: true,
+  debates: true,
+};
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
   const [dashboardMode, setDashboardMode] = useState<
@@ -323,6 +329,14 @@ export default function Home() {
     [],
   );
 
+  // Reset data when source changes
+  useEffect(() => {
+    setOverviewData(null);
+    setSentimentDist([]);
+    setSentimentTimeline([]);
+    setSentimentSources([]);
+  }, [selectedSource]);
+
   // Tab-aware polling
   useEffect(() => {
     let cancelled = false;
@@ -492,9 +506,10 @@ export default function Home() {
                 </button>
               )}
             </div>
-            <select
-              value={selectedSource}
-              onChange={(e) => setSelectedSource(e.target.value)}
+            {TAB_FILTER_CAPABILITIES[activeTab] && (
+              <select
+                value={selectedSource}
+                onChange={(e) => setSelectedSource(e.target.value)}
               style={{
                 padding: "8px 16px",
                 borderRadius: "8px",
@@ -525,7 +540,8 @@ export default function Home() {
                   <option value="reddit_vn">Reddit VN</option>
                 </>
               )}
-            </select>
+              </select>
+            )}
             <button
               onClick={() => window.print()}
               className="print-hide"
