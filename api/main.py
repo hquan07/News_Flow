@@ -7,7 +7,7 @@ from api.config import get_settings
 from api.database import lifespan_db
 from api.middleware import RequestContextMiddleware
 from api.services.health import dependency_health
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public
 
 settings = get_settings()
 
@@ -54,6 +54,7 @@ app.include_router(auth.router, prefix=prefix)
 app.include_router(recommendations.router, prefix=prefix)
 app.include_router(admin.router, prefix=prefix)
 app.include_router(crawler_admin.router, prefix=prefix)
+app.include_router(public.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])

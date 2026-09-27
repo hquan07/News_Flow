@@ -1,5 +1,5 @@
-import React from 'react';
-import { Activity, Database } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Activity, Database, AlertTriangle } from 'lucide-react';
 
 interface LandingHeroProps {
   authMode: 'login' | 'register';
@@ -17,13 +17,37 @@ interface LandingHeroProps {
 const LandingHero: React.FC<LandingHeroProps> = ({ 
   authMode, setAuthMode, authName, setAuthName, authEmail, setAuthEmail, authPassword, setAuthPassword, authModalError, handleAuth 
 }) => {
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('http://localhost:8001/api/v1/public/summary')
+      .then(res => res.json())
+      .then(data => {
+        setSummary(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setSummary({ status: 'unavailable', articles_processed: 0 });
+        setLoading(false);
+      });
+  }, []);
+
+  const isHealthy = summary?.status === 'healthy';
+
   return (
     <div className="landing-layout">
       
       {/* Left Column: Hero Information */}
       <div className="landing-copy">
-        <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '10px 20px', borderRadius: '30px', color: '#60a5fa', fontWeight: 600, marginBottom: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-          <Activity size={18} /> System Online & Processing
+        <div style={{ background: isHealthy ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)', border: `1px solid ${isHealthy ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`, padding: '10px 20px', borderRadius: '30px', color: isHealthy ? '#60a5fa' : '#ef4444', fontWeight: 600, marginBottom: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          {loading ? (
+            <>Checking system...</>
+          ) : isHealthy ? (
+            <><Activity size={18} /> System Online & Processing</>
+          ) : (
+            <><AlertTriangle size={18} /> Status unavailable</>
+          )}
         </div>
         
         <h1 className="landing-title">
@@ -37,12 +61,16 @@ const LandingHero: React.FC<LandingHeroProps> = ({
         <div className="landing-stats">
           <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
             <Database size={32} color="#3b82f6" style={{ marginBottom: '10px' }} />
-            <h3 style={{ fontSize: '1.5rem', margin: '0 0 5px 0' }}>150K+</h3>
+            <h3 style={{ fontSize: '1.5rem', margin: '0 0 5px 0' }}>
+              {loading ? '...' : summary?.articles_processed > 0 ? `${(summary.articles_processed / 1000).toFixed(0)}K+` : '0'}
+            </h3>
             <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.9rem' }}>Articles Processed</p>
           </div>
           <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
             <Activity size={32} color="#f43f5e" style={{ marginBottom: '10px' }} />
-            <h3 style={{ fontSize: '1.5rem', margin: '0 0 5px 0' }}>Real-time</h3>
+            <h3 style={{ fontSize: '1.5rem', margin: '0 0 5px 0' }}>
+              {loading ? '...' : isHealthy ? 'Real-time' : 'Offline'}
+            </h3>
             <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.9rem' }}>Anomaly Alerts</p>
           </div>
         </div>
