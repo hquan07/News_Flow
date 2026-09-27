@@ -2,46 +2,17 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
-import {
   Activity,
   BookOpen,
-  BarChart2,
   Radio,
   ThumbsUp,
   Hash,
-  Users,
   MessageSquare,
   AlertTriangle,
   Share2,
-  Settings,
-  Play,
-  RefreshCw,
-  Database,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Loader,
   Download,
-  FileText,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
-import KnowledgeGraph from "@/components/KnowledgeGraph";
 import AlertsPanel from "@/components/AlertsPanel";
 import AdminView from "@/components/views/AdminView";
 import DebatesView from "@/components/views/DebatesView";
@@ -118,7 +89,6 @@ export default function Home() {
 
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [user, setUser] = useState<any>(null);
-  const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -153,7 +123,6 @@ export default function Home() {
         localStorage.setItem("token", data.access_token);
         localStorage.setItem("user_cache", JSON.stringify(data.user));
         setUser(data.user);
-        setShowAuth(false);
       } else {
         setAuthMode("login");
         setAuthModalError("Registered successfully. Please login.");
@@ -217,7 +186,7 @@ export default function Home() {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-    } catch (e) {}
+    } catch {}
   };
 
   // Load UI state on mount
@@ -286,7 +255,7 @@ export default function Home() {
       setSentimentTimeline(result.sentiment_timeline || []);
       setSentimentSources(result.sentiment_by_source || []);
     }
-  }, [selectedSource, dashboardMode]);
+  }, [dashboardMode, selectedSource]);
 
   const fetchDebates = useCallback(async () => {
     const sourceParam = selectedSource ? `&source=${selectedSource}` : "";
@@ -299,7 +268,7 @@ export default function Home() {
         top_debates: result.top_debates,
       }));
     }
-  }, [selectedSource, dashboardMode]);
+  }, [dashboardMode, selectedSource]);
 
   const fetchAdmin = useCallback(async () => {
     const token = localStorage.getItem("token");
@@ -336,12 +305,12 @@ export default function Home() {
       setEntityTypeDist(results[2].value || []);
     if (results[3].status === "fulfilled")
       setEntitySentiment(results[3].value || []);
-  }, [selectedSource, dashboardMode]);
+  }, []);
 
   const fetchNetwork = useCallback(async () => {
     const result = await safeFetch(`${API_BASE}/entities/knowledge-graph`);
     setKnowledgeGraph(result);
-  }, [selectedSource, dashboardMode]);
+  }, []);
 
   const fetchArticles = useCallback(
     async (p: number) => {
@@ -351,7 +320,7 @@ export default function Home() {
       setArticles(result.data || []);
       setArticlesMeta(result);
     },
-    [selectedSource, dashboardMode],
+    [],
   );
 
   // Tab-aware polling
@@ -369,7 +338,7 @@ export default function Home() {
         else if (activeTab === "debates") await fetchDebates();
         else if (activeTab === "admin_dashboard") await fetchAdmin();
         if (!cancelled) setApiError(null);
-      } catch (err: any) {
+      } catch {
         if (!cancelled) setApiError("Mất kết nối tới API server");
       }
     };
@@ -818,7 +787,6 @@ export default function Home() {
 
           {activeTab === "foryou" && (
             <ForYouView
-              articles={articles}
               forYouArticles={forYouArticles}
               trackClick={trackClick}
               timeAgo={timeAgo}
@@ -829,11 +797,10 @@ export default function Home() {
               adminLatency={adminLatency}
               adminClickbait={adminClickbait}
               adminUsers={adminUsers}
-              timeAgo={timeAgo}
             />
           )}
           {activeTab === "debates" && dashboardMode === "social" && (
-            <DebatesView overviewData={overviewData} feed={feed} />
+            <DebatesView overviewData={overviewData} />
           )}
         </>
       )}

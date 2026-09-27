@@ -68,7 +68,7 @@ const AlertsPanel: React.FC = () => {
         setThresholds(data);
       }
       setError(null);
-    } catch (err: any) {
+    } catch {
       setError('Failed to fetch alerts.');
     } finally {
       setLoading(false);
@@ -89,7 +89,7 @@ const AlertsPanel: React.FC = () => {
           if (data.crisis) setCrisisAlerts(data.crisis);
           if (data.viral) setViralAlerts(data.viral);
         }
-      } catch (e) {}
+      } catch {}
     });
 
     return () => {
@@ -108,7 +108,7 @@ const AlertsPanel: React.FC = () => {
         setShowConfig(false);
         fetchAlerts(); // Re-fetch alerts with new config
       }
-    } catch (e) {
+    } catch {
       alert("Failed to save config");
     }
   };
@@ -133,6 +133,7 @@ const AlertsPanel: React.FC = () => {
           <Settings size={18} /> Configure
         </button>
       </div>
+      {error && <p role="alert" className="error-toast">{error}</p>}
 
       {showConfig && (
         <div className="glass-panel config-panel" style={{ marginBottom: '20px', padding: '20px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>

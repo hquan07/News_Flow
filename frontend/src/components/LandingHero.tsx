@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Database, ShieldAlert, Cpu } from 'lucide-react';
+import { Activity, Database } from 'lucide-react';
 
 interface LandingHeroProps {
   authMode: 'login' | 'register';

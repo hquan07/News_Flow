@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   BarChart,
   Bar,
@@ -14,7 +14,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { Users, Hash , MessageSquare , ThumbsUp } from "lucide-react";
+import { Users, MessageSquare, ThumbsUp } from "lucide-react";
 
 export default function EntitiesView({
   entitiesData,

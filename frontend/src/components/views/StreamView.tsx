@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Radio } from "lucide-react";
 
 export default function StreamView({ feed, isConnected }: any) {

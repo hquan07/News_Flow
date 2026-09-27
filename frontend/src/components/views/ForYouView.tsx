@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { BookOpen, Clock, ThumbsUp } from "lucide-react";
+import React from "react";
 
 export default function ForYouView({
-  articles,
   forYouArticles,
   trackClick,
   timeAgo,

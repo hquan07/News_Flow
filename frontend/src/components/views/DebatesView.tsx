@@ -1,18 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import React from "react";
 import { MessageSquare, ThumbsUp } from "lucide-react";
 
-export default function DebatesView({ overviewData, feed }: any) {
+export default function DebatesView({ overviewData }: any) {
   return (
     <>
       <div className="glass-panel" style={{ marginTop: "20px" }}>

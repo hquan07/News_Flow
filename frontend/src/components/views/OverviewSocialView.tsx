@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   LineChart,
   Line,
@@ -9,20 +9,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
   Legend,
 } from "recharts";
-import {
-  Activity,
-  BarChart2,
-  ThumbsUp,
-  MessageSquare,
-  Hash,
-} from "lucide-react";
+import { Activity } from "lucide-react";
 
 export default function OverviewSocialView({
   overviewData,

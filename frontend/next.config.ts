@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
-    useTypeScriptCli: false,
+    useTypeScriptCli: true,
   },
   async rewrites() {
     return [

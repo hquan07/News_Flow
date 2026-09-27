@@ -1,9 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,12 +11,8 @@ import {
   Bar,
   AreaChart,
   Area,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
 } from "recharts";
-import { Activity, BarChart2, Hash, ThumbsUp, BookOpen , FileText } from "lucide-react";
+import { Activity, BarChart2, FileText } from "lucide-react";
 
 export default function OverviewNewsView({
   overviewData,

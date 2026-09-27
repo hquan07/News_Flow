@@ -8,7 +8,7 @@ router = APIRouter(prefix="/articles", tags=["Articles"])
 
 
 @router.get("")
-async def list_articles(
+def list_articles(
         page: int = Query(default=1, ge=1),
         page_size: int = Query(default=20, ge=1, le=100),
         q: Optional[str] = Query(default=None, description="Search in title"),
@@ -27,7 +27,7 @@ async def list_articles(
 
 
 @router.get("/{article_id}")
-async def get_article(article_id: str):
+def get_article(article_id: str):
     article = get_article_detail(article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")

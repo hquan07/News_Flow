@@ -1,18 +1,11 @@
 import React, { useState } from "react";
 import {
   Activity,
-  Server,
-  Clock,
   Users,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
   BookOpen,
   Share2,
 } from "lucide-react";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -30,7 +23,6 @@ export default function AdminView({
   adminLatency,
   adminClickbait,
   adminUsers,
-  timeAgo,
 }: any) {
   const [activeCard, setActiveCard] = useState<number | null>(null);
   return (

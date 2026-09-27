@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Share2 } from "lucide-react";
 import KnowledgeGraph from "@/components/KnowledgeGraph";
 

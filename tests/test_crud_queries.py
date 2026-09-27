@@ -1,0 +1,75 @@
+from api.services import crud
+
+
+class _Result:
+    def __init__(self, rows=None, first_row=None):
+        self._rows = rows or []
+        self.first_row = first_row
+
+    def named_results(self):
+        return iter(self._rows)
+
+
+class _Client:
+    def __init__(self, results):
+        self.results = iter(results)
+        self.calls = []
+        self.closed = False
+
+    def query(self, sql, parameters=None):
+        self.calls.append((sql, parameters or {}))
+        return next(self.results)
+
+    def close(self):
+        self.closed = True
+
+
+def test_article_filters_and_sentiment_are_applied(monkeypatch):
+    client = _Client([
+        _Result(first_row=(1,)),
+        _Result(rows=[{
+            "article_id": "hash-1",
+            "title": "AI tại Việt Nam",
+            "sentiment_score": 0.75,
+            "sentiment_label": "positive",
+        }]),
+    ])
+    monkeypatch.setattr(crud, "get_ch_client", lambda: client)
+
+    response = crud.get_articles(
+        page=2,
+        page_size=10,
+        entity="OpenAI",
+        keyword="trí tuệ nhân tạo",
+    )
+
+    count_sql, count_params = client.calls[0]
+    data_sql, data_params = client.calls[1]
+    assert "raw_articles FINAL" in count_sql
+    assert "raw_article_entities" in count_sql
+    assert "raw_article_keywords" in count_sql
+    assert count_params == {"entity": "OpenAI", "keyword": "trí tuệ nhân tạo"}
+    assert "argMax(sentiment_score, loaded_at)" in data_sql
+    assert "LIMIT {page_size:UInt32} OFFSET {offset:UInt64}" in data_sql
+    assert data_params["page_size"] == 10
+    assert data_params["offset"] == 10
+    assert response["data"][0]["sentiment_score"] == 0.75
+    assert client.closed is True
+
+
+def test_article_detail_deduplicates_enrichment_rows(monkeypatch):
+    client = _Client([
+        _Result(rows=[{"article_id": "hash-1", "sentiment_score": -0.25}]),
+        _Result(rows=[{"keyword": "AI"}]),
+        _Result(rows=[{"entity_name": "OpenAI", "entity_type": "ORG"}]),
+    ])
+    monkeypatch.setattr(crud, "get_ch_client", lambda: client)
+
+    article = crud.get_article_detail("hash-1")
+
+    assert article["sentiment_score"] == -0.25
+    assert article["keywords"] == ["AI"]
+    assert article["entities"] == [{"entity_name": "OpenAI", "entity_type": "ORG"}]
+    assert "GROUP BY keyword" in client.calls[1][0]
+    assert "GROUP BY entity, entity_type" in client.calls[2][0]
+    assert client.closed is True

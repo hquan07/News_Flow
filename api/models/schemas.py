@@ -58,17 +58,17 @@ class ArticleBase(BaseModel):
     url: str
     source: str
     category: str
-    publish_time: Optional[datetime] = None
+    publish_date: Optional[datetime] = None
     word_count: Optional[int] = None
 
 
 class ArticleDetail(ArticleBase):
-    article_id: int
+    article_id: str
     author: Optional[str] = None
     keyword_count: Optional[int] = None
     crawl_latency_minutes: Optional[float] = None
-    keywords: list[str] = []
-    entities: list[dict] = []
+    keywords: list[str] = Field(default_factory=list)
+    entities: list[dict] = Field(default_factory=list)
 
 
 class ArticleSearchParams(BaseModel):
@@ -92,7 +92,7 @@ class OverviewResponse(BaseModel):
     articles_by_hour: list[dict]
     category_distribution: list[dict]
     source_speed: list[dict]
-    sentiment_distribution: Optional[list[dict]] = []
+    sentiment_distribution: Optional[list[dict]] = Field(default_factory=list)
 
 # Trending schemas
 class TrendingKeyword(BaseModel):
@@ -122,7 +122,7 @@ class CoOccurrence(BaseModel):
 class TrendingResponse(BaseModel):
     top_keywords: list[TrendingKeyword]
     keyword_timeline: Optional[KeywordTimeline] = None
-    co_occurrences: list[CoOccurrence] = []
+    co_occurrences: list[CoOccurrence] = Field(default_factory=list)
 
 # Source comparison schemas
 class SourceCategorySplit(BaseModel):
@@ -150,7 +150,7 @@ class SourceComparisonResponse(BaseModel):
     category_split: list[SourceCategorySplit]
     avg_word_count: list[dict]
     overlap: list[SourceOverlap]
-    reaction_times: list[ReactionTime] = []
+    reaction_times: list[ReactionTime] = Field(default_factory=list)
 
 # Alerts schemas
 class SpikeAlert(BaseModel):
@@ -172,14 +172,14 @@ class NewKeyword(BaseModel):
 class AlertsResponse(BaseModel):
     spikes: list[SpikeAlert]
     new_keywords: list[NewKeyword]
-    category_anomalies: list[dict] = []
+    category_anomalies: list[dict] = Field(default_factory=list)
 
 # Entity schemas
 class EntityStat(BaseModel):
     entity_name: str
     entity_type: str
     mention_count: int
-    sources: list[str] = []
+    sources: list[str] = Field(default_factory=list)
 
 
 class EntityTimeline(BaseModel):
@@ -191,4 +191,4 @@ class EntityTimeline(BaseModel):
 class EntityResponse(BaseModel):
     top_entities: list[EntityStat]
     entity_timeline: Optional[EntityTimeline] = None
-    entity_by_category: list[dict] = []
+    entity_by_category: list[dict] = Field(default_factory=list)
