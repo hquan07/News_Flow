@@ -24,8 +24,8 @@ import EntitiesView from "@/components/views/EntitiesView";
 import SentimentView from "@/components/views/SentimentView";
 import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+import { API_BASE, apiFetch } from "@/lib/api";
+import { readCachedUser } from "@/lib/auth-storage";
 
 type FeedEvent = {
   timestamp: string;
@@ -48,9 +48,7 @@ function timeAgo(dateStr: string): string {
 }
 
 async function safeFetch(url: string): Promise<any> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return apiFetch(url);
 }
 
 const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
@@ -116,14 +114,11 @@ export default function Home() {
           ? { email: authEmail, password: authPassword }
           : { email: authEmail, password: authPassword, full_name: authName };
 
-      const res = await fetch(url, {
+      const data = await apiFetch<any>(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Auth failed");
 
       if (authMode === "login") {
         localStorage.setItem("token", data.access_token);
@@ -171,11 +166,10 @@ export default function Home() {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/recommendations/`, {
+      const data = await apiFetch<any>(`${API_BASE}/recommendations/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (res.ok) setForYouArticles(data.articles || []);
+      setForYouArticles(data.articles || []);
     } catch (e) {
       console.error(e);
     }
@@ -215,11 +209,7 @@ export default function Home() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      setUser(
-        JSON.parse(
-          localStorage.getItem("user_cache") || '{"email": "user@example.com"}',
-        ),
-      );
+      setUser(readCachedUser());
     }
   }, []);
 
@@ -281,15 +271,9 @@ export default function Home() {
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
     const [latencyRes, clickbaitRes, usersRes] = await Promise.all([
-      fetch(`${API_BASE}/admin/metrics/latency`, { headers }).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE}/admin/metrics/volume`, { headers }).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE}/admin/metrics/users`, { headers }).then((r) =>
-        r.json(),
-      ),
+      apiFetch(`${API_BASE}/admin/metrics/latency`, { headers }),
+      apiFetch(`${API_BASE}/admin/metrics/volume`, { headers }),
+      apiFetch(`${API_BASE}/admin/metrics/users`, { headers }),
     ]);
     setAdminLatency(latencyRes);
     setAdminClickbait(clickbaitRes);
@@ -356,8 +340,12 @@ export default function Home() {
         else if (activeTab === "debates") await fetchDebates();
         else if (activeTab === "admin_dashboard") await fetchAdmin();
         if (!cancelled) setApiError(null);
-      } catch {
-        if (!cancelled) setApiError("Mất kết nối tới API server");
+      } catch (error) {
+        if (!cancelled) {
+          const reason =
+            error instanceof Error ? error.message : "Unknown API error";
+          setApiError(`Mất kết nối tới API server: ${reason}`);
+        }
       }
     };
 

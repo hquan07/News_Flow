@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Database, AlertTriangle } from 'lucide-react';
+import { API_BASE, apiFetch } from '@/lib/api';
 
 interface LandingHeroProps {
   authMode: 'login' | 'register';
@@ -21,8 +22,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8001/api/v1/public/summary')
-      .then(res => res.json())
+    apiFetch(`${API_BASE}/public/summary`)
       .then(data => {
         setSummary(data);
         setLoading(false);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Clock, Activity, TrendingUp, ShieldAlert, Zap, Settings, Save, X } from 'lucide-react';
+import { API_BASE, apiFetch } from '@/lib/api';
 
 interface SpikeAlert {
   hour_slot: string;
@@ -28,8 +29,6 @@ interface AlertThresholds {
   viral_interactions: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api/v1';
-
 const AlertsPanel: React.FC = () => {
   const [spikes, setSpikes] = useState<SpikeAlert[]>([]);
   const [crisisAlerts, setCrisisAlerts] = useState<SocialCrisisAlert[]>([]);
@@ -48,25 +47,16 @@ const AlertsPanel: React.FC = () => {
   const fetchAlerts = async () => {
     try {
       setLoading(true);
-      const [resSpikes, resSocial, resConfig] = await Promise.all([
-        fetch(`${API_BASE}/alerts?threshold=1.0&limit=10`),
-        fetch(`${API_BASE}/alerts/social`),
-        fetch(`${API_BASE}/alerts/config`)
+      const [spikesData, socialData, configData] = await Promise.all([
+        apiFetch<any>(`${API_BASE}/alerts?threshold=1.0&limit=10`),
+        apiFetch<any>(`${API_BASE}/alerts/social`),
+        apiFetch<AlertThresholds>(`${API_BASE}/alerts/config`)
       ]);
-      
-      if (resSpikes.ok) {
-        const data = await resSpikes.json();
-        setSpikes(data.spikes || []);
-      }
-      if (resSocial.ok) {
-        const data = await resSocial.json();
-        setCrisisAlerts(data.crisis_alerts || []);
-        setViralAlerts(data.viral_alerts || []);
-      }
-      if (resConfig.ok) {
-        const data = await resConfig.json();
-        setThresholds(data);
-      }
+
+      setSpikes(spikesData.spikes || []);
+      setCrisisAlerts(socialData.crisis_alerts || []);
+      setViralAlerts(socialData.viral_alerts || []);
+      setThresholds(configData);
       setError(null);
     } catch {
       setError('Failed to fetch alerts.');

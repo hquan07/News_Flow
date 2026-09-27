@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+import { API_BASE, apiFetch } from "@/lib/api";
+import { readCachedUser } from "@/lib/auth-storage";
 
 export function useAuth(setActiveTab: (tab: string) => void) {
   const [user, setUser] = useState<any>(null);
@@ -14,7 +14,7 @@ export function useAuth(setActiveTab: (tab: string) => void) {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      setUser(JSON.parse(localStorage.getItem("user_cache") || '{"email": "user@example.com"}'));
+      setUser(readCachedUser());
     }
   }, []);
 
@@ -27,14 +27,11 @@ export function useAuth(setActiveTab: (tab: string) => void) {
         ? { email: authEmail, password: authPassword }
         : { email: authEmail, password: authPassword, full_name: authName };
 
-      const res = await fetch(url, {
+      const data = await apiFetch<any>(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Auth failed");
 
       if (authMode === "login") {
         localStorage.setItem("token", data.access_token);
