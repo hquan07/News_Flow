@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
 
-    CLICKHOUSE_HOST: str = "clickhouse"
+    CLICKHOUSE_HOST: str = "localhost"
     CLICKHOUSE_PORT: int = 8123
     CLICKHOUSE_DB: str = "newspulse"
     CLICKHOUSE_USER: str = "admin"
