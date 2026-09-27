@@ -35,7 +35,7 @@ export default function SentimentView({
             </div>
           </div>
           <div className="chart-container">
-            {sentimentDist.length > 0 ? (
+            {sentimentDist && sentimentDist.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -85,7 +85,7 @@ export default function SentimentView({
             </div>
           </div>
           <div className="chart-container">
-            {sentimentSources.length > 0 ? (
+            {sentimentSources && sentimentSources.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={sentimentSources}>
                   <CartesianGrid
@@ -126,7 +126,7 @@ export default function SentimentView({
             </div>
           </div>
           <div className="chart-container">
-            {sentimentTimeline.length > 0 ? (
+            {sentimentTimeline && sentimentTimeline.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={sentimentTimeline}>
                   <CartesianGrid

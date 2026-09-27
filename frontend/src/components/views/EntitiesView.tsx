@@ -15,6 +15,8 @@ import {
   Legend,
 } from "recharts";
 import { Users, MessageSquare, ThumbsUp } from "lucide-react";
+import EmptyState from "../ui/EmptyState";
+import ChartSkeleton from "../ui/ChartSkeleton";
 
 export default function EntitiesView({
   entitiesData,
@@ -35,7 +37,7 @@ export default function EntitiesView({
             </div>
           </div>
           <div className="chart-container-large">
-            {entitiesData.length > 0 ? (
+            {entitiesData && entitiesData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={entitiesData}
@@ -70,18 +72,10 @@ export default function EntitiesView({
                   />
                 </BarChart>
               </ResponsiveContainer>
+            ) : !entitiesData ? (
+              <ChartSkeleton />
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No entity data available
-              </div>
+              <EmptyState message="No entity data available" />
             )}
           </div>
         </div>
@@ -105,7 +99,7 @@ export default function EntitiesView({
               overflow: "hidden",
             }}
           >
-            {trendingKeywords.length > 0 ? (
+            {trendingKeywords && trendingKeywords.length > 0 ? (
               (() => {
                 const maxCount =
                   Math.max(...trendingKeywords.map((k: any) => k.count)) || 1;
@@ -150,18 +144,10 @@ export default function EntitiesView({
                   );
                 });
               })()
+            ) : !trendingKeywords ? (
+              <ChartSkeleton />
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "100%",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No keyword data available
-              </div>
+              <EmptyState message="No keyword data available" />
             )}
           </div>
         </div>
@@ -173,7 +159,7 @@ export default function EntitiesView({
             </div>
           </div>
           <div className="chart-container-large">
-            {entityTypeDist.length > 0 ? (
+            {entityTypeDist && entityTypeDist.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -211,18 +197,10 @@ export default function EntitiesView({
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+            ) : !entityTypeDist ? (
+              <ChartSkeleton />
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No type data available
-              </div>
+              <EmptyState message="No type data available" />
             )}
           </div>
         </div>
@@ -234,7 +212,7 @@ export default function EntitiesView({
             </div>
           </div>
           <div className="chart-container-large">
-            {entitySentiment.length > 0 ? (
+            {entitySentiment && entitySentiment.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={entitySentiment} margin={{ bottom: 40 }}>
                   <CartesianGrid
@@ -266,18 +244,10 @@ export default function EntitiesView({
                   <Bar dataKey="Negative" stackId="a" fill="#ef4444" />
                 </BarChart>
               </ResponsiveContainer>
+            ) : !entitySentiment ? (
+              <ChartSkeleton />
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No entity sentiment data available
-              </div>
+              <EmptyState message="No entity sentiment data available" />
             )}
           </div>
         </div>
