@@ -130,7 +130,7 @@ export default function OverviewSocialView({
                 <Activity size={20} /> Engagement Timeline
               </div>
             </div>
-            <div style={{ height: 300, width: "100%" }}>
+            <div className="chart-container">
               {overviewData?.engagement_timeline?.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={overviewData.engagement_timeline}>

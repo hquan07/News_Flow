@@ -413,18 +413,12 @@ export default function Home() {
   return (
     <div className="container">
       {user && (
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+        <header className="dashboard-header">
           <div>
             <h1>NewsPulse Intelligence</h1>
             <p className="subtitle">Real-time Data Pipeline Dashboard</p>
           </div>
-          <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+          <div className="header-controls">
             <div
               className="mode-toggle"
               style={{

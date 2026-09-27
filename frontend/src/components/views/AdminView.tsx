@@ -320,7 +320,7 @@ export default function AdminView({
                 <Activity size={20} /> Crawl Latency by Source
               </div>
             </div>
-            <div style={{ height: 300, width: "100%" }}>
+            <div className="chart-container">
               {adminLatency?.sources?.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -366,7 +366,7 @@ export default function AdminView({
                 <BookOpen size={20} /> News Articles Volume
               </div>
             </div>
-            <div style={{ height: 300, width: "100%" }}>
+            <div className="chart-container">
               {adminClickbait?.news?.sources?.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -414,7 +414,7 @@ export default function AdminView({
                 <Share2 size={20} /> Social Posts Volume
               </div>
             </div>
-            <div style={{ height: 300, width: "100%" }}>
+            <div className="chart-container">
               {adminClickbait?.social?.sources?.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -462,7 +462,7 @@ export default function AdminView({
                 <Users size={20} /> User Roles Distribution
               </div>
             </div>
-            <div style={{ height: 300, width: "100%" }}>
+            <div className="chart-container">
               {adminUsers ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>

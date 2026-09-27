@@ -18,15 +18,15 @@ const LandingHero: React.FC<LandingHeroProps> = ({
   authMode, setAuthMode, authName, setAuthName, authEmail, setAuthEmail, authPassword, setAuthPassword, authModalError, handleAuth 
 }) => {
   return (
-    <div style={{ display: 'flex', minHeight: '80vh', alignItems: 'center', justifyContent: 'center', gap: '60px', padding: '40px' }}>
+    <div className="landing-layout">
       
       {/* Left Column: Hero Information */}
-      <div style={{ flex: 1, maxWidth: '600px' }}>
+      <div className="landing-copy">
         <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '10px 20px', borderRadius: '30px', color: '#60a5fa', fontWeight: 600, marginBottom: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
           <Activity size={18} /> System Online & Processing
         </div>
         
-        <h1 style={{ fontSize: '3.5rem', fontWeight: 800, margin: '0 0 20px 0', background: 'linear-gradient(135deg, #60a5fa, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1.1 }}>
+        <h1 className="landing-title">
           NewsPulse Intelligence
         </h1>
         
@@ -34,7 +34,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({
           Real-time Data Pipeline Dashboard for large-scale News & Social Media analysis, powered by NLP and anomaly detection.
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div className="landing-stats">
           <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
             <Database size={32} color="#3b82f6" style={{ marginBottom: '10px' }} />
             <h3 style={{ fontSize: '1.5rem', margin: '0 0 5px 0' }}>150K+</h3>
@@ -49,8 +49,8 @@ const LandingHero: React.FC<LandingHeroProps> = ({
       </div>
 
       {/* Right Column: Login Form */}
-      <div style={{ flex: 1, maxWidth: '450px' }}>
-        <div className="glass-panel" style={{ padding: '2.5rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="auth-card-container">
+        <div className="glass-panel auth-card">
           <h2 style={{ marginBottom: '1.5rem', textAlign: 'center', fontSize: '2rem' }}>
             {authMode === 'login' ? 'Welcome Back' : 'Create Account'}
           </h2>

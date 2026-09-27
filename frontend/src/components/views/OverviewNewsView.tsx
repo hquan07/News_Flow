@@ -178,7 +178,7 @@ export default function OverviewNewsView({
                 <FileText size={14} /> CSV
               </button>
             </div>
-            <div style={{ height: 300, width: "100%" }}>
+            <div className="chart-container">
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
@@ -246,7 +246,7 @@ export default function OverviewNewsView({
                 <Activity size={20} /> Category Distribution
               </div>
             </div>
-            <div style={{ height: 300, width: "100%" }}>
+            <div className="chart-container">
               {sourceData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={sourceData}>

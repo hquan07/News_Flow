@@ -41,6 +41,29 @@ header {
   text-align: center;
 }
 
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .header-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
 h1 {
   font-size: 2.5rem;
   font-weight: 700;
@@ -62,6 +85,10 @@ h1 {
   justify-content: center;
   gap: 1rem;
   margin-bottom: 2rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 0.5rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-btn {
@@ -77,6 +104,8 @@ h1 {
   align-items: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
@@ -116,6 +145,93 @@ h1 {
 @media (max-width: 1024px) {
   .overview-grid { grid-template-columns: repeat(2, 1fr); }
   .charts-grid { grid-template-columns: 1fr; }
+}
+
+.chart-container {
+  height: 300px;
+  width: 100%;
+}
+
+.chart-container-large {
+  height: 400px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .chart-container {
+    height: 240px;
+  }
+  .chart-container-large {
+    height: 300px;
+  }
+}
+
+/* Landing Page */
+.landing-layout {
+  display: flex;
+  min-height: 80vh;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  padding: 40px;
+}
+
+.landing-copy {
+  flex: 1;
+  max-width: 600px;
+}
+
+.landing-title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin: 0 0 20px 0;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+}
+
+.landing-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.auth-card-container {
+  flex: 1;
+  max-width: 450px;
+}
+
+.auth-card {
+  padding: 2.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+@media (max-width: 768px) {
+  .landing-layout {
+    flex-direction: column;
+    padding: 1.25rem;
+    gap: 2rem;
+  }
+
+  .landing-title {
+    font-size: clamp(2.25rem, 12vw, 3rem);
+  }
+
+  .landing-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card-container {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .auth-card {
+    padding: 1.5rem;
+  }
 }
 
 /* Panels */
@@ -233,6 +349,12 @@ h1 {
 }
 .data-table a:hover {
   text-decoration: underline;
+}
+
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Tags */

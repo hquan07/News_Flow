@@ -79,7 +79,8 @@ export default function ArticlesView({
             <FileText size={14} /> CSV
           </button>
         </div>
-        <table className="data-table">
+        <div className="table-scroll-container">
+          <table className="data-table">
           <thead>
             <tr>
               <th>Title</th>
@@ -141,6 +142,7 @@ export default function ArticlesView({
             )}
           </tbody>
         </table>
+        </div>
         {articlesMeta.total_pages > 1 && (
           <div className="pagination">
             <button disabled={page <= 1} onClick={() => setPage((p: number) => p - 1)}>

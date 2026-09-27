@@ -32,7 +32,7 @@ export default function SentimentView({
               <ThumbsUp size={20} /> Overall Sentiment
             </div>
           </div>
-          <div style={{ height: 300, width: "100%" }}>
+          <div className="chart-container">
             {sentimentDist.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -90,7 +90,7 @@ export default function SentimentView({
               <BarChart2 size={20} /> Sentiment by Source
             </div>
           </div>
-          <div style={{ height: 300, width: "100%" }}>
+          <div className="chart-container">
             {sentimentSources.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={sentimentSources}>
@@ -139,7 +139,7 @@ export default function SentimentView({
               <Activity size={20} /> Sentiment Timeline
             </div>
           </div>
-          <div style={{ height: 300, width: "100%" }}>
+          <div className="chart-container">
             {sentimentTimeline.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={sentimentTimeline}>

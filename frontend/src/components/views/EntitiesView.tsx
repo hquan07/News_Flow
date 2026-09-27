@@ -34,7 +34,7 @@ export default function EntitiesView({
               <Users size={20} /> Top Entities
             </div>
           </div>
-          <div style={{ height: 400, width: "100%" }}>
+          <div className="chart-container-large">
             {entitiesData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -172,7 +172,7 @@ export default function EntitiesView({
               <MessageSquare size={20} /> Entity Types
             </div>
           </div>
-          <div style={{ height: 400, width: "100%" }}>
+          <div className="chart-container-large">
             {entityTypeDist.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -233,7 +233,7 @@ export default function EntitiesView({
               <ThumbsUp size={20} /> Sentiment by Entity
             </div>
           </div>
-          <div style={{ height: 400, width: "100%" }}>
+          <div className="chart-container-large">
             {entitySentiment.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={entitySentiment} margin={{ bottom: 40 }}>
