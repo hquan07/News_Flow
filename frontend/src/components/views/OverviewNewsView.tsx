@@ -13,6 +13,8 @@ import {
   Area,
 } from "recharts";
 import { Activity, BarChart2, FileText } from "lucide-react";
+import EmptyState from "../ui/EmptyState";
+import ChartSkeleton from "../ui/ChartSkeleton";
 
 export default function OverviewNewsView({
   overviewData,
@@ -142,7 +144,9 @@ export default function OverviewNewsView({
             );
           })}
           {!overviewData?.kpi_cards && (
-            <div style={{ color: "var(--text-muted)" }}>Loading metrics...</div>
+            <div style={{ gridColumn: "1 / -1", height: "120px" }}>
+              <ChartSkeleton height="100%" />
+            </div>
           )}
         </div>
 
@@ -224,18 +228,10 @@ export default function OverviewNewsView({
                     />
                   </AreaChart>
                 </ResponsiveContainer>
+              ) : !overviewData ? (
+                <ChartSkeleton />
               ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "100%",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  No trend data available
-                </div>
+                <EmptyState message="No trend data available" />
               )}
             </div>
           </div>
@@ -266,18 +262,10 @@ export default function OverviewNewsView({
                     <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+              ) : !overviewData ? (
+                <ChartSkeleton />
               ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "100%",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  No source data available
-                </div>
+                <EmptyState message="No source data available" />
               )}
             </div>
           </div>

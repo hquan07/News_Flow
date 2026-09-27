@@ -78,13 +78,13 @@ export default function Home() {
   const [adminClickbait, setAdminClickbait] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any>(null);
 
-  const [sentimentDist, setSentimentDist] = useState<any[]>([]);
-  const [sentimentTimeline, setSentimentTimeline] = useState<any[]>([]);
-  const [sentimentSources, setSentimentSources] = useState<any[]>([]);
-  const [entitiesData, setEntitiesData] = useState<any[]>([]);
-  const [trendingKeywords, setTrendingKeywords] = useState<any[]>([]);
-  const [entityTypeDist, setEntityTypeDist] = useState<any[]>([]);
-  const [entitySentiment, setEntitySentiment] = useState<any[]>([]);
+  const [sentimentDist, setSentimentDist] = useState<any[] | null>(null);
+  const [sentimentTimeline, setSentimentTimeline] = useState<any[] | null>(null);
+  const [sentimentSources, setSentimentSources] = useState<any[] | null>(null);
+  const [entitiesData, setEntitiesData] = useState<any[] | null>(null);
+  const [trendingKeywords, setTrendingKeywords] = useState<any[] | null>(null);
+  const [entityTypeDist, setEntityTypeDist] = useState<any[] | null>(null);
+  const [entitySentiment, setEntitySentiment] = useState<any[] | null>(null);
   const [knowledgeGraph, setKnowledgeGraph] = useState<any>({
     nodes: [],
     links: [],
@@ -332,10 +332,14 @@ export default function Home() {
   // Reset data when source changes
   useEffect(() => {
     setOverviewData(null);
-    setSentimentDist([]);
-    setSentimentTimeline([]);
-    setSentimentSources([]);
-  }, [selectedSource]);
+    setSentimentDist(null);
+    setSentimentTimeline(null);
+    setSentimentSources(null);
+    setEntitiesData(null);
+    setTrendingKeywords(null);
+    setEntityTypeDist(null);
+    setEntitySentiment(null);
+  }, [selectedSource, activeTab]);
 
   // Tab-aware polling
   useEffect(() => {

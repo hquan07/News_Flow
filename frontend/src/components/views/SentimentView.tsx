@@ -17,6 +17,8 @@ import {
   Legend,
 } from "recharts";
 import { ThumbsUp , BarChart2 , Activity } from "lucide-react";
+import EmptyState from "../ui/EmptyState";
+import ChartSkeleton from "../ui/ChartSkeleton";
 
 export default function SentimentView({
   sentimentDist,
@@ -68,18 +70,10 @@ export default function SentimentView({
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+            ) : !sentimentDist ? (
+              <ChartSkeleton />
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No sentiment data available
-              </div>
+              <EmptyState message="No sentiment data available" />
             )}
           </div>
         </div>
@@ -117,18 +111,10 @@ export default function SentimentView({
                   <Bar dataKey="Negative" stackId="a" fill="#ef4444" />
                 </BarChart>
               </ResponsiveContainer>
+            ) : !sentimentSources ? (
+              <ChartSkeleton />
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No source sentiment data available
-              </div>
+              <EmptyState message="No source sentiment data available" />
             )}
           </div>
         </div>
@@ -192,18 +178,10 @@ export default function SentimentView({
                   />
                 </LineChart>
               </ResponsiveContainer>
+            ) : !sentimentTimeline ? (
+              <ChartSkeleton />
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No timeline data available
-              </div>
+              <EmptyState message="No timeline data available" />
             )}
           </div>
         </div>
