@@ -17,8 +17,8 @@ KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "newspulse.dlq")
 
 class ArticleSchema(BaseModel):
     url: str
-    title: str = Field(..., min_length=5)
-    content: str = Field(..., min_length=10)
+    title: str = Field(..., min_length=0)
+    content: str = Field(..., min_length=0)
     author: Optional[str] = None
     publish_time: Optional[str] = None
     crawled_time: Optional[str] = None
