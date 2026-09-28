@@ -860,13 +860,18 @@ export default function Home() {
               </>
             )}
 
-            {dashboardMode === "admin" && (
-              <>
+            {dashboardMode === "admin" && (<></>)}
+          </div>
+
+          {/* Admin sidebar layout */}
+          {dashboardMode === "admin" && (
+            <div className="admin-layout">
+              <aside className="admin-sidebar" role="tablist" aria-label="Admin navigation">
                 <button
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "admin_dashboard"}
-                  className={`tab-btn ${activeTab === "admin_dashboard" ? "active" : ""}`}
+                  className={`admin-sidebar-btn ${activeTab === "admin_dashboard" ? "active" : ""}`}
                   onClick={() => setActiveTab("admin_dashboard")}
                 >
                   <Activity size={18} /> Admin Dashboard
@@ -875,7 +880,7 @@ export default function Home() {
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "articles"}
-                  className={`tab-btn ${activeTab === "articles" ? "active" : ""}`}
+                  className={`admin-sidebar-btn ${activeTab === "articles" ? "active" : ""}`}
                   onClick={() => {
                     setActiveTab("articles");
                     setPage(1);
@@ -888,7 +893,7 @@ export default function Home() {
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "stream"}
-                  className={`tab-btn ${activeTab === "stream" ? "active" : ""}`}
+                  className={`admin-sidebar-btn ${activeTab === "stream" ? "active" : ""}`}
                   onClick={() => setActiveTab("stream")}
                 >
                   <Radio size={18} /> Live Stream Debug
@@ -897,7 +902,7 @@ export default function Home() {
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "alerts"}
-                  className={`tab-btn ${activeTab === "alerts" ? "active" : ""}`}
+                  className={`admin-sidebar-btn ${activeTab === "alerts" ? "active" : ""}`}
                   onClick={() => setActiveTab("alerts")}
                 >
                   <AlertTriangle size={18} /> System Alerts
@@ -906,14 +911,111 @@ export default function Home() {
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "architecture"}
-                  className={`tab-btn ${activeTab === "architecture" ? "active" : ""}`}
+                  className={`admin-sidebar-btn ${activeTab === "architecture" ? "active" : ""}`}
                   onClick={() => setActiveTab("architecture")}
                 >
                   <Server size={18} /> Architecture
                 </button>
-              </>
-            )}
-          </div>
+              </aside>
+              <div className="admin-content">
+
+          {activeTab === "admin_dashboard" && dashboardMode === "admin" && (
+            <AdminView
+              adminLatency={adminLatency}
+              adminClickbait={adminClickbait}
+              adminUsers={adminUsers}
+              adminHealth={adminHealth}
+              adminOperations={adminOperations}
+              adminAlertMetrics={adminAlertMetrics}
+              updatedAt={dataUpdatedAt}
+            />
+          )}
+
+          {activeTab === "articles" && dashboardMode === "admin" && (
+            <ArticlesView
+              title="System Articles"
+              articles={articles}
+              articlesMeta={articlesMeta}
+              page={page}
+              setPage={setPage}
+              searchQuery={articleSearchInput}
+              setSearchQuery={setArticleSearchInput}
+              loading={articlesLoading}
+              filters={articleFilters}
+              setFilters={(filters) => {
+                setArticleFilters(filters);
+                setPage(1);
+              }}
+              contextFilter={articleAlertFilter}
+              clearContextFilter={() => {
+                setArticleAlertFilter(null);
+                setPage(1);
+              }}
+              trackClick={trackClick}
+              timeAgo={timeAgo}
+              exportToCSV={exportToCSV}
+            />
+          )}
+
+          {activeTab === "stream" && dashboardMode === "admin" && (
+            <StreamView
+              feed={feed}
+              isConnected={isConnected}
+              isPaused={isStreamPaused}
+              bufferedCount={bufferedFeed.length}
+              onPause={() => {
+                streamPausedRef.current = true;
+                setIsStreamPaused(true);
+              }}
+              onResume={() => {
+                streamPausedRef.current = false;
+                setIsStreamPaused(false);
+                setFeed((current) => [...bufferedFeed, ...current].slice(0, 50));
+                setBufferedFeed([]);
+              }}
+            />
+          )}
+
+          {activeTab === "alerts" && dashboardMode === "admin" && (
+            <AlertsPanel
+              liveAlerts={liveSocialAlerts}
+              onOpenArticles={(filter) => {
+                setArticleAlertFilter(filter);
+                setArticleSearchInput("");
+                setArticleSearchQuery("");
+                setArticleFilters({ ...EMPTY_ARTICLE_FILTERS });
+                setPage(1);
+                setDashboardMode("news");
+                setActiveTab("articles");
+              }}
+            />
+          )}
+
+          {activeTab === "architecture" && dashboardMode === "admin" && (
+            <ArchitectureView />
+          )}
+
+          {apiError && (
+            <div className="error-toast">
+              <AlertTriangle
+                size={16}
+                style={{
+                  display: "inline",
+                  verticalAlign: "middle",
+                  marginRight: "0.5rem",
+                }}
+              />
+              {apiError}
+            </div>
+          )}
+
+              </div>
+            </div>
+          )}
+
+          {/* Non-admin content */}
+          {dashboardMode !== "admin" && (
+            <>
 
           {activeTab === "overview" && dashboardMode === "news" && (
             <OverviewNewsView
@@ -961,7 +1063,7 @@ export default function Home() {
 
           {activeTab === "articles" && (
             <ArticlesView
-              title={dashboardMode === "admin" ? "System Articles" : "Latest Articles"}
+              title="Latest Articles"
               articles={articles}
               articlesMeta={articlesMeta}
               page={page}
@@ -985,38 +1087,15 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "stream" && (
-            <StreamView
-              feed={feed}
-              isConnected={isConnected}
-              isPaused={isStreamPaused}
-              bufferedCount={bufferedFeed.length}
-              onPause={() => {
-                streamPausedRef.current = true;
-                setIsStreamPaused(true);
-              }}
-              onResume={() => {
-                streamPausedRef.current = false;
-                setIsStreamPaused(false);
-                setFeed((current) => [...bufferedFeed, ...current].slice(0, 50));
-                setBufferedFeed([]);
-              }}
+          {activeTab === "foryou" && (
+            <ForYouView
+              forYouArticles={forYouArticles}
+              trackClick={trackClick}
+              timeAgo={timeAgo}
             />
           )}
-
-          {activeTab === "alerts" && (
-            <AlertsPanel
-              liveAlerts={liveSocialAlerts}
-              onOpenArticles={(filter) => {
-                setArticleAlertFilter(filter);
-                setArticleSearchInput("");
-                setArticleSearchQuery("");
-                setArticleFilters({ ...EMPTY_ARTICLE_FILTERS });
-                setPage(1);
-                setDashboardMode("news");
-                setActiveTab("articles");
-              }}
-            />
+          {activeTab === "debates" && dashboardMode === "social" && (
+            <DebatesView overviewData={overviewData} />
           )}
 
           {apiError && (
@@ -1033,32 +1112,11 @@ export default function Home() {
             </div>
           )}
 
-          {activeTab === "foryou" && (
-            <ForYouView
-              forYouArticles={forYouArticles}
-              trackClick={trackClick}
-              timeAgo={timeAgo}
-            />
-          )}
-          {activeTab === "admin_dashboard" && dashboardMode === "admin" && (
-            <AdminView
-              adminLatency={adminLatency}
-              adminClickbait={adminClickbait}
-              adminUsers={adminUsers}
-              adminHealth={adminHealth}
-              adminOperations={adminOperations}
-              adminAlertMetrics={adminAlertMetrics}
-              updatedAt={dataUpdatedAt}
-            />
-          )}
-          {activeTab === "debates" && dashboardMode === "social" && (
-            <DebatesView overviewData={overviewData} />
-          )}
-          {activeTab === "architecture" && dashboardMode === "admin" && (
-            <ArchitectureView />
+            </>
           )}
         </>
       )}
     </div>
   );
 }
+

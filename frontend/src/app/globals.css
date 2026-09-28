@@ -135,6 +135,84 @@ h1 {
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
 }
 
+/* Admin Sidebar Layout */
+.admin-layout {
+  display: flex;
+  gap: 1.5rem;
+  min-height: calc(100vh - 180px);
+}
+
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 200px;
+  max-width: 220px;
+  padding: 1rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  position: sticky;
+  top: 1rem;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.admin-sidebar-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.admin-sidebar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+
+.admin-sidebar-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+}
+
+.admin-content {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .admin-layout {
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    flex-direction: row;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    position: static;
+    padding: 0.5rem;
+  }
+  .admin-sidebar-btn {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+    flex-shrink: 0;
+  }
+}
+
 /* Grids */
 .dashboard-grid {
   display: grid;
