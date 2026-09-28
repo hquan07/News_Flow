@@ -95,9 +95,11 @@ export default function OverviewSocialView({
             }
 
             return (
-              <div
+              <button
+                type="button"
                 key={i}
                 className={`glass-panel metric-card ${activeCard === i + 20 ? "expanded" : ""}`}
+                aria-expanded={activeCard === i + 20}
                 onClick={() =>
                   setActiveCard(activeCard === i + 20 ? null : i + 20)
                 }
@@ -110,7 +112,7 @@ export default function OverviewSocialView({
                 >
                   <div className="metric-label">{kpi.label}</div>
                   <div className="metric-value">{kpi.value}</div>
-                  <div className="metric-hint">Click để xem chi tiết</div>
+                  <div className="metric-hint">Click for details</div>
                 </div>
                 {activeCard === i + 20 && (
                   <div className="metric-details">
@@ -122,12 +124,12 @@ export default function OverviewSocialView({
                         paddingBottom: "4px",
                       }}
                     >
-                      {kpi.label} (Chi tiết)
+                      {kpi.label} details
                     </div>
                     {details}
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>

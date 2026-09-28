@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Clock3, Database } from "lucide-react";
 import { formatCompactNumber, formatDateTime } from "@/lib/formatters";
 
@@ -27,12 +27,14 @@ export default function ChartCard({
   large = false,
   children,
 }: ChartCardProps) {
+  const titleId = useId();
+  const descriptionId = useId();
   return (
-    <section className={`glass-panel chart-card${wide ? " chart-card-wide" : ""}`}>
+    <section className={`glass-panel chart-card${wide ? " chart-card-wide" : ""}`} aria-labelledby={titleId} aria-describedby={descriptionId}>
       <div className="chart-card-header">
         <div>
-          <h2 className="panel-title">{title}</h2>
-          <p className="chart-description">{description}</p>
+          <h2 id={titleId} className="panel-title">{title}</h2>
+          <p id={descriptionId} className="chart-description">{description}</p>
         </div>
         {actions && <div className="chart-actions">{actions}</div>}
       </div>
@@ -44,7 +46,7 @@ export default function ChartCard({
         )}
         <span>Updated: {formatDateTime(updatedAt)}</span>
       </div>
-      <div className={large ? "chart-container-large" : "chart-container"}>
+      <div className={large ? "chart-container-large" : "chart-container"} role="group" aria-label={`${description} Unit: ${unit}. Time range: ${timeRange}.`}>
         {children}
       </div>
     </section>

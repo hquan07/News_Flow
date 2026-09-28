@@ -18,6 +18,11 @@
   padding: 0;
 }
 
+:focus-visible {
+  outline: 3px solid var(--accent-blue);
+  outline-offset: 3px;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--bg-dark);
@@ -77,6 +82,16 @@ h1 {
 .subtitle {
   color: var(--text-muted);
   font-size: 1.1rem;
+}
+
+.auth-mode-switch {
+  border: 0;
+  padding: 0.25rem;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* Tabs */
@@ -441,6 +456,32 @@ h1 {
   width: 100%;
   color: inherit;
   font: inherit;
+}
+.metric-card-static {
+  cursor: default;
+  min-height: 148px;
+}
+.metric-tone-success .metric-value {
+  background: none;
+  color: var(--accent-green);
+  -webkit-text-fill-color: currentColor;
+}
+.metric-tone-warning .metric-value {
+  background: none;
+  color: #f59e0b;
+  -webkit-text-fill-color: currentColor;
+}
+.metric-tone-danger .metric-value {
+  background: none;
+  color: #ef4444;
+  -webkit-text-fill-color: currentColor;
+}
+.admin-health-checked {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: right;
 }
 .metric-card:hover .metric-hint {
   opacity: 1;
@@ -813,6 +854,15 @@ h1 {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Print Optimization for PDF Export */

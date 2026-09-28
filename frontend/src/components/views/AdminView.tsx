@@ -5,34 +5,66 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ReferenceLin
 import ChartCard from "../ui/ChartCard";
 import EmptyState from "../ui/EmptyState";
 import ChartSkeleton from "../ui/ChartSkeleton";
+import MetricCard from "../ui/MetricCard";
 import { formatCompactNumber, formatDateTime, formatPercent, formatSourceName } from "@/lib/formatters";
+
+interface VolumeGroup {
+  sources: string[];
+  volumes: number[];
+  total: number;
+}
+
+interface AdminViewProps {
+  adminLatency: { sources: string[]; avg_latency: number[]; overall_average: number; sla_target: number; generated_at?: string } | null;
+  adminClickbait: { news: VolumeGroup; social: VolumeGroup; generated_at?: string } | null;
+  adminUsers: { total_users: number; standard_users: number; admin_users: number; generated_at?: string } | null;
+  adminHealth: { status: string; services: Record<string, { status: string; latency_ms?: number }>; generated_at?: string } | null;
+  adminOperations: { articles_last_24h: number; total_articles: number; nlp_linked_articles: number; nlp_coverage_pct: number; latest_loaded_at?: string; freshness_minutes: number | null; generated_at?: string } | null;
+  updatedAt?: string | null;
+}
 
 function rows(sources: string[] = [], values: number[] = [], key: string) {
   return sources.map((source, index) => ({ source: formatSourceName(source), [key]: Number(values[index] || 0) })).sort((a, b) => Number(b[key]) - Number(a[key]));
 }
 
-export default function AdminView({ adminLatency, adminClickbait, adminUsers, adminHealth, updatedAt }: any) {
+function formatFreshness(minutes: number | null | undefined) {
+  if (minutes === null || minutes === undefined) return "Unknown";
+  if (minutes < 2) return "Now";
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1440) return `${(minutes / 60).toFixed(1)} h`;
+  return `${(minutes / 1440).toFixed(1)} d`;
+}
+
+export default function AdminView({ adminLatency, adminClickbait, adminUsers, adminHealth, adminOperations, updatedAt }: AdminViewProps) {
   const latencyRows = rows(adminLatency?.sources, adminLatency?.avg_latency, "latency");
   const newsRows = rows(adminClickbait?.news?.sources, adminClickbait?.news?.volumes, "total");
   const socialRows = rows(adminClickbait?.social?.sources, adminClickbait?.social?.volumes, "total");
   const roleRows = adminUsers ? [{ name: "Standard users", count: Number(adminUsers.standard_users || 0), color: "#3b82f6" }, { name: "Admin users", count: Number(adminUsers.admin_users || 0), color: "#f97316" }] : [];
   const roleTotal = roleRows.reduce((sum, row) => sum + row.count, 0);
   const healthStatus = adminHealth?.status ?? "unknown";
-  const healthColor = healthStatus === "healthy" ? "#10b981" : healthStatus === "degraded" ? "#f59e0b" : "#ef4444";
+  const healthyServices = Object.values(adminHealth?.services ?? {}).filter((service) => service.status === "healthy").length;
+  const serviceCount = Object.keys(adminHealth?.services ?? {}).length;
+  const healthDetails = Object.entries(adminHealth?.services ?? {}).map(([name, service]) => `${name}: ${service.status}${service.latency_ms ? ` (${service.latency_ms} ms)` : ""}`).join(" · ");
   const generatedAt = adminLatency?.generated_at ?? adminClickbait?.generated_at ?? updatedAt;
-
-  const summary = [
-    { label: "Total users", value: formatCompactNumber(adminUsers?.total_users ?? 0), hint: `${adminUsers?.admin_users ?? 0} administrators` },
-    { label: "Average crawl latency", value: `${Number(adminLatency?.overall_average ?? 0).toFixed(1)} min`, hint: `SLA target ≤ ${adminLatency?.sla_target ?? 5} min` },
-    { label: "News articles", value: formatCompactNumber(adminClickbait?.news?.total ?? 0), hint: `${newsRows.length} active sources` },
-    { label: "Social posts", value: formatCompactNumber(adminClickbait?.social?.total ?? 0), hint: `${socialRows.length} active platforms` },
-  ];
+  const latency = Number(adminLatency?.overall_average ?? 0);
+  const latencyTone = latency > Number(adminLatency?.sla_target ?? 5) ? "warning" : "default";
+  const coverage = Number(adminOperations?.nlp_coverage_pct ?? 0);
+  const coverageTone = coverage >= 95 ? "success" : coverage >= 70 ? "warning" : "danger";
+  const freshness = adminOperations?.freshness_minutes;
+  const freshnessTone = freshness === null || freshness === undefined ? "danger" : freshness <= 60 ? "success" : freshness <= 360 ? "warning" : "danger";
+  const healthTone = healthStatus === "healthy" ? "success" : healthStatus === "degraded" ? "warning" : "danger";
 
   return <>
-    <div className="overview-grid">
-      {summary.map((metric) => <div className="glass-panel metric-card" key={metric.label}><div className="metric-content"><div className="metric-label">{metric.label}</div><div className="metric-value">{metric.value}</div><div className="chart-description">{metric.hint}</div></div></div>)}
-      <div className="glass-panel metric-card"><div className="metric-content"><div className="metric-label">System health</div><div className="metric-value" style={{ background: "none", WebkitTextFillColor: healthColor, color: healthColor, textTransform: "capitalize" }}>{healthStatus}</div><div className="chart-description">{Object.entries(adminHealth?.services ?? {}).map(([name, service]: any) => `${name}: ${service.status}${service.latency_ms ? ` (${service.latency_ms} ms)` : ""}`).join(" · ") || "Health data unavailable"}</div></div></div>
-    </div>
+    <section className="overview-grid admin-metrics-grid" aria-label="Administrative summary metrics">
+      <MetricCard label="Total users" value={formatCompactNumber(adminUsers?.total_users ?? 0)} hint={`${adminUsers?.admin_users ?? 0} administrators`} loading={adminUsers === null} />
+      <MetricCard label="News articles" value={formatCompactNumber(adminClickbait?.news?.total ?? 0)} hint={`${newsRows.length} active sources`} loading={adminClickbait === null} />
+      <MetricCard label="Social posts" value={formatCompactNumber(adminClickbait?.social?.total ?? 0)} hint={`${socialRows.length} active platforms`} loading={adminClickbait === null} />
+      <MetricCard label="Articles ingested (24h)" value={formatCompactNumber(adminOperations?.articles_last_24h ?? 0)} hint="New warehouse records" loading={adminOperations === null} />
+      <MetricCard label="Average crawl latency" value={`${latency.toFixed(1)} min`} hint={`SLA target ≤ ${adminLatency?.sla_target ?? 5} min`} loading={adminLatency === null} tone={latencyTone} />
+      <MetricCard label="NLP coverage" value={formatPercent(coverage)} hint={`${formatCompactNumber(adminOperations?.nlp_linked_articles ?? 0)} of ${formatCompactNumber(adminOperations?.total_articles ?? 0)} articles`} loading={adminOperations === null} tone={coverageTone} />
+      <MetricCard label="Data freshness" value={formatFreshness(freshness)} hint={adminOperations?.latest_loaded_at ? `Latest ingest ${formatDateTime(adminOperations.latest_loaded_at)}` : "No ingestion timestamp"} loading={adminOperations === null} tone={freshnessTone} />
+      <MetricCard label="System health" value={healthStatus} hint={serviceCount ? `${healthyServices}/${serviceCount} dependencies available` : "Health data unavailable"} loading={adminHealth === null} tone={healthTone} title={healthDetails || undefined} />
+    </section>
 
     <div className="charts-grid">
       <ChartCard wide title={<><Activity size={20} /> Crawl Latency by Source</>} description="Which sources exceed the crawl-latency service target?" timeRange="Current aggregate" unit="Minutes" total={latencyRows.length} updatedAt={generatedAt}>
@@ -51,6 +83,6 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
         {adminUsers === null ? <ChartSkeleton /> : roleTotal ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={roleRows} dataKey="count" nameKey="name" cx="50%" cy="45%" innerRadius="45%" outerRadius="72%">{roleRows.map((row) => <Cell key={row.name} fill={row.color} />)}</Pie><Tooltip formatter={(value, _name, item) => [`${Number(value).toLocaleString()} · ${formatPercent(Number(value) * 100 / roleTotal)}`, item.payload.name]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><Legend verticalAlign="bottom" /></PieChart></ResponsiveContainer> : <EmptyState message="No user data" />}
       </ChartCard>
     </div>
-    <p className="chart-description" style={{ textAlign: "right" }}><Server size={13} style={{ verticalAlign: "middle" }} /> Health checked {formatDateTime(adminHealth?.generated_at ?? updatedAt)}</p>
+    <p className="chart-description admin-health-checked"><Server size={13} aria-hidden="true" /> Health checked {formatDateTime(adminHealth?.generated_at ?? updatedAt)}</p>
   </>;
 }

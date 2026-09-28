@@ -83,24 +83,24 @@ const LandingHero: React.FC<LandingHeroProps> = ({
             {authMode === 'login' ? 'Welcome Back' : 'Create Account'}
           </h2>
           {authModalError && (
-            <div style={{ padding: '12px', marginBottom: '1.5rem', background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.5)' }}>
+            <div role="alert" aria-live="polite" style={{ padding: '12px', marginBottom: '1.5rem', background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.5)' }}>
               {authModalError}
             </div>
           )}
           <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             {authMode === 'register' && (
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>Full Name</label>
-                <input type="text" value={authName} onChange={e => setAuthName(e.target.value)} required style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '1rem' }} />
+                <label htmlFor="auth-name" style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>Full Name</label>
+                <input id="auth-name" name="name" autoComplete="name" type="text" value={authName} onChange={e => setAuthName(e.target.value)} required style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '1rem' }} />
               </div>
             )}
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>Email</label>
-              <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} required style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '1rem' }} />
+              <label htmlFor="auth-email" style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>Email</label>
+              <input id="auth-email" name="email" autoComplete="email" type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} required style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '1rem' }} />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>Password</label>
-              <input type="password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} required style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '1rem' }} />
+              <label htmlFor="auth-password" style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>Password</label>
+              <input id="auth-password" name="password" autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} type="password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} required style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '1rem' }} />
             </div>
 
             <button type="submit" style={{ padding: '14px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: 'white', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', marginTop: '10px', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform = 'scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}>
@@ -108,9 +108,9 @@ const LandingHero: React.FC<LandingHeroProps> = ({
             </button>
           </form>
           <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.95rem' }}>
-            <span style={{ color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
+            <button type="button" className="auth-mode-switch" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
               {authMode === 'login' ? "Don't have an account? Register" : "Already have an account? Login"}
-            </span>
+            </button>
           </div>
         </div>
       </div>

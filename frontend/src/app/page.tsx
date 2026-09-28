@@ -38,13 +38,13 @@ function timeAgo(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diffSec = Math.floor((now - then) / 1000);
-  if (diffSec < 60) return `${diffSec}s trước`;
+  if (diffSec < 60) return `${diffSec}s ago`;
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin} phút trước`;
+  if (diffMin < 60) return `${diffMin} min ago`;
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr} giờ trước`;
+  if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay} ngày trước`;
+  return `${diffDay}d ago`;
 }
 
 async function safeFetch(url: string): Promise<any> {
@@ -76,6 +76,7 @@ export default function Home() {
   const [adminClickbait, setAdminClickbait] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any>(null);
   const [adminHealth, setAdminHealth] = useState<any>(null);
+  const [adminOperations, setAdminOperations] = useState<any>(null);
   const [dataUpdatedAt, setDataUpdatedAt] = useState<string | null>(null);
 
   const [sentimentDist, setSentimentDist] = useState<any[] | null>(null);
@@ -277,16 +278,18 @@ export default function Home() {
     const token = localStorage.getItem("token");
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    const [latencyRes, clickbaitRes, usersRes, healthRes] = await Promise.all([
+    const [latencyRes, clickbaitRes, usersRes, healthRes, operationsRes] = await Promise.all([
       apiFetch(`${API_BASE}/admin/metrics/latency`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/volume`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/users`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/health`, { headers }),
+      apiFetch(`${API_BASE}/admin/metrics/operations`, { headers }),
     ]);
     setAdminLatency(latencyRes);
     setAdminClickbait(clickbaitRes);
     setAdminUsers(usersRes);
     setAdminHealth(healthRes);
+    setAdminOperations(operationsRes);
   }, []);
 
   const fetchEntities = useCallback(async () => {
@@ -356,16 +359,21 @@ export default function Home() {
         if (!cancelled) {
           const reason =
             error instanceof Error ? error.message : "Unknown API error";
-          setApiError(`Mất kết nối tới API server: ${reason}`);
+          setApiError(`Unable to reach the API server: ${reason}`);
         }
       }
     };
 
-    poll();
-    const intervalId = setInterval(poll, 15000);
+    const pollWhenVisible = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    pollWhenVisible();
+    const intervalId = setInterval(pollWhenVisible, 15000);
+    document.addEventListener("visibilitychange", pollWhenVisible);
     return () => {
       cancelled = true;
       clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", pollWhenVisible);
     };
   }, [
     activeTab,
@@ -621,34 +629,64 @@ export default function Home() {
         />
       ) : (
         <>
-          <div className="tabs">
+          <div
+            className="tabs"
+            role="tablist"
+            aria-label="Dashboard sections"
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+              const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+              const currentIndex = tabs.indexOf(document.activeElement as HTMLButtonElement);
+              if (currentIndex < 0) return;
+              event.preventDefault();
+              const offset = event.key === "ArrowRight" ? 1 : -1;
+              const next = tabs[(currentIndex + offset + tabs.length) % tabs.length];
+              next.focus();
+              next.click();
+            }}
+          >
             {dashboardMode === "news" && (
               <>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "overview"}
                   className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
                   onClick={() => setActiveTab("overview")}
                 >
                   <Activity size={18} /> Overview
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "sentiment"}
                   className={`tab-btn ${activeTab === "sentiment" ? "active" : ""}`}
                   onClick={() => setActiveTab("sentiment")}
                 >
                   <ThumbsUp size={18} /> Sentiment
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "entities"}
                   className={`tab-btn ${activeTab === "entities" ? "active" : ""}`}
                   onClick={() => setActiveTab("entities")}
                 >
                   <Hash size={18} /> Entities & NLP
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "network"}
                   className={`tab-btn ${activeTab === "network" ? "active" : ""}`}
                   onClick={() => setActiveTab("network")}
                 >
                   <Share2 size={18} /> Network
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "articles"}
                   className={`tab-btn ${activeTab === "articles" ? "active" : ""}`}
                   onClick={() => {
                     setActiveTab("articles");
@@ -659,6 +697,9 @@ export default function Home() {
                 </button>
                 {user && (
                   <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "foryou"}
                     className={`tab-btn ${activeTab === "foryou" ? "active" : ""}`}
                     onClick={() => setActiveTab("foryou")}
                     style={{
@@ -675,18 +716,27 @@ export default function Home() {
             {dashboardMode === "social" && (
               <>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "overview"}
                   className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
                   onClick={() => setActiveTab("overview")}
                 >
                   <Activity size={18} /> Overview
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "sentiment"}
                   className={`tab-btn ${activeTab === "sentiment" ? "active" : ""}`}
                   onClick={() => setActiveTab("sentiment")}
                 >
                   <ThumbsUp size={18} /> Sentiment
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "debates"}
                   className={`tab-btn ${activeTab === "debates" ? "active" : ""}`}
                   onClick={() => setActiveTab("debates")}
                 >
@@ -698,12 +748,18 @@ export default function Home() {
             {dashboardMode === "admin" && (
               <>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "admin_dashboard"}
                   className={`tab-btn ${activeTab === "admin_dashboard" ? "active" : ""}`}
                   onClick={() => setActiveTab("admin_dashboard")}
                 >
                   <Activity size={18} /> Admin Dashboard
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "articles"}
                   className={`tab-btn ${activeTab === "articles" ? "active" : ""}`}
                   onClick={() => {
                     setActiveTab("articles");
@@ -713,12 +769,18 @@ export default function Home() {
                   <BookOpen size={18} /> System Articles
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "stream"}
                   className={`tab-btn ${activeTab === "stream" ? "active" : ""}`}
                   onClick={() => setActiveTab("stream")}
                 >
                   <Radio size={18} /> Live Stream Debug
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "alerts"}
                   className={`tab-btn ${activeTab === "alerts" ? "active" : ""}`}
                   onClick={() => setActiveTab("alerts")}
                 >
@@ -817,6 +879,7 @@ export default function Home() {
               adminClickbait={adminClickbait}
               adminUsers={adminUsers}
               adminHealth={adminHealth}
+              adminOperations={adminOperations}
               updatedAt={dataUpdatedAt}
             />
           )}

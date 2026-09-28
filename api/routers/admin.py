@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from api.database import get_mongo_db
 from api.security import get_admin_user
-from api.services.analytics import _query
+from api.services.analytics import _query, _query_one
 from api.services.health import dependency_health
 
 router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
@@ -104,3 +104,46 @@ async def get_user_metrics(user: dict = Depends(get_admin_user)):
 async def get_system_health(user: dict = Depends(get_admin_user)):
     result = await dependency_health()
     return {**result, "generated_at": datetime.now(timezone.utc).isoformat()}
+
+
+@router.get("/metrics/operations")
+def get_operations_metrics(user: dict = Depends(get_admin_user)):
+    """Return ingestion freshness and NLP coverage for the current article set."""
+    row = _query_one("""
+        SELECT
+            (SELECT uniqExact(url_hash)
+             FROM newspulse.raw_articles) AS total_articles,
+            (SELECT uniqExact(url_hash)
+             FROM newspulse.raw_articles
+             WHERE loaded_at >= now() - INTERVAL 24 HOUR) AS articles_last_24h,
+            (SELECT max(loaded_at)
+             FROM newspulse.raw_articles) AS latest_loaded_at,
+            (SELECT uniqExact(a.url_hash)
+             FROM newspulse.raw_articles a
+             INNER JOIN newspulse.raw_article_sentiment s
+                 ON a.url_hash = s.url_hash) AS nlp_linked_articles
+    """)
+
+    total_articles = int(row.get("total_articles", 0) or 0)
+    linked_articles = int(row.get("nlp_linked_articles", 0) or 0)
+    latest_loaded_at = row.get("latest_loaded_at")
+    freshness_minutes = None
+    if latest_loaded_at:
+        if latest_loaded_at.tzinfo is None:
+            latest_loaded_at = latest_loaded_at.replace(tzinfo=timezone.utc)
+        freshness_minutes = max(
+            int((datetime.now(timezone.utc) - latest_loaded_at).total_seconds() // 60),
+            0,
+        )
+
+    return {
+        "articles_last_24h": int(row.get("articles_last_24h", 0) or 0),
+        "total_articles": total_articles,
+        "nlp_linked_articles": linked_articles,
+        "nlp_coverage_pct": round(
+            linked_articles * 100 / total_articles, 1
+        ) if total_articles else 0.0,
+        "latest_loaded_at": latest_loaded_at,
+        "freshness_minutes": freshness_minutes,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
