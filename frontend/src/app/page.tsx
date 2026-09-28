@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Share2,
   Download,
+  Server,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AlertsPanel from "@/components/AlertsPanel";
@@ -24,6 +25,7 @@ import EntitiesView from "@/components/views/EntitiesView";
 import SentimentView from "@/components/views/SentimentView";
 import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
+import ArchitectureView from "@/components/views/ArchitectureView";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { readCachedUser } from "@/lib/auth-storage";
 
@@ -786,6 +788,15 @@ export default function Home() {
                 >
                   <AlertTriangle size={18} /> System Alerts
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "architecture"}
+                  className={`tab-btn ${activeTab === "architecture" ? "active" : ""}`}
+                  onClick={() => setActiveTab("architecture")}
+                >
+                  <Server size={18} /> Architecture
+                </button>
               </>
             )}
           </div>
@@ -885,6 +896,9 @@ export default function Home() {
           )}
           {activeTab === "debates" && dashboardMode === "social" && (
             <DebatesView overviewData={overviewData} />
+          )}
+          {activeTab === "architecture" && dashboardMode === "admin" && (
+            <ArchitectureView />
           )}
         </>
       )}
