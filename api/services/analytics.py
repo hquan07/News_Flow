@@ -167,17 +167,111 @@ def get_social_crisis_alerts(negative_pct_threshold=30.0, min_posts=10):
     )
 
 
+_PLACEHOLDER_PATTERNS = [
+    "Chủ đề đang hot trên %",
+    "Bài thảo luận % trên %",
+]
+
+
+def _is_placeholder_title(title: str) -> bool:
+    """Check if a title is a known synthetic/placeholder string."""
+    if not title or not title.strip():
+        return True
+    for pattern in _PLACEHOLDER_PATTERNS:
+        parts = pattern.split("%")
+        if all(p in title for p in parts if p):
+            return True
+    return False
+
+
 def get_viral_post_alerts(interaction_threshold=50):
     """Detect individual social posts with high interactions in the last hour."""
-    return _query(
+    rows = _query(
         f"SELECT post_id, source, title, "
         f"(like_count + reply_count) as interactions, "
-        f"sentiment_label "
+        f"sentiment_label, "
+        f"publish_time "
         f"FROM newspulse.social_sentiment_metrics "
         f"WHERE publish_time >= now() - INTERVAL 1 HOUR "
         f"AND (like_count + reply_count) >= {interaction_threshold} "
         f"ORDER BY interactions DESC LIMIT 10"
     )
+    results = []
+    seen_ids = set()
+    for row in rows:
+        pid = row.get("post_id", "")
+        if pid in seen_ids:
+            continue
+        seen_ids.add(pid)
+        title = row.get("title", "")
+        is_placeholder = _is_placeholder_title(title)
+        pt = row.get("publish_time")
+        results.append({
+            "post_id": pid,
+            "source": row.get("source", ""),
+            "title": title if not is_placeholder else "",
+            "interactions": row.get("interactions", 0),
+            "sentiment_label": row.get("sentiment_label", ""),
+            "publish_time": pt.isoformat() if hasattr(pt, "isoformat") else str(pt) if pt else None,
+            "data_quality": {
+                "title_available": not is_placeholder,
+            },
+        })
+    return results
+
+
+def get_viral_post_detail(post_id: str):
+    """Fetch full detail for a single social post by post_id."""
+    rows = _query(
+        "SELECT post_id, source, title, content, "
+        "like_count, reply_count, upvote_ratio, "
+        "(like_count + reply_count) as interactions, "
+        "sentiment_score, sentiment_label, "
+        "url, author, top_comments, "
+        "publish_time, crawled_at "
+        "FROM newspulse.social_sentiment_metrics "
+        "WHERE post_id = {post_id:String} "
+        "LIMIT 1",
+        {"post_id": post_id},
+    )
+    if not rows:
+        return None
+
+    row = rows[0]
+    title = row.get("title", "")
+    content = row.get("content", "")
+    url = row.get("url", "")
+    is_placeholder_t = _is_placeholder_title(title)
+    is_placeholder_c = bool(
+        not content or not content.strip()
+        or "Nội dung chi tiết của bài thảo luận" in content
+    )
+    pt = row.get("publish_time")
+    ca = row.get("crawled_at")
+
+    return {
+        "post_id": row["post_id"],
+        "source": row.get("source", ""),
+        "title": title if not is_placeholder_t else "",
+        "content": content if not is_placeholder_c else "",
+        "excerpt": (content[:200] + "…") if content and len(content) > 200 and not is_placeholder_c else (content if not is_placeholder_c else ""),
+        "url": url,
+        "author": row.get("author", ""),
+        "like_count": row.get("like_count", 0),
+        "reply_count": row.get("reply_count", 0),
+        "interactions": row.get("interactions", 0),
+        "upvote_ratio": row.get("upvote_ratio", 0.0),
+        "sentiment_score": row.get("sentiment_score", 0.0),
+        "sentiment_label": row.get("sentiment_label", ""),
+        "top_comments": row.get("top_comments", []),
+        "publish_time": pt.isoformat() if hasattr(pt, "isoformat") else str(pt) if pt else None,
+        "crawled_at": ca.isoformat() if hasattr(ca, "isoformat") else str(ca) if ca else None,
+        "data_quality": {
+            "title_available": not is_placeholder_t,
+            "content_available": not is_placeholder_c,
+            "url_available": bool(url and url.strip()),
+        },
+    }
 
 
 def get_entity_stats(time_range="7d", entity_type=None, limit=20, source=None, category=None):
