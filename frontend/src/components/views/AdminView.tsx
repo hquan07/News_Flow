@@ -1,520 +1,56 @@
-import React, { useState } from "react";
-import {
-  Activity,
-  Users,
-  BookOpen,
-  Share2,
-} from "lucide-react";
-import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
+"use client";
 
-export default function AdminView({
-  adminLatency,
-  adminClickbait,
-  adminUsers,
-}: any) {
-  const [activeCard, setActiveCard] = useState<number | null>(null);
-  return (
-    <>
-      <>
-        <div className="overview-grid">
-          <div
-            className={`glass-panel metric-card ${activeCard === 10 ? "expanded" : ""}`}
-            onClick={() => setActiveCard(activeCard === 10 ? null : 10)}
-          >
-            <div
-              className="metric-content"
-              style={{ display: activeCard === 10 ? "none" : "block" }}
-            >
-              <div className="metric-label">Total Users</div>
-              <div className="metric-value">{adminUsers?.total_users || 0}</div>
-              <div className="metric-hint">Click để xem chi tiết</div>
-            </div>
-            {activeCard === 10 && (
-              <div className="metric-details">
-                <div
-                  className="metric-label"
-                  style={{
-                    marginBottom: "8px",
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  Total Users (Chi tiết)
-                </div>
-                <ul className="metric-details-list">
-                  <li>
-                    <span>Standard Users</span>
-                    <strong>{adminUsers?.standard_users || 0}</strong>
-                  </li>
-                  <li>
-                    <span>Admin Users</span>
-                    <strong style={{ color: "#ef4444" }}>
-                      {adminUsers?.admin_users || 0}
-                    </strong>
-                  </li>
-                </ul>
-              </div>
-            )}
-          </div>
+import { Activity, BookOpen, Server, Share2, Users } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import ChartCard from "../ui/ChartCard";
+import EmptyState from "../ui/EmptyState";
+import ChartSkeleton from "../ui/ChartSkeleton";
+import { formatCompactNumber, formatDateTime, formatPercent, formatSourceName } from "@/lib/formatters";
 
-          <div
-            className={`glass-panel metric-card ${activeCard === 11 ? "expanded" : ""}`}
-            onClick={() => setActiveCard(activeCard === 11 ? null : 11)}
-          >
-            <div
-              className="metric-content"
-              style={{ display: activeCard === 11 ? "none" : "block" }}
-            >
-              <div className="metric-label">Avg Crawl Latency</div>
-              <div className="metric-value">
-                {adminLatency?.avg_latency?.length
-                  ? (
-                      adminLatency.avg_latency.reduce(
-                        (a: number, b: number) => a + b,
-                        0,
-                      ) / adminLatency.avg_latency.length
-                    ).toFixed(1)
-                  : 0}{" "}
-                m
-              </div>
-              <div className="metric-hint">Click để xem chi tiết</div>
-            </div>
-            {activeCard === 11 && (
-              <div className="metric-details">
-                <div
-                  className="metric-label"
-                  style={{
-                    marginBottom: "8px",
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  Latency (Chi tiết)
-                </div>
-                <ul className="metric-details-list">
-                  {adminLatency?.sources
-                    ?.slice(0, 5)
-                    .map((s: string, i: number) => (
-                      <li key={s}>
-                        <span style={{ textTransform: "capitalize" }}>{s}</span>
-                        <strong>{adminLatency.avg_latency[i]} m</strong>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-          </div>
+function rows(sources: string[] = [], values: number[] = [], key: string) {
+  return sources.map((source, index) => ({ source: formatSourceName(source), [key]: Number(values[index] || 0) })).sort((a, b) => Number(b[key]) - Number(a[key]));
+}
 
-          <div
-            className={`glass-panel metric-card ${activeCard === 12 ? "expanded" : ""}`}
-            onClick={() => setActiveCard(activeCard === 12 ? null : 12)}
-          >
-            <div
-              className="metric-content"
-              style={{ display: activeCard === 12 ? "none" : "block" }}
-            >
-              <div className="metric-label">Total News Articles</div>
-              <div className="metric-value">
-                {adminClickbait?.news?.volumes?.length
-                  ? adminClickbait.news.volumes.reduce(
-                      (a: number, b: number) => a + b,
-                      0,
-                    )
-                  : 0}
-              </div>
-              <div className="metric-hint">Click để xem chi tiết</div>
-            </div>
-            {activeCard === 12 && (
-              <div className="metric-details">
-                <div
-                  className="metric-label"
-                  style={{
-                    marginBottom: "8px",
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  News (Chi tiết)
-                </div>
-                <ul className="metric-details-list">
-                  {adminClickbait?.news?.sources
-                    ?.slice(0, 5)
-                    .map((s: string, i: number) => (
-                      <li key={s}>
-                        <span style={{ textTransform: "capitalize" }}>{s}</span>
-                        <strong>{adminClickbait.news.volumes[i]}</strong>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-          </div>
+export default function AdminView({ adminLatency, adminClickbait, adminUsers, adminHealth, updatedAt }: any) {
+  const latencyRows = rows(adminLatency?.sources, adminLatency?.avg_latency, "latency");
+  const newsRows = rows(adminClickbait?.news?.sources, adminClickbait?.news?.volumes, "total");
+  const socialRows = rows(adminClickbait?.social?.sources, adminClickbait?.social?.volumes, "total");
+  const roleRows = adminUsers ? [{ name: "Standard users", count: Number(adminUsers.standard_users || 0), color: "#3b82f6" }, { name: "Admin users", count: Number(adminUsers.admin_users || 0), color: "#f97316" }] : [];
+  const roleTotal = roleRows.reduce((sum, row) => sum + row.count, 0);
+  const healthStatus = adminHealth?.status ?? "unknown";
+  const healthColor = healthStatus === "healthy" ? "#10b981" : healthStatus === "degraded" ? "#f59e0b" : "#ef4444";
+  const generatedAt = adminLatency?.generated_at ?? adminClickbait?.generated_at ?? updatedAt;
 
-          <div
-            className={`glass-panel metric-card ${activeCard === 13 ? "expanded" : ""}`}
-            onClick={() => setActiveCard(activeCard === 13 ? null : 13)}
-          >
-            <div
-              className="metric-content"
-              style={{ display: activeCard === 13 ? "none" : "block" }}
-            >
-              <div className="metric-label">Total Social Posts</div>
-              <div className="metric-value">
-                {adminClickbait?.social?.volumes?.length
-                  ? adminClickbait.social.volumes.reduce(
-                      (a: number, b: number) => a + b,
-                      0,
-                    )
-                  : 0}
-              </div>
-              <div className="metric-hint">Click để xem chi tiết</div>
-            </div>
-            {activeCard === 13 && (
-              <div className="metric-details">
-                <div
-                  className="metric-label"
-                  style={{
-                    marginBottom: "8px",
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  Social (Chi tiết)
-                </div>
-                <ul className="metric-details-list">
-                  {adminClickbait?.social?.sources
-                    ?.slice(0, 5)
-                    .map((s: string, i: number) => (
-                      <li key={s}>
-                        <span style={{ textTransform: "capitalize" }}>{s}</span>
-                        <strong>{adminClickbait.social.volumes[i]}</strong>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-          </div>
+  const summary = [
+    { label: "Total users", value: formatCompactNumber(adminUsers?.total_users ?? 0), hint: `${adminUsers?.admin_users ?? 0} administrators` },
+    { label: "Average crawl latency", value: `${Number(adminLatency?.overall_average ?? 0).toFixed(1)} min`, hint: `SLA target ≤ ${adminLatency?.sla_target ?? 5} min` },
+    { label: "News articles", value: formatCompactNumber(adminClickbait?.news?.total ?? 0), hint: `${newsRows.length} active sources` },
+    { label: "Social posts", value: formatCompactNumber(adminClickbait?.social?.total ?? 0), hint: `${socialRows.length} active platforms` },
+  ];
 
-          <div className={`glass-panel metric-card`}>
-            <div className="metric-content">
-              <div className="metric-label">System Health</div>
-              <div
-                className="metric-value"
-                style={{ color: "var(--accent-green)" }}
-              >
-                Healthy
-              </div>
-              <div className="metric-hint">All systems operational</div>
-            </div>
-          </div>
+  return <>
+    <div className="overview-grid">
+      {summary.map((metric) => <div className="glass-panel metric-card" key={metric.label}><div className="metric-content"><div className="metric-label">{metric.label}</div><div className="metric-value">{metric.value}</div><div className="chart-description">{metric.hint}</div></div></div>)}
+      <div className="glass-panel metric-card"><div className="metric-content"><div className="metric-label">System health</div><div className="metric-value" style={{ background: "none", WebkitTextFillColor: healthColor, color: healthColor, textTransform: "capitalize" }}>{healthStatus}</div><div className="chart-description">{Object.entries(adminHealth?.services ?? {}).map(([name, service]: any) => `${name}: ${service.status}${service.latency_ms ? ` (${service.latency_ms} ms)` : ""}`).join(" · ") || "Health data unavailable"}</div></div></div>
+    </div>
 
-          <div className={`glass-panel metric-card`}>
-            <div className="metric-content">
-              <div className="metric-label">System Uptime</div>
-              <div className="metric-value">99.9%</div>
-              <div className="metric-hint">Hoạt động ổn định</div>
-            </div>
-          </div>
+    <div className="charts-grid">
+      <ChartCard wide title={<><Activity size={20} /> Crawl Latency by Source</>} description="Which sources exceed the crawl-latency service target?" timeRange="Current aggregate" unit="Minutes" total={latencyRows.length} updatedAt={generatedAt}>
+        {adminLatency === null ? <ChartSkeleton /> : latencyRows.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={latencyRows} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)" /><XAxis dataKey="source" stroke="#94a3b8" fontSize={11} interval="preserveStartEnd" /><YAxis stroke="#94a3b8" fontSize={11} unit="m" allowDecimals={false} /><Tooltip formatter={(value) => [`${Number(value).toFixed(2)} minutes`, "Average latency"]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><ReferenceLine y={adminLatency.sla_target ?? 5} stroke="#f59e0b" strokeDasharray="5 5" label={{ value: `SLA ${adminLatency.sla_target ?? 5}m`, fill: "#fbbf24", fontSize: 11 }} /><Bar dataKey="latency" name="Average latency">{latencyRows.map((row) => <Cell key={row.source} fill={Number(row.latency) > (adminLatency.sla_target ?? 5) ? "#f97316" : "#3b82f6"} />)}</Bar></BarChart></ResponsiveContainer> : <EmptyState message="No latency data" />}
+      </ChartCard>
 
-          <div
-            className={`glass-panel metric-card ${activeCard === 15 ? "expanded" : ""}`}
-            onClick={() => setActiveCard(activeCard === 15 ? null : 15)}
-          >
-            <div
-              className="metric-content"
-              style={{ display: activeCard === 15 ? "none" : "block" }}
-            >
-              <div className="metric-label">Active News Sources</div>
-              <div className="metric-value">
-                {adminClickbait?.news?.sources?.length || 0}
-              </div>
-              <div className="metric-hint">Click để xem chi tiết</div>
-            </div>
-            {activeCard === 15 && (
-              <div className="metric-details">
-                <div
-                  className="metric-label"
-                  style={{
-                    marginBottom: "8px",
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  Các trang báo
-                </div>
-                <ul className="metric-details-list">
-                  {adminClickbait?.news?.sources
-                    ?.slice(0, 5)
-                    .map((s: string) => (
-                      <li key={s}>
-                        <span style={{ textTransform: "capitalize" }}>{s}</span>
-                        <strong style={{ color: "var(--accent-green)" }}>
-                          Active
-                        </strong>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-          </div>
+      <ChartCard title={<><BookOpen size={20} /> News Volume</>} description="Which publishers contribute the most articles?" timeRange="All available data" unit="Articles" total={adminClickbait?.news?.total ?? 0} updatedAt={adminClickbait?.generated_at ?? updatedAt}>
+        {adminClickbait === null ? <ChartSkeleton /> : newsRows.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={newsRows} layout="vertical" margin={{ left: 10, right: 12 }}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)" horizontal={false} /><XAxis type="number" tickFormatter={formatCompactNumber} allowDecimals={false} stroke="#94a3b8" fontSize={11} /><YAxis type="category" dataKey="source" width={90} stroke="#94a3b8" fontSize={11} /><Tooltip formatter={(value, _name, item) => [`${Number(value).toLocaleString()} · ${formatPercent((adminClickbait.news.total ? Number(value) / adminClickbait.news.total : 0) * 100)}`, item.payload.source]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer> : <EmptyState message="No news volume data" />}
+      </ChartCard>
 
-          <div
-            className={`glass-panel metric-card ${activeCard === 16 ? "expanded" : ""}`}
-            onClick={() => setActiveCard(activeCard === 16 ? null : 16)}
-          >
-            <div
-              className="metric-content"
-              style={{ display: activeCard === 16 ? "none" : "block" }}
-            >
-              <div className="metric-label">Active Social Platforms</div>
-              <div className="metric-value">
-                {adminClickbait?.social?.sources?.length || 0}
-              </div>
-              <div className="metric-hint">Click để xem chi tiết</div>
-            </div>
-            {activeCard === 16 && (
-              <div className="metric-details">
-                <div
-                  className="metric-label"
-                  style={{
-                    marginBottom: "8px",
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  Các MXH
-                </div>
-                <ul className="metric-details-list">
-                  {adminClickbait?.social?.sources
-                    ?.slice(0, 5)
-                    .map((s: string) => (
-                      <li key={s}>
-                        <span style={{ textTransform: "capitalize" }}>{s}</span>
-                        <strong style={{ color: "var(--accent-green)" }}>
-                          Active
-                        </strong>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
+      <ChartCard title={<><Share2 size={20} /> Social Volume</>} description="Which social platforms contribute the most posts?" timeRange="All available data" unit="Posts" total={adminClickbait?.social?.total ?? 0} updatedAt={adminClickbait?.generated_at ?? updatedAt}>
+        {adminClickbait === null ? <ChartSkeleton /> : socialRows.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={socialRows} layout="vertical" margin={{ left: 10, right: 12 }}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)" horizontal={false} /><XAxis type="number" tickFormatter={formatCompactNumber} allowDecimals={false} stroke="#94a3b8" fontSize={11} /><YAxis type="category" dataKey="source" width={90} stroke="#94a3b8" fontSize={11} /><Tooltip formatter={(value, _name, item) => [`${Number(value).toLocaleString()} · ${formatPercent((adminClickbait.social.total ? Number(value) / adminClickbait.social.total : 0) * 100)}`, item.payload.source]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><Bar dataKey="total" fill="#8b5cf6" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer> : <EmptyState message="No social volume data" />}
+      </ChartCard>
 
-        <div className="charts-grid">
-          <div className="glass-panel" style={{ gridColumn: "1 / -1" }}>
-            <div className="panel-header">
-              <div className="panel-title">
-                <Activity size={20} /> Crawl Latency by Source
-              </div>
-            </div>
-            <div className="chart-container">
-              {adminLatency?.sources?.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={adminLatency.sources.map((s: string, i: number) => ({
-                      source: s,
-                      latency: adminLatency.avg_latency[i],
-                    }))}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,0.1)"
-                    />
-                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip
-                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                      contentStyle={{
-                        backgroundColor: "rgba(30, 41, 59, 0.9)",
-                      }}
-                    />
-                    <Bar dataKey="latency" fill="#3b82f6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "100%",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  No Data
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="glass-panel">
-            <div className="panel-header">
-              <div className="panel-title">
-                <BookOpen size={20} /> News Articles Volume
-              </div>
-            </div>
-            <div className="chart-container">
-              {adminClickbait?.news?.sources?.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={adminClickbait.news.sources.map(
-                      (s: string, i: number) => ({
-                        source: s,
-                        total: adminClickbait.news.volumes[i],
-                      }),
-                    )}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,0.1)"
-                    />
-                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip
-                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                      contentStyle={{
-                        backgroundColor: "rgba(30, 41, 59, 0.9)",
-                      }}
-                    />
-                    <Bar dataKey="total" fill="#ef4444" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "100%",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  No Data
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="glass-panel">
-            <div className="panel-header">
-              <div className="panel-title">
-                <Share2 size={20} /> Social Posts Volume
-              </div>
-            </div>
-            <div className="chart-container">
-              {adminClickbait?.social?.sources?.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={adminClickbait.social.sources.map(
-                      (s: string, i: number) => ({
-                        source: s,
-                        total: adminClickbait.social.volumes[i],
-                      }),
-                    )}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,0.1)"
-                    />
-                    <XAxis dataKey="source" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip
-                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                      contentStyle={{
-                        backgroundColor: "rgba(30, 41, 59, 0.9)",
-                      }}
-                    />
-                    <Bar dataKey="total" fill="#8b5cf6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "100%",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  No Data
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="glass-panel" style={{ gridColumn: "1 / -1" }}>
-            <div className="panel-header">
-              <div className="panel-title">
-                <Users size={20} /> User Roles Distribution
-              </div>
-            </div>
-            <div className="chart-container">
-              {adminUsers ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        {
-                          name: "Standard Users",
-                          count: adminUsers.standard_users,
-                        },
-                        {
-                          name: "Admin Users",
-                          count: adminUsers.admin_users,
-                        },
-                      ]}
-                      dataKey="count"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label
-                    >
-                      <Cell fill="#3b82f6" />
-                      <Cell fill="#ef4444" />
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "rgba(30, 41, 59, 0.9)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                      itemStyle={{ color: "#fff" }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "100%",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  No Data
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </>
-      )
-    </>
-  );
+      <ChartCard wide title={<><Users size={20} /> User Roles</>} description="How are registered accounts distributed by access level?" timeRange="Current snapshot" unit="Users and share" total={roleTotal} updatedAt={adminUsers?.generated_at ?? updatedAt}>
+        {adminUsers === null ? <ChartSkeleton /> : roleTotal ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={roleRows} dataKey="count" nameKey="name" cx="50%" cy="45%" innerRadius="45%" outerRadius="72%">{roleRows.map((row) => <Cell key={row.name} fill={row.color} />)}</Pie><Tooltip formatter={(value, _name, item) => [`${Number(value).toLocaleString()} · ${formatPercent(Number(value) * 100 / roleTotal)}`, item.payload.name]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><Legend verticalAlign="bottom" /></PieChart></ResponsiveContainer> : <EmptyState message="No user data" />}
+      </ChartCard>
+    </div>
+    <p className="chart-description" style={{ textAlign: "right" }}><Server size={13} style={{ verticalAlign: "middle" }} /> Health checked {formatDateTime(adminHealth?.generated_at ?? updatedAt)}</p>
+  </>;
 }

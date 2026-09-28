@@ -12,12 +12,21 @@ import {
   Legend,
 } from "recharts";
 import { Activity } from "lucide-react";
+import ChartCard from "../ui/ChartCard";
+import ChartSkeleton from "../ui/ChartSkeleton";
+import EmptyState from "../ui/EmptyState";
+import { formatCompactNumber } from "@/lib/formatters";
 
 export default function OverviewSocialView({
   overviewData,
   activeCard,
   setActiveCard,
+  updatedAt,
 }: any) {
+  const engagementTotal = (overviewData?.engagement_timeline ?? []).reduce(
+    (sum: number, row: any) => sum + Number(row.Likes || 0) + Number(row.Replies || 0),
+    0,
+  );
   return (
     <>
       <>
@@ -124,13 +133,7 @@ export default function OverviewSocialView({
         </div>
 
         <div className="charts-grid">
-          <div className="glass-panel" style={{ gridColumn: "1 / -1" }}>
-            <div className="panel-header">
-              <div className="panel-title">
-                <Activity size={20} /> Engagement Timeline
-              </div>
-            </div>
-            <div className="chart-container">
+          <ChartCard wide title={<><Activity size={20} /> Engagement Timeline</>} description="How do likes and replies change across time buckets?" timeRange="All available data" unit="Interactions" total={engagementTotal} updatedAt={updatedAt}>
               {overviewData?.engagement_timeline?.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={overviewData.engagement_timeline}>
@@ -149,7 +152,7 @@ export default function OverviewSocialView({
                         })
                       }
                     />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} allowDecimals={false} tickFormatter={formatCompactNumber} />
                     <Tooltip
                       labelFormatter={(t) =>
                         new Date(t as string).toLocaleString()
@@ -161,14 +164,14 @@ export default function OverviewSocialView({
                     />
                     <Legend />
                     <Line
-                      type="monotone"
+                      type="linear"
                       dataKey="Likes"
                       stroke="#3b82f6"
                       strokeWidth={2}
                       dot={false}
                     />
                     <Line
-                      type="monotone"
+                      type="linear"
                       dataKey="Replies"
                       stroke="#ec4899"
                       strokeWidth={2}
@@ -176,21 +179,8 @@ export default function OverviewSocialView({
                     />
                   </LineChart>
                 </ResponsiveContainer>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "100%",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  No timeline data available
-                </div>
-              )}
-            </div>
-          </div>
+              ) : !overviewData ? <ChartSkeleton /> : <EmptyState message="No engagement timeline data" />}
+          </ChartCard>
         </div>
       </>
     </>

@@ -75,6 +75,8 @@ export default function Home() {
   const [adminLatency, setAdminLatency] = useState<any>(null);
   const [adminClickbait, setAdminClickbait] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any>(null);
+  const [adminHealth, setAdminHealth] = useState<any>(null);
+  const [dataUpdatedAt, setDataUpdatedAt] = useState<string | null>(null);
 
   const [sentimentDist, setSentimentDist] = useState<any[] | null>(null);
   const [sentimentTimeline, setSentimentTimeline] = useState<any[] | null>(null);
@@ -270,22 +272,24 @@ export default function Home() {
     const token = localStorage.getItem("token");
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    const [latencyRes, clickbaitRes, usersRes] = await Promise.all([
+    const [latencyRes, clickbaitRes, usersRes, healthRes] = await Promise.all([
       apiFetch(`${API_BASE}/admin/metrics/latency`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/volume`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/users`, { headers }),
+      apiFetch(`${API_BASE}/admin/metrics/health`, { headers }),
     ]);
     setAdminLatency(latencyRes);
     setAdminClickbait(clickbaitRes);
     setAdminUsers(usersRes);
+    setAdminHealth(healthRes);
   }, []);
 
   const fetchEntities = useCallback(async () => {
     const results = await Promise.allSettled([
-      safeFetch(`${API_BASE}/entities`),
+      safeFetch(`${API_BASE}/entities?limit=50`),
       safeFetch(`${API_BASE}/trending/keywords`),
       safeFetch(`${API_BASE}/entities/type-distribution`),
-      safeFetch(`${API_BASE}/entities/sentiment`),
+      safeFetch(`${API_BASE}/entities/sentiment?limit=50`),
     ]);
     if (results[0].status === "fulfilled")
       setEntitiesData(results[0].value || []);
@@ -298,7 +302,7 @@ export default function Home() {
   }, []);
 
   const fetchNetwork = useCallback(async () => {
-    const result = await safeFetch(`${API_BASE}/entities/knowledge-graph`);
+    const result = await safeFetch(`${API_BASE}/entities/knowledge-graph?limit=100`);
     setKnowledgeGraph(result);
   }, []);
 
@@ -339,7 +343,10 @@ export default function Home() {
         else if (activeTab === "foryou") await fetchForYou();
         else if (activeTab === "debates") await fetchDebates();
         else if (activeTab === "admin_dashboard") await fetchAdmin();
-        if (!cancelled) setApiError(null);
+        if (!cancelled) {
+          setApiError(null);
+          setDataUpdatedAt(new Date().toISOString());
+        }
       } catch (error) {
         if (!cancelled) {
           const reason =
@@ -724,6 +731,7 @@ export default function Home() {
               activeCard={activeCard}
               setActiveCard={setActiveCard}
               exportToCSV={exportToCSV}
+              updatedAt={dataUpdatedAt}
             />
           )}
           {activeTab === "overview" && dashboardMode === "social" && (
@@ -731,6 +739,7 @@ export default function Home() {
               overviewData={overviewData}
               activeCard={activeCard}
               setActiveCard={setActiveCard}
+              updatedAt={dataUpdatedAt}
             />
           )}
 
@@ -739,6 +748,7 @@ export default function Home() {
               sentimentDist={sentimentDist}
               sentimentTimeline={sentimentTimeline}
               sentimentSources={sentimentSources}
+              updatedAt={dataUpdatedAt}
             />
           )}
 
@@ -748,11 +758,12 @@ export default function Home() {
               trendingKeywords={trendingKeywords}
               entityTypeDist={entityTypeDist}
               entitySentiment={entitySentiment}
+              updatedAt={dataUpdatedAt}
             />
           )}
 
           {activeTab === "network" && (
-            <NetworkView knowledgeGraph={knowledgeGraph} />
+            <NetworkView knowledgeGraph={knowledgeGraph} updatedAt={dataUpdatedAt} />
           )}
 
           {activeTab === "articles" && (
@@ -799,6 +810,8 @@ export default function Home() {
               adminLatency={adminLatency}
               adminClickbait={adminClickbait}
               adminUsers={adminUsers}
+              adminHealth={adminHealth}
+              updatedAt={dataUpdatedAt}
             />
           )}
           {activeTab === "debates" && dashboardMode === "social" && (

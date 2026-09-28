@@ -268,6 +268,147 @@ h1 {
   gap: 0.5rem;
 }
 
+.chart-card-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.chart-description {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.chart-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  min-height: 2.5rem;
+  padding: 0.65rem 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.chart-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.chart-actions,
+.chart-toggle,
+.graph-controls,
+.graph-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chart-action-button,
+.chart-toggle button,
+.graph-controls button,
+.graph-controls select,
+.graph-controls input {
+  min-height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.75);
+  color: var(--text-main);
+  padding: 0.4rem 0.65rem;
+  font: inherit;
+}
+
+.chart-toggle button,
+.graph-controls button {
+  cursor: pointer;
+}
+
+.chart-toggle button.active {
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+}
+
+.donut-center {
+  color: var(--text-main);
+  text-align: center;
+}
+
+.entity-type-badge,
+.legend-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legend-dot::before {
+  content: "";
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--legend-color);
+}
+
+.graph-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 1rem;
+}
+
+.graph-stage {
+  position: relative;
+  min-height: 560px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.graph-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.graph-details {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.graph-details h3 { margin-bottom: 0.75rem; }
+.graph-details dl { display: grid; gap: 0.65rem; }
+.graph-details dt { color: var(--text-muted); font-size: 0.75rem; }
+.graph-details dd { margin: 0.15rem 0 0; }
+
+.graph-data-table {
+  margin-top: 1rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .chart-card-header,
+  .graph-toolbar {
+    flex-direction: column;
+  }
+  .chart-meta { min-height: auto; }
+  .graph-shell { grid-template-columns: 1fr; }
+  .graph-stage { min-height: 420px; }
+  .graph-controls input { width: 100%; }
+}
+
 /* Metrics */
 .metric-label {
   color: var(--text-muted);
@@ -297,6 +438,9 @@ h1 {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  width: 100%;
+  color: inherit;
+  font: inherit;
 }
 .metric-card:hover .metric-hint {
   opacity: 1;
