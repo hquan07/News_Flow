@@ -10,10 +10,12 @@ from api.services.analytics import (
 )
 from api.security import get_admin_user
 from api.services.alert_state import get_alert_states, update_alert_state
+from api.services.alert_metrics import alert_metrics
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Literal, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
+from time import monotonic
 
 logger = logging.getLogger("newspulse.alerts")
 
@@ -106,6 +108,7 @@ class VolumeSpikeDetail(BaseModel):
 class SocialAlertsResponse(BaseModel):
     crisis_alerts: List[SocialCrisisAlert]
     viral_alerts: List[ViralPostAlertSummary]
+    generated_at: datetime
 
 class AlertThresholds(BaseModel):
     crisis_negative_pct: float = 30.0
@@ -168,17 +171,26 @@ def alerts(
 
 @router.get("/social", response_model=SocialAlertsResponse)
 def social_alerts():
-    crisis = get_social_crisis_alerts(
-        negative_pct_threshold=current_thresholds.crisis_negative_pct,
-        min_posts=current_thresholds.crisis_min_posts
-    )
-    viral = get_viral_post_alerts(
-        interaction_threshold=current_thresholds.viral_interactions
-    )
-    return SocialAlertsResponse(
-        crisis_alerts=crisis,
-        viral_alerts=viral
-    )
+    started = monotonic()
+    outcome = "success"
+    try:
+        crisis = get_social_crisis_alerts(
+            negative_pct_threshold=current_thresholds.crisis_negative_pct,
+            min_posts=current_thresholds.crisis_min_posts
+        )
+        viral = get_viral_post_alerts(
+            interaction_threshold=current_thresholds.viral_interactions
+        )
+        return SocialAlertsResponse(
+            crisis_alerts=crisis,
+            viral_alerts=viral,
+            generated_at=datetime.now(timezone.utc),
+        )
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        alert_metrics.observe("social_snapshot", outcome, monotonic() - started)
 
 
 @router.get("/social/trends", response_model=InteractionTrendResponse)
@@ -186,7 +198,21 @@ def social_interaction_trend(
     source: Optional[str] = Query(default=None),
     granularity: Literal["15m", "1h"] = Query(default="15m"),
 ):
-    return get_interaction_trend(source=source, granularity=granularity)
+    started = monotonic()
+    outcome = "success"
+    try:
+        return get_interaction_trend(source=source, granularity=granularity)
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        alert_metrics.observe("interaction_trend", outcome, monotonic() - started)
+
+
+@router.get("/metrics", response_model=dict)
+def get_alert_metrics(_user: dict = Depends(get_admin_user)):
+    """Return process-local alert workflow telemetry for operators."""
+    return alert_metrics.snapshot()
 
 
 @router.post("/state/query", response_model=List[AlertState])
@@ -194,7 +220,15 @@ async def query_alert_states(
     query: AlertStateQuery,
     user: dict = Depends(get_admin_user),
 ):
-    return await get_alert_states(user["sub"], query.alert_ids)
+    started = monotonic()
+    outcome = "success"
+    try:
+        return await get_alert_states(user["sub"], query.alert_ids)
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        alert_metrics.observe("state_query", outcome, monotonic() - started)
 
 
 @router.patch("/state/{alert_id}", response_model=AlertState)
@@ -203,28 +237,45 @@ async def patch_alert_state(
     patch: AlertStatePatch,
     user: dict = Depends(get_admin_user),
 ):
-    return await update_alert_state(
-        user["sub"],
-        alert_id,
-        pinned=patch.pinned,
-        acknowledged=patch.acknowledged,
-    )
+    started = monotonic()
+    outcome = "success"
+    try:
+        return await update_alert_state(
+            user["sub"],
+            alert_id,
+            pinned=patch.pinned,
+            acknowledged=patch.acknowledged,
+        )
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        alert_metrics.observe("state_update", outcome, monotonic() - started)
 
 @router.get("/social/posts/{post_id}", response_model=ViralPostDetail)
 def get_social_post_detail(post_id: str):
     """Fetch full detail for a single viral/social post."""
+    started = monotonic()
+    outcome = "success"
     try:
         detail = get_viral_post_detail(post_id)
     except Exception as exc:
+        outcome = "error"
         logger.error("Failed to fetch detail for post_id=%s: %s", post_id, exc)
+        alert_metrics.observe("viral_detail", outcome, monotonic() - started)
         raise HTTPException(status_code=503, detail="Data warehouse unavailable")
     if detail is None:
+        outcome = "not_found"
+        alert_metrics.observe("viral_detail", outcome, monotonic() - started)
         raise HTTPException(status_code=404, detail="Post not found")
+    alert_metrics.observe("viral_detail", outcome, monotonic() - started)
     return detail
 
 
 @router.get("/social/crisis/{source}", response_model=SocialCrisisDetail)
 def get_crisis_detail(source: str):
+    started = monotonic()
+    outcome = "success"
     try:
         detail = get_social_crisis_detail(
             source,
@@ -232,20 +283,32 @@ def get_crisis_detail(source: str):
             min_posts=current_thresholds.crisis_min_posts,
         )
     except Exception as exc:
+        outcome = "error"
         logger.error("Failed to fetch crisis detail for source=%s: %s", source, exc)
+        alert_metrics.observe("crisis_detail", outcome, monotonic() - started)
         raise HTTPException(status_code=503, detail="Data warehouse unavailable")
     if detail is None:
+        outcome = "not_found"
+        alert_metrics.observe("crisis_detail", outcome, monotonic() - started)
         raise HTTPException(status_code=404, detail="Active crisis alert not found")
+    alert_metrics.observe("crisis_detail", outcome, monotonic() - started)
     return detail
 
 
 @router.get("/volume/{hour_slot}", response_model=VolumeSpikeDetail)
 def get_spike_detail(hour_slot: datetime, threshold: float = Query(default=0.5, ge=0)):
+    started = monotonic()
+    outcome = "success"
     try:
         detail = get_volume_spike_detail(hour_slot, threshold=threshold)
     except Exception as exc:
+        outcome = "error"
         logger.error("Failed to fetch spike detail for hour_slot=%s: %s", hour_slot, exc)
+        alert_metrics.observe("volume_detail", outcome, monotonic() - started)
         raise HTTPException(status_code=503, detail="Data warehouse unavailable")
     if detail is None:
+        outcome = "not_found"
+        alert_metrics.observe("volume_detail", outcome, monotonic() - started)
         raise HTTPException(status_code=404, detail="Volume spike not found")
+    alert_metrics.observe("volume_detail", outcome, monotonic() - started)
     return detail

@@ -899,7 +899,11 @@ h1 {
 }
 
 .alerts-header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  text-align: left;
   padding: 2rem;
   border-top: 4px solid var(--accent-blue);
   background: linear-gradient(180deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
@@ -908,7 +912,7 @@ h1 {
 .alerts-header h2 {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 1rem;
   font-size: 2rem;
   margin-bottom: 0.5rem;
@@ -916,6 +920,39 @@ h1 {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.alerts-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.alert-freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #6ee7b7;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.alert-freshness.stale {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fcd34d;
+}
+
+.alert-config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
 }
 
 .icon-pulse {
@@ -1260,6 +1297,13 @@ h1 {
   cursor: pointer;
   font: inherit;
   font-size: 0.7rem;
+}
+
+.alert-card-interactive:focus-visible,
+.alert-card-actions button:focus-visible,
+.alerts-header-actions button:focus-visible {
+  outline: 3px solid rgba(96, 165, 250, 0.8);
+  outline-offset: 3px;
 }
 
 .alert-card-actions button.active {
@@ -1609,9 +1653,51 @@ h1 {
   .article-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .alerts-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .alerts-header-actions {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 640px) {
+  .alerts-grid,
+  .alert-config-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .alerts-header,
+  .alert-card {
+    padding: 1rem;
+  }
+
+  .alerts-header h2 {
+    font-size: 1.45rem;
+  }
+
+  .alerts-header-actions,
+  .alerts-header-actions .btn,
+  .alert-freshness {
+    width: 100%;
+  }
+
+  .alert-freshness {
+    justify-content: center;
+  }
+
+  .alert-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .alert-card-actions button {
+    min-height: 40px;
+  }
+
   .article-search-row {
     align-items: stretch;
     flex-direction: column;

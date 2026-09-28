@@ -49,6 +49,7 @@ interface AlertsPanelProps {
   liveAlerts?: {
     crisis: SocialCrisisAlert[];
     viral: ViralPostAlertSummary[];
+    timestamp: string;
   } | null;
   onOpenArticles: (filter: ArticleAlertFilter) => void;
 }
@@ -143,6 +144,8 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
     Record<string, AlertWorkflowState>
   >({});
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [freshnessTick, setFreshnessTick] = useState(() => Date.now());
 
   // Drill-down state
   const [selectedAlert, setSelectedAlert] =
@@ -214,6 +217,7 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
       // Deduplicate by post_id
       setViralAlerts(deduplicateViralAlerts(socialData.viral_alerts || []));
       setThresholds(configData);
+      setLastUpdatedAt(socialData.generated_at || new Date().toISOString());
       setError(null);
     } catch {
       setError("Failed to fetch alerts.");
@@ -230,7 +234,24 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
     if (!liveAlerts) return;
     setCrisisAlerts(liveAlerts.crisis);
     setViralAlerts(deduplicateViralAlerts(liveAlerts.viral));
+    setLastUpdatedAt(liveAlerts.timestamp);
   }, [liveAlerts]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setFreshnessTick(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const freshnessAgeSeconds = lastUpdatedAt
+    ? Math.max(0, Math.floor((freshnessTick - new Date(lastUpdatedAt).getTime()) / 1000))
+    : null;
+  const isStale = freshnessAgeSeconds !== null && freshnessAgeSeconds > 90;
+  const freshnessLabel =
+    freshnessAgeSeconds === null
+      ? "Freshness unavailable"
+      : freshnessAgeSeconds < 60
+        ? `Updated ${freshnessAgeSeconds}s ago`
+        : `Updated ${Math.floor(freshnessAgeSeconds / 60)}m ago`;
 
   useEffect(() => {
     if (!alertIdsKey) {
@@ -498,11 +519,6 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
     <div className="alerts-wrapper">
       <div
         className="alerts-header glass-panel"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
       >
         <div>
           <h2>
@@ -514,23 +530,36 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
             trends
           </p>
         </div>
-        <button
-          className="btn btn-secondary"
-          onClick={() => setShowConfig(!showConfig)}
-        >
-          <Settings size={18} /> Configure
-        </button>
+        <div className="alerts-header-actions">
+          <span
+            className={`alert-freshness ${isStale ? "stale" : ""}`}
+            role="status"
+            aria-live="polite"
+          >
+            <Clock size={15} aria-hidden="true" />
+            {isStale ? `Stale data · ${freshnessLabel}` : freshnessLabel}
+          </span>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowConfig(!showConfig)}
+            aria-expanded={showConfig}
+          >
+            <Settings size={18} /> Configure
+          </button>
+        </div>
       </div>
       {error && (
         <p role="alert" className="error-toast">
           {error}
         </p>
       )}
-      {actionError && (
-        <p role="alert" className="alert-action-error">
-          {actionError}
-        </p>
-      )}
+      <div aria-live="polite" aria-atomic="true">
+        {actionError && (
+          <p role="alert" className="alert-action-error">
+            {actionError}
+          </p>
+        )}
+      </div>
 
       {showConfig && (
         <div
@@ -552,13 +581,7 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
           >
             <Settings size={20} /> Alert Thresholds
           </h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: "20px",
-            }}
-          >
+          <div className="alert-config-grid">
             <div>
               <label>Crisis: Min Negative %</label>
               <input

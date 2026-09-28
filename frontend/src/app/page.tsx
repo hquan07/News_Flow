@@ -48,6 +48,7 @@ type FeedEvent = {
 type LiveSocialAlerts = {
   crisis: SocialCrisisAlert[];
   viral: ViralPostAlertSummary[];
+  timestamp: string;
 };
 
 function timeAgo(dateStr: string): string {
@@ -488,7 +489,11 @@ export default function Home() {
 
           const crisis = Array.isArray(payload.crisis) ? payload.crisis : [];
           const viral = Array.isArray(payload.viral) ? payload.viral : [];
-          setLiveSocialAlerts({ crisis, viral });
+          setLiveSocialAlerts({
+            crisis,
+            viral,
+            timestamp: payload.timestamp || new Date().toISOString(),
+          });
           const feedEvent: FeedEvent = {
             timestamp: payload.timestamp || new Date().toISOString(),
             type: "social_alerts",

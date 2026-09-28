@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from api.services.analytics import get_social_crisis_alerts, get_viral_post_alerts
 from api.routers.alerts import current_thresholds
 from api.config import get_settings
+from api.services.alert_metrics import alert_metrics
 
 router = APIRouter(prefix="/stream", tags=["Stream"])
 logger = logging.getLogger("newspulse.stream")
@@ -74,7 +75,9 @@ async def event_generator(request: Request):
                     "viral": viral,
                 }, default=str)
                 yield f"event: alert\ndata: {data}\n\n"
+                alert_metrics.observe("sse_snapshot", "success", 0)
         except Exception:
+            alert_metrics.observe("sse_snapshot", "error", 0)
             logger.exception("Failed to refresh SSE alerts")
             
         data = json.dumps({
