@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 import logging
 from api.config import get_ch_client
 
@@ -13,6 +13,8 @@ def _build_article_filters(
         category=None,
         date_from=None,
         date_to=None,
+        published_from=None,
+        published_to=None,
         entity=None,
         keyword=None,
 ):
@@ -34,6 +36,12 @@ def _build_article_filters(
     if date_to:
         conditions.append("toDate(publish_time) <= {date_to:Date}")
         params["date_to"] = date_to
+    if published_from:
+        conditions.append("publish_time >= {published_from:DateTime}")
+        params["published_from"] = published_from
+    if published_to:
+        conditions.append("publish_time < {published_to:DateTime}")
+        params["published_to"] = published_to
     if entity:
         conditions.append("""
             url_hash IN (
@@ -65,6 +73,8 @@ def get_articles(
         category: Optional[str] = None,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
+        published_from: Optional[datetime] = None,
+        published_to: Optional[datetime] = None,
         entity: Optional[str] = None,
         keyword: Optional[str] = None,
 ) -> dict:
@@ -75,6 +85,8 @@ def get_articles(
         category=category,
         date_from=date_from,
         date_to=date_to,
+        published_from=published_from,
+        published_to=published_to,
         entity=entity,
         keyword=keyword,
     )

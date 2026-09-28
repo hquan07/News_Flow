@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime, timedelta
 from typing import Optional
 
 from api.config import get_ch_client
@@ -122,7 +123,7 @@ def get_source_comparison(time_range="7d", source=None, category=None):
 
 def get_alerts(threshold=2.0, limit=10):
     """Detect anomalous spikes using z-score on hourly article counts."""
-    return _query(
+    rows = _query(
         f"WITH hourly AS ("
         f"  SELECT toStartOfHour(publish_time) AS hour_slot, count() AS cnt "
         f"  FROM newspulse.raw_articles "
@@ -130,10 +131,19 @@ def get_alerts(threshold=2.0, limit=10):
         f"), stats AS ("
         f"  SELECT avg(cnt) AS avg_cnt, stddevPop(cnt) AS std_cnt FROM hourly"
         f") "
-        f"SELECT h.hour_slot, h.cnt AS article_count, toInt32(s.avg_cnt) AS avg_count "
+        f"SELECT h.hour_slot, h.cnt AS article_count, toInt32(s.avg_cnt) AS avg_count, "
+        f"round(s.std_cnt, 2) AS std_count, "
+        f"if(s.std_cnt = 0, 0, round((h.cnt - s.avg_cnt) / s.std_cnt, 2)) AS z_score "
         f"FROM hourly h, stats s "
         f"WHERE h.cnt > s.avg_cnt + {threshold} * s.std_cnt ORDER BY h.hour_slot DESC LIMIT {limit}"
     )
+    for row in rows:
+        row["threshold"] = threshold
+        row["alert_reason"] = (
+            f"Hourly volume is {row.get('z_score', 0)} standard deviations above "
+            f"the 7-day hourly average (threshold: {threshold})."
+        )
+    return rows
 
 
 def get_social_debates(time_range="7d", limit=10, source=None, category=None):
@@ -154,7 +164,7 @@ def get_social_debates(time_range="7d", limit=10, source=None, category=None):
 
 def get_social_crisis_alerts(negative_pct_threshold=30.0, min_posts=10):
     """Detect sources with high negative sentiment in the last hour."""
-    return _query(
+    rows = _query(
         f"SELECT source, "
         f"count() as total_posts, "
         f"countIf(sentiment_label = 'negative') as negative_posts, "
@@ -165,6 +175,15 @@ def get_social_crisis_alerts(negative_pct_threshold=30.0, min_posts=10):
         f"HAVING negative_pct > {negative_pct_threshold} AND total_posts >= {min_posts} "
         f"ORDER BY negative_pct DESC"
     )
+    for row in rows:
+        row["negative_pct_threshold"] = negative_pct_threshold
+        row["min_posts_threshold"] = min_posts
+        row["alert_reason"] = (
+            f"Negative sentiment is {row.get('negative_pct', 0)}% across "
+            f"{row.get('total_posts', 0)} posts in the last hour "
+            f"(threshold: > {negative_pct_threshold}% and at least {min_posts} posts)."
+        )
+    return rows
 
 
 _PLACEHOLDER_PATTERNS = [
@@ -218,6 +237,11 @@ def get_viral_post_alerts(interaction_threshold=50):
             "interactions": row.get("interactions", 0),
             "sentiment_label": row.get("sentiment_label", ""),
             "publish_time": pt.isoformat() if hasattr(pt, "isoformat") else str(pt) if pt else None,
+            "threshold": interaction_threshold,
+            "alert_reason": (
+                f"This post has {row.get('interactions', 0)} interactions in the last hour "
+                f"(threshold: {interaction_threshold})."
+            ),
             "data_quality": {
                 "title_available": not is_placeholder,
                 "synthetic": _is_synthetic_post(pid),
@@ -279,6 +303,111 @@ def get_viral_post_detail(post_id: str):
             "synthetic": _is_synthetic_post(row["post_id"]),
         },
     }
+
+
+def get_social_crisis_detail(
+    source: str,
+    negative_pct_threshold: float = 30.0,
+    min_posts: int = 10,
+):
+    """Return the active crisis snapshot and its highest-impact negative posts."""
+    summary = next(
+        (
+            item
+            for item in get_social_crisis_alerts(
+                negative_pct_threshold=negative_pct_threshold,
+                min_posts=min_posts,
+            )
+            if item.get("source") == source
+        ),
+        None,
+    )
+    if summary is None:
+        return None
+
+    distribution = _query(
+        "SELECT sentiment_label AS label, count() AS count "
+        "FROM newspulse.social_sentiment_metrics "
+        "WHERE publish_time >= now() - INTERVAL 1 HOUR "
+        "AND source = {source:String} "
+        "GROUP BY sentiment_label ORDER BY count DESC",
+        {"source": source},
+    )
+    rows = _query(
+        "SELECT post_id, source, title, "
+        "(like_count + reply_count) AS interactions, sentiment_label, publish_time "
+        "FROM newspulse.social_sentiment_metrics "
+        "WHERE publish_time >= now() - INTERVAL 1 HOUR "
+        "AND source = {source:String} AND sentiment_label = 'negative' "
+        "ORDER BY interactions DESC LIMIT 5",
+        {"source": source},
+    )
+    top_posts = []
+    for row in rows:
+        title = row.get("title", "")
+        is_placeholder = _is_placeholder_title(title)
+        publish_time = row.get("publish_time")
+        top_posts.append({
+            "post_id": row.get("post_id", ""),
+            "source": row.get("source", source),
+            "title": title if not is_placeholder else "",
+            "interactions": row.get("interactions", 0),
+            "sentiment_label": row.get("sentiment_label", "negative"),
+            "publish_time": (
+                publish_time.isoformat()
+                if hasattr(publish_time, "isoformat")
+                else str(publish_time) if publish_time else None
+            ),
+            "data_quality": {
+                "title_available": not is_placeholder,
+                "synthetic": _is_synthetic_post(row.get("post_id", "")),
+            },
+        })
+
+    return {
+        **summary,
+        "sentiment_distribution": distribution,
+        "top_negative_posts": top_posts,
+    }
+
+
+def get_volume_spike_detail(hour_slot: datetime, threshold: float = 2.0):
+    """Return spike diagnostics and articles published during the alert hour."""
+    stats = _query(
+        "WITH hourly AS ("
+        "  SELECT toStartOfHour(publish_time) AS hour_slot, count() AS cnt "
+        "  FROM newspulse.raw_articles "
+        "  WHERE publish_time >= now() - INTERVAL 7 DAY GROUP BY hour_slot"
+        "), aggregate_stats AS ("
+        "  SELECT avg(cnt) AS avg_cnt, stddevPop(cnt) AS std_cnt FROM hourly"
+        ") "
+        "SELECT h.hour_slot, h.cnt AS article_count, round(s.avg_cnt, 2) AS avg_count, "
+        "round(s.std_cnt, 2) AS std_count, "
+        "if(s.std_cnt = 0, 0, round((h.cnt - s.avg_cnt) / s.std_cnt, 2)) AS z_score "
+        "FROM hourly h, aggregate_stats s WHERE h.hour_slot = {hour_slot:DateTime} LIMIT 1",
+        {"hour_slot": hour_slot},
+    )
+    if not stats:
+        return None
+
+    articles = _query(
+        "SELECT url_hash AS article_id, title, url, source, category, publish_time "
+        "FROM newspulse.raw_articles FINAL "
+        "WHERE publish_time >= {hour_slot:DateTime} "
+        "AND publish_time < {window_end:DateTime} "
+        "ORDER BY publish_time DESC LIMIT 10",
+        {"hour_slot": hour_slot, "window_end": hour_slot + timedelta(hours=1)},
+    )
+    detail = stats[0]
+    detail["threshold"] = threshold
+    detail["window_end"] = hour_slot + timedelta(hours=1)
+    detail["is_active"] = detail.get("z_score", 0) > threshold
+    detail["alert_reason"] = (
+        f"Hourly volume is {detail.get('z_score', 0)} standard deviations above "
+        f"the 7-day hourly average (threshold: {threshold})."
+    )
+    detail["articles"] = articles
+    return detail
 
 
 def get_entity_stats(time_range="7d", entity_type=None, limit=20, source=None, category=None):

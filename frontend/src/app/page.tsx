@@ -29,6 +29,7 @@ import ArchitectureView from "@/components/views/ArchitectureView";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { readCachedUser } from "@/lib/auth-storage";
 import type {
+  ArticleAlertFilter,
   SocialCrisisAlert,
   ViralPostAlertSummary,
 } from "@/lib/alert-types";
@@ -85,6 +86,8 @@ export default function Home() {
   const [articleSearchInput, setArticleSearchInput] = useState("");
   const [articleSearchQuery, setArticleSearchQuery] = useState("");
   const [articlesLoading, setArticlesLoading] = useState(false);
+  const [articleAlertFilter, setArticleAlertFilter] =
+    useState<ArticleAlertFilter | null>(null);
   const [liveSocialAlerts, setLiveSocialAlerts] =
     useState<LiveSocialAlerts | null>(null);
 
@@ -343,6 +346,10 @@ export default function Home() {
         page_size: "20",
       });
       if (articleSearchQuery) params.set("q", articleSearchQuery);
+      if (articleAlertFilter) {
+        params.set("published_from", articleAlertFilter.publishedFrom);
+        params.set("published_to", articleAlertFilter.publishedTo);
+      }
 
       try {
         const result = await apiFetch<any>(
@@ -362,7 +369,7 @@ export default function Home() {
         }
       }
     },
-    [articleSearchQuery],
+    [articleAlertFilter, articleSearchQuery],
   );
 
   useEffect(() => {
@@ -774,6 +781,7 @@ export default function Home() {
                   onClick={() => {
                     setActiveTab("articles");
                     setPage(1);
+                    setArticleAlertFilter(null);
                   }}
                 >
                   <BookOpen size={18} /> Latest News
@@ -847,6 +855,7 @@ export default function Home() {
                   onClick={() => {
                     setActiveTab("articles");
                     setPage(1);
+                    setArticleAlertFilter(null);
                   }}
                 >
                   <BookOpen size={18} /> System Articles
@@ -936,6 +945,11 @@ export default function Home() {
               searchQuery={articleSearchInput}
               setSearchQuery={setArticleSearchInput}
               loading={articlesLoading}
+              contextFilter={articleAlertFilter}
+              clearContextFilter={() => {
+                setArticleAlertFilter(null);
+                setPage(1);
+              }}
               trackClick={trackClick}
               timeAgo={timeAgo}
               exportToCSV={exportToCSV}
@@ -947,7 +961,17 @@ export default function Home() {
           )}
 
           {activeTab === "alerts" && (
-            <AlertsPanel liveAlerts={liveSocialAlerts} />
+            <AlertsPanel
+              liveAlerts={liveSocialAlerts}
+              onOpenArticles={(filter) => {
+                setArticleAlertFilter(filter);
+                setArticleSearchInput("");
+                setArticleSearchQuery("");
+                setPage(1);
+                setDashboardMode("news");
+                setActiveTab("articles");
+              }}
+            />
           )}
 
           {apiError && (

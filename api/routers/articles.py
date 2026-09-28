@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 
 from api.services.crud import get_articles, get_article_detail
 
@@ -16,12 +16,15 @@ def list_articles(
         category: Optional[str] = Query(default=None),
         date_from: Optional[date] = Query(default=None),
         date_to: Optional[date] = Query(default=None),
+        published_from: Optional[datetime] = Query(default=None),
+        published_to: Optional[datetime] = Query(default=None),
         entity: Optional[str] = Query(default=None, description="Filter by entity"),
         keyword: Optional[str] = Query(default=None, description="Filter by keyword"),
 ):
     return get_articles(
         page=page, page_size=page_size, q=q, source=source,
         category=category, date_from=date_from, date_to=date_to,
+        published_from=published_from, published_to=published_to,
         entity=entity, keyword=keyword,
     )
 

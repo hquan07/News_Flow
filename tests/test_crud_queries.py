@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from api.services import crud
 
 
@@ -73,3 +75,20 @@ def test_article_detail_deduplicates_enrichment_rows(monkeypatch):
     assert "GROUP BY keyword" in client.calls[1][0]
     assert "GROUP BY entity, entity_type" in client.calls[2][0]
     assert client.closed is True
+
+
+def test_article_filters_support_alert_time_window():
+    published_from = datetime(2026, 9, 28, 10, 0)
+    published_to = datetime(2026, 9, 28, 11, 0)
+
+    where, params = crud._build_article_filters(
+        published_from=published_from,
+        published_to=published_to,
+    )
+
+    assert "publish_time >= {published_from:DateTime}" in where
+    assert "publish_time < {published_to:DateTime}" in where
+    assert params == {
+        "published_from": published_from,
+        "published_to": published_to,
+    }

@@ -2,6 +2,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import { BookOpen, FileText, Search, X } from "lucide-react";
+import type { ArticleAlertFilter } from "@/lib/alert-types";
 
 type Article = {
   article_id: string;
@@ -27,6 +28,8 @@ type ArticlesViewProps = {
   searchQuery: string;
   setSearchQuery: Dispatch<SetStateAction<string>>;
   loading: boolean;
+  contextFilter: ArticleAlertFilter | null;
+  clearContextFilter: () => void;
   trackClick: (articleHash: string) => void | Promise<void>;
   timeAgo: (date: string) => string;
   exportToCSV: (data: Record<string, unknown>[], filename: string) => void;
@@ -41,6 +44,8 @@ export default function ArticlesView({
   searchQuery,
   setSearchQuery,
   loading,
+  contextFilter,
+  clearContextFilter,
   trackClick,
   timeAgo,
   exportToCSV,
@@ -115,6 +120,16 @@ export default function ArticlesView({
               : `${articlesMeta.total ?? articles.length} article${(articlesMeta.total ?? articles.length) === 1 ? "" : "s"}`}
           </span>
         </div>
+        {contextFilter && (
+          <div className="article-context-filter" role="status">
+            <span>
+              <strong>Alert filter:</strong> {contextFilter.label}
+            </span>
+            <button type="button" onClick={clearContextFilter}>
+              <X size={15} /> Clear filter
+            </button>
+          </div>
+        )}
         <div className="table-scroll-container">
           <table className="data-table">
           <thead>

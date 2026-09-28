@@ -14,11 +14,18 @@ import {
 } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
 import AlertDetailModal from "./AlertDetailModal";
+import {
+  CrisisDetailModal,
+  VolumeSpikeDetailModal,
+} from "./AlertInsightModals";
 import type {
+  ArticleAlertFilter,
   ViralPostAlertSummary,
   ViralPostDetail,
   SocialCrisisAlert,
+  SocialCrisisDetail,
   SpikeAlert,
+  VolumeSpikeDetail,
 } from "@/lib/alert-types";
 
 interface AlertThresholds {
@@ -32,6 +39,7 @@ interface AlertsPanelProps {
     crisis: SocialCrisisAlert[];
     viral: ViralPostAlertSummary[];
   } | null;
+  onOpenArticles: (filter: ArticleAlertFilter) => void;
 }
 
 function deduplicateViralAlerts(alerts: ViralPostAlertSummary[]) {
@@ -43,7 +51,10 @@ function deduplicateViralAlerts(alerts: ViralPostAlertSummary[]) {
   });
 }
 
-const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
+const AlertsPanel: React.FC<AlertsPanelProps> = ({
+  liveAlerts,
+  onOpenArticles,
+}) => {
   const [spikes, setSpikes] = useState<SpikeAlert[]>([]);
   const [crisisAlerts, setCrisisAlerts] = useState<SocialCrisisAlert[]>([]);
   const [viralAlerts, setViralAlerts] = useState<ViralPostAlertSummary[]>([]);
@@ -65,6 +76,20 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
   const [detailError, setDetailError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const [selectedCrisis, setSelectedCrisis] =
+    useState<SocialCrisisAlert | null>(null);
+  const [crisisDetail, setCrisisDetail] =
+    useState<SocialCrisisDetail | null>(null);
+  const [crisisLoading, setCrisisLoading] = useState(false);
+  const [crisisError, setCrisisError] = useState<string | null>(null);
+  const crisisTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const [selectedSpike, setSelectedSpike] = useState<SpikeAlert | null>(null);
+  const [spikeDetail, setSpikeDetail] = useState<VolumeSpikeDetail | null>(null);
+  const [spikeLoading, setSpikeLoading] = useState(false);
+  const [spikeError, setSpikeError] = useState<string | null>(null);
+  const spikeTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const fetchAlerts = async () => {
     try {
@@ -145,6 +170,86 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
     setDetailError(null);
     // Return focus to the trigger card
     triggerRef.current?.focus();
+  }, []);
+
+  const handleOpenCrisis = useCallback(
+    async (alert: SocialCrisisAlert, btnEl: HTMLButtonElement | null) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      crisisTriggerRef.current = btnEl;
+      setSelectedCrisis(alert);
+      setCrisisDetail(null);
+      setCrisisLoading(true);
+      setCrisisError(null);
+
+      try {
+        const detail = await apiFetch<SocialCrisisDetail>(
+          `${API_BASE}/alerts/social/crisis/${encodeURIComponent(alert.source)}`,
+          { signal: controller.signal },
+        );
+        if (!controller.signal.aborted) setCrisisDetail(detail);
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+        setCrisisError(
+          err?.status === 404
+            ? "This crisis is no longer active."
+            : "Failed to load crisis details.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setCrisisLoading(false);
+      }
+    },
+    [],
+  );
+
+  const handleCloseCrisis = useCallback(() => {
+    abortRef.current?.abort();
+    setSelectedCrisis(null);
+    setCrisisDetail(null);
+    setCrisisLoading(false);
+    setCrisisError(null);
+    crisisTriggerRef.current?.focus();
+  }, []);
+
+  const handleOpenSpike = useCallback(
+    async (alert: SpikeAlert, btnEl: HTMLButtonElement | null) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      spikeTriggerRef.current = btnEl;
+      setSelectedSpike(alert);
+      setSpikeDetail(null);
+      setSpikeLoading(true);
+      setSpikeError(null);
+
+      try {
+        const detail = await apiFetch<VolumeSpikeDetail>(
+          `${API_BASE}/alerts/volume/${encodeURIComponent(alert.hour_slot)}?threshold=${alert.threshold ?? 0.5}`,
+          { signal: controller.signal },
+        );
+        if (!controller.signal.aborted) setSpikeDetail(detail);
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+        setSpikeError(
+          err?.status === 404
+            ? "This spike is no longer available."
+            : "Failed to load volume spike details.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setSpikeLoading(false);
+      }
+    },
+    [],
+  );
+
+  const handleCloseSpike = useCallback(() => {
+    abortRef.current?.abort();
+    setSelectedSpike(null);
+    setSpikeDetail(null);
+    setSpikeLoading(false);
+    setSpikeError(null);
+    spikeTriggerRef.current?.focus();
   }, []);
 
   const handleSaveConfig = async () => {
@@ -313,10 +418,14 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
           </h3>
           <div className="alerts-grid">
             {crisisAlerts.map((crisis, idx) => (
-              <div
+              <button
+                type="button"
                 key={idx}
-                className="alert-card glass-panel severity-high"
+                className="alert-card glass-panel severity-high alert-card-interactive alert-card-crisis"
                 style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}
+                aria-haspopup="dialog"
+                aria-expanded={selectedCrisis?.source === crisis.source}
+                onClick={(event) => handleOpenCrisis(crisis, event.currentTarget)}
               >
                 <div className="alert-card-header">
                   <div className="alert-time">
@@ -343,7 +452,8 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
                     </span>
                   </div>
                 </div>
-              </div>
+                <div className="alert-card-hint">Click for crisis details →</div>
+              </button>
             ))}
           </div>
         </div>
@@ -460,9 +570,13 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
                   ? "severity-medium"
                   : "severity-low";
               return (
-                <div
+                <button
+                  type="button"
                   key={idx}
-                  className={`alert-card glass-panel ${severityClass}`}
+                  className={`alert-card glass-panel ${severityClass} alert-card-interactive alert-card-spike`}
+                  aria-haspopup="dialog"
+                  aria-expanded={selectedSpike?.hour_slot === spike.hour_slot}
+                  onClick={(event) => handleOpenSpike(spike, event.currentTarget)}
                 >
                   <div className="alert-card-header">
                     <div className="alert-time">
@@ -492,7 +606,8 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
                       </span>
                     </div>
                   </div>
-                </div>
+                  <div className="alert-card-hint">Click for spike details →</div>
+                </button>
               );
             })
           )}
@@ -507,6 +622,26 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
         detail={alertDetail}
         loading={detailLoading}
         error={detailError}
+      />
+      <CrisisDetailModal
+        open={!!selectedCrisis}
+        onClose={handleCloseCrisis}
+        summary={selectedCrisis}
+        detail={crisisDetail}
+        loading={crisisLoading}
+        error={crisisError}
+      />
+      <VolumeSpikeDetailModal
+        open={!!selectedSpike}
+        onClose={handleCloseSpike}
+        summary={selectedSpike}
+        detail={spikeDetail}
+        loading={spikeLoading}
+        error={spikeError}
+        onOpenArticles={(filter) => {
+          handleCloseSpike();
+          onOpenArticles(filter);
+        }}
       />
     </div>
   );

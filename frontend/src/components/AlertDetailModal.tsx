@@ -259,6 +259,14 @@ export default function AlertDetailModal({
               </span>
             </div>
           )}
+
+          <section className="alert-explanation">
+            <h4><AlertTriangle size={16} /> Why this alert?</h4>
+            <p>
+              {summary?.alert_reason ||
+                `This post exceeded the configured threshold of ${summary?.threshold ?? 50} interactions in the last hour.`}
+            </p>
+          </section>
         </div>
       )}
     </Modal>
