@@ -1,12 +1,20 @@
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from api.config import get_ch_client
 
 
 logger = logging.getLogger("newspulse.analytics")
+
+
+def _alert_hour_key(value=None) -> str:
+    if value is None:
+        value = datetime.now(timezone.utc)
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y%m%d%H")
+    return str(value).replace(" ", "T")[:13]
 
 
 def _resolve_time_range(time_range, date_column="publish_time"):
@@ -138,6 +146,7 @@ def get_alerts(threshold=2.0, limit=10):
         f"WHERE h.cnt > s.avg_cnt + {threshold} * s.std_cnt ORDER BY h.hour_slot DESC LIMIT {limit}"
     )
     for row in rows:
+        row["alert_id"] = f"volume:{_alert_hour_key(row.get('hour_slot'))}"
         row["threshold"] = threshold
         row["alert_reason"] = (
             f"Hourly volume is {row.get('z_score', 0)} standard deviations above "
@@ -176,6 +185,7 @@ def get_social_crisis_alerts(negative_pct_threshold=30.0, min_posts=10):
         f"ORDER BY negative_pct DESC"
     )
     for row in rows:
+        row["alert_id"] = f"crisis:{row.get('source', '')}:{_alert_hour_key()}"
         row["negative_pct_threshold"] = negative_pct_threshold
         row["min_posts_threshold"] = min_posts
         row["alert_reason"] = (
@@ -231,6 +241,7 @@ def get_viral_post_alerts(interaction_threshold=50):
         is_placeholder = _is_placeholder_title(title)
         pt = row.get("publish_time")
         results.append({
+            "alert_id": f"viral:{pid}",
             "post_id": pid,
             "source": row.get("source", ""),
             "title": title if not is_placeholder else "",
@@ -408,6 +419,36 @@ def get_volume_spike_detail(hour_slot: datetime, threshold: float = 2.0):
     )
     detail["articles"] = articles
     return detail
+
+
+def get_interaction_trend(source: str | None = None, granularity: str = "15m"):
+    """Aggregate social interactions into operator-friendly time buckets."""
+    if granularity == "1h":
+        bucket_expression = "toStartOfHour(publish_time)"
+        lookback = "24 HOUR"
+    else:
+        bucket_expression = "toStartOfInterval(publish_time, INTERVAL 15 MINUTE)"
+        lookback = "1 HOUR"
+
+    params = {}
+    source_filter = ""
+    if source:
+        source_filter = " AND source = {source:String}"
+        params["source"] = source
+
+    rows = _query(
+        f"SELECT {bucket_expression} AS bucket, "
+        f"sum(like_count + reply_count) AS interactions, count() AS post_count "
+        f"FROM newspulse.social_sentiment_metrics "
+        f"WHERE publish_time >= now() - INTERVAL {lookback}{source_filter} "
+        f"GROUP BY bucket ORDER BY bucket",
+        params,
+    )
+    return {
+        "source": source,
+        "granularity": granularity,
+        "data": rows,
+    }
 
 
 def get_entity_stats(time_range="7d", entity_type=None, limit=20, source=None, category=None):

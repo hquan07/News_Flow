@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Body, HTTPException
+from fastapi import APIRouter, Query, Body, Depends, HTTPException
 from api.services.analytics import (
     get_alerts,
     get_social_crisis_alerts,
@@ -6,9 +6,12 @@ from api.services.analytics import (
     get_viral_post_alerts,
     get_viral_post_detail,
     get_volume_spike_detail,
+    get_interaction_trend,
 )
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from api.security import get_admin_user
+from api.services.alert_state import get_alert_states, update_alert_state
+from pydantic import BaseModel, Field, model_validator
+from typing import List, Literal, Optional
 from datetime import datetime
 import logging
 
@@ -16,6 +19,7 @@ logger = logging.getLogger("newspulse.alerts")
 
 
 class SimpleSpikeAlert(BaseModel):
+    alert_id: str = ""
     hour_slot: datetime
     article_count: int
     avg_count: int
@@ -25,6 +29,7 @@ class SimpleSpikeAlert(BaseModel):
     alert_reason: str = ""
 
 class SocialCrisisAlert(BaseModel):
+    alert_id: str = ""
     source: str
     total_posts: int
     negative_posts: int
@@ -40,6 +45,7 @@ class AlertDataQuality(BaseModel):
     synthetic: bool = False
 
 class ViralPostAlertSummary(BaseModel):
+    alert_id: str = ""
     post_id: str
     source: str
     title: str
@@ -106,6 +112,37 @@ class AlertThresholds(BaseModel):
     crisis_min_posts: int = 10
     viral_interactions: int = 50
 
+class AlertStateQuery(BaseModel):
+    alert_ids: List[str] = Field(default_factory=list, max_length=100)
+
+class AlertStatePatch(BaseModel):
+    pinned: Optional[bool] = None
+    acknowledged: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def require_update(self):
+        if self.pinned is None and self.acknowledged is None:
+            raise ValueError("At least one alert state field is required")
+        return self
+
+class AlertState(BaseModel):
+    alert_id: str
+    user_id: str
+    pinned: bool = False
+    acknowledged: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+class InteractionTrendPoint(BaseModel):
+    bucket: datetime
+    interactions: int
+    post_count: int
+
+class InteractionTrendResponse(BaseModel):
+    source: Optional[str] = None
+    granularity: Literal["15m", "1h"]
+    data: List[InteractionTrendPoint] = Field(default_factory=list)
+
 # In-memory config for MVP
 current_thresholds = AlertThresholds()
 
@@ -141,6 +178,36 @@ def social_alerts():
     return SocialAlertsResponse(
         crisis_alerts=crisis,
         viral_alerts=viral
+    )
+
+
+@router.get("/social/trends", response_model=InteractionTrendResponse)
+def social_interaction_trend(
+    source: Optional[str] = Query(default=None),
+    granularity: Literal["15m", "1h"] = Query(default="15m"),
+):
+    return get_interaction_trend(source=source, granularity=granularity)
+
+
+@router.post("/state/query", response_model=List[AlertState])
+async def query_alert_states(
+    query: AlertStateQuery,
+    user: dict = Depends(get_admin_user),
+):
+    return await get_alert_states(user["sub"], query.alert_ids)
+
+
+@router.patch("/state/{alert_id}", response_model=AlertState)
+async def patch_alert_state(
+    alert_id: str,
+    patch: AlertStatePatch,
+    user: dict = Depends(get_admin_user),
+):
+    return await update_alert_state(
+        user["sub"],
+        alert_id,
+        pinned=patch.pinned,
+        acknowledged=patch.acknowledged,
     )
 
 @router.get("/social/posts/{post_id}", response_model=ViralPostDetail)

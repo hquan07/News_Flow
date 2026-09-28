@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   AlertTriangle,
   Clock,
@@ -11,11 +17,15 @@ import {
   Settings,
   Save,
   X,
+  Pin,
+  CheckCircle2,
+  Layers3,
 } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
 import AlertDetailModal from "./AlertDetailModal";
 import {
   CrisisDetailModal,
+  ViralClusterModal,
   VolumeSpikeDetailModal,
 } from "./AlertInsightModals";
 import type {
@@ -26,6 +36,7 @@ import type {
   SocialCrisisDetail,
   SpikeAlert,
   VolumeSpikeDetail,
+  AlertWorkflowState,
 } from "@/lib/alert-types";
 
 interface AlertThresholds {
@@ -51,6 +62,67 @@ function deduplicateViralAlerts(alerts: ViralPostAlertSummary[]) {
   });
 }
 
+type ViralCluster = {
+  id: string;
+  source: string;
+  posts: ViralPostAlertSummary[];
+  interactions: number;
+};
+
+function crisisAlertId(alert: SocialCrisisAlert) {
+  return alert.alert_id || `crisis:${alert.source}`;
+}
+
+function spikeAlertId(alert: SpikeAlert) {
+  return alert.alert_id || `volume:${alert.hour_slot}`;
+}
+
+function viralTopicKey(alert: ViralPostAlertSummary) {
+  if (!alert.data_quality.title_available || !alert.title.trim()) {
+    return "unlabelled";
+  }
+  const words = alert.title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 2)
+    .slice(0, 4);
+  return words.join("-") || "unlabelled";
+}
+
+function AlertCardActions({
+  state,
+  onToggle,
+}: {
+  state?: AlertWorkflowState;
+  onToggle: (field: "pinned" | "acknowledged", value: boolean) => void;
+}) {
+  const pinned = state?.pinned ?? false;
+  const acknowledged = state?.acknowledged ?? false;
+  return (
+    <div className="alert-card-actions">
+      <button
+        type="button"
+        className={pinned ? "active" : ""}
+        aria-pressed={pinned}
+        onClick={() => onToggle("pinned", !pinned)}
+      >
+        <Pin size={14} /> {pinned ? "Pinned" : "Pin"}
+      </button>
+      <button
+        type="button"
+        className={acknowledged ? "active acknowledged" : ""}
+        aria-pressed={acknowledged}
+        onClick={() => onToggle("acknowledged", !acknowledged)}
+      >
+        <CheckCircle2 size={14} /> {acknowledged ? "Acknowledged" : "Acknowledge"}
+      </button>
+    </div>
+  );
+}
+
 const AlertsPanel: React.FC<AlertsPanelProps> = ({
   liveAlerts,
   onOpenArticles,
@@ -67,6 +139,10 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const [workflowStates, setWorkflowStates] = useState<
+    Record<string, AlertWorkflowState>
+  >({});
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Drill-down state
   const [selectedAlert, setSelectedAlert] =
@@ -90,6 +166,38 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
   const [spikeLoading, setSpikeLoading] = useState(false);
   const [spikeError, setSpikeError] = useState<string | null>(null);
   const spikeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<ViralCluster | null>(null);
+  const clusterTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const viralClusters = useMemo<ViralCluster[]>(() => {
+    const grouped = new Map<
+      string,
+      { source: string; posts: ViralPostAlertSummary[] }
+    >();
+    viralAlerts.forEach((alert) => {
+      const topic = viralTopicKey(alert);
+      const groupKey = `${alert.source}:${topic}`;
+      const group = grouped.get(groupKey) || { source: alert.source, posts: [] };
+      group.posts.push(alert);
+      grouped.set(groupKey, group);
+    });
+    return Array.from(grouped.entries()).map(([groupKey, { source, posts }]) => ({
+      id: `cluster:${groupKey}`,
+      source,
+      posts,
+      interactions: posts.reduce((total, post) => total + post.interactions, 0),
+    }));
+  }, [viralAlerts]);
+
+  const alertIds = useMemo(
+    () => [
+      ...crisisAlerts.map(crisisAlertId),
+      ...viralClusters.map((cluster) => cluster.id),
+      ...spikes.map(spikeAlertId),
+    ],
+    [crisisAlerts, spikes, viralClusters],
+  );
+  const alertIdsKey = alertIds.slice().sort().join("|");
 
   const fetchAlerts = async () => {
     try {
@@ -123,6 +231,89 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
     setCrisisAlerts(liveAlerts.crisis);
     setViralAlerts(deduplicateViralAlerts(liveAlerts.viral));
   }, [liveAlerts]);
+
+  useEffect(() => {
+    if (!alertIdsKey) {
+      setWorkflowStates({});
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const controller = new AbortController();
+    apiFetch<AlertWorkflowState[]>(`${API_BASE}/alerts/state/query`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ alert_ids: alertIdsKey.split("|") }),
+      signal: controller.signal,
+    })
+      .then((states) => {
+        setActionError(null);
+        setWorkflowStates(
+          Object.fromEntries(states.map((state) => [state.alert_id, state])),
+        );
+      })
+      .catch((requestError) => {
+        if (requestError?.name !== "AbortError") {
+          setActionError("Unable to load saved alert states.");
+        }
+      });
+    return () => controller.abort();
+  }, [alertIdsKey]);
+
+  const toggleWorkflowState = useCallback(
+    async (
+      alertId: string,
+      field: "pinned" | "acknowledged",
+      value: boolean,
+    ) => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setActionError("Please sign in again to update alerts.");
+        return;
+      }
+      const previous = workflowStates[alertId] || {
+        alert_id: alertId,
+        pinned: false,
+        acknowledged: false,
+      };
+      setActionError(null);
+      setWorkflowStates((current) => ({
+        ...current,
+        [alertId]: { ...previous, [field]: value },
+      }));
+      try {
+        const saved = await apiFetch<AlertWorkflowState>(
+          `${API_BASE}/alerts/state/${encodeURIComponent(alertId)}`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ [field]: value }),
+          },
+        );
+        setWorkflowStates((current) => ({ ...current, [alertId]: saved }));
+      } catch {
+        setWorkflowStates((current) => ({ ...current, [alertId]: previous }));
+        setActionError("Failed to update alert state. Please try again.");
+      }
+    },
+    [workflowStates],
+  );
+
+  const sortPinnedFirst = useCallback(
+    <T,>(items: T[], getId: (item: T) => string) =>
+      [...items].sort(
+        (left, right) =>
+          Number(workflowStates[getId(right)]?.pinned || false) -
+          Number(workflowStates[getId(left)]?.pinned || false),
+      ),
+    [workflowStates],
+  );
 
   // --- Drill-down handlers ---
   const handleOpenDetail = useCallback(
@@ -171,6 +362,27 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
     // Return focus to the trigger card
     triggerRef.current?.focus();
   }, []);
+
+  const handleOpenCluster = useCallback(
+    (cluster: ViralCluster, btnEl: HTMLButtonElement | null) => {
+      clusterTriggerRef.current = btnEl;
+      setSelectedCluster(cluster);
+    },
+    [],
+  );
+
+  const handleCloseCluster = useCallback(() => {
+    setSelectedCluster(null);
+    clusterTriggerRef.current?.focus();
+  }, []);
+
+  const handleSelectClusterPost = useCallback(
+    (post: ViralPostAlertSummary) => {
+      setSelectedCluster(null);
+      void handleOpenDetail(post, clusterTriggerRef.current);
+    },
+    [handleOpenDetail],
+  );
 
   const handleOpenCrisis = useCallback(
     async (alert: SocialCrisisAlert, btnEl: HTMLButtonElement | null) => {
@@ -314,6 +526,11 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
           {error}
         </p>
       )}
+      {actionError && (
+        <p role="alert" className="alert-action-error">
+          {actionError}
+        </p>
+      )}
 
       {showConfig && (
         <div
@@ -417,44 +634,55 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
             <ShieldAlert size={20} /> Active Social Crisis
           </h3>
           <div className="alerts-grid">
-            {crisisAlerts.map((crisis, idx) => (
-              <button
-                type="button"
-                key={idx}
-                className="alert-card glass-panel severity-high alert-card-interactive alert-card-crisis"
-                style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}
-                aria-haspopup="dialog"
-                aria-expanded={selectedCrisis?.source === crisis.source}
-                onClick={(event) => handleOpenCrisis(crisis, event.currentTarget)}
-              >
-                <div className="alert-card-header">
-                  <div className="alert-time">
-                    <ShieldAlert size={16} /> {crisis.source}
-                  </div>
-                  <div
-                    className="alert-badge"
-                    style={{ background: "#ef4444" }}
+            {sortPinnedFirst(crisisAlerts, crisisAlertId).map((crisis) => {
+              const alertId = crisisAlertId(crisis);
+              const state = workflowStates[alertId];
+              return (
+                <div
+                  key={alertId}
+                  className={`alert-card-shell ${state?.acknowledged ? "acknowledged" : ""} ${state?.pinned ? "pinned" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="alert-card glass-panel severity-high alert-card-interactive alert-card-crisis"
+                    style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}
+                    aria-haspopup="dialog"
+                    aria-expanded={selectedCrisis?.source === crisis.source}
+                    onClick={(event) => handleOpenCrisis(crisis, event.currentTarget)}
                   >
-                    Crisis
-                  </div>
+                    <div className="alert-card-header">
+                      <div className="alert-time">
+                        <ShieldAlert size={16} /> {crisis.source}
+                      </div>
+                      <div className="alert-badge" style={{ background: "#ef4444" }}>
+                        Crisis
+                      </div>
+                    </div>
+                    <div className="alert-stats">
+                      <div className="stat-box">
+                        <span className="stat-label">Total Posts</span>
+                        <span className="stat-value">{crisis.total_posts}</span>
+                      </div>
+                      <div className="stat-box highlight">
+                        <span className="stat-label" style={{ color: "#ef4444" }}>
+                          Negative
+                        </span>
+                        <span className="stat-value" style={{ color: "#ef4444" }}>
+                          {crisis.negative_pct}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="alert-card-hint">Click for crisis details →</div>
+                  </button>
+                  <AlertCardActions
+                    state={state}
+                    onToggle={(field, value) =>
+                      void toggleWorkflowState(alertId, field, value)
+                    }
+                  />
                 </div>
-                <div className="alert-stats">
-                  <div className="stat-box">
-                    <span className="stat-label">Total Posts</span>
-                    <span className="stat-value">{crisis.total_posts}</span>
-                  </div>
-                  <div className="stat-box highlight">
-                    <span className="stat-label" style={{ color: "#ef4444" }}>
-                      Negative
-                    </span>
-                    <span className="stat-value" style={{ color: "#ef4444" }}>
-                      {crisis.negative_pct}%
-                    </span>
-                  </div>
-                </div>
-                <div className="alert-card-hint">Click for crisis details →</div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -474,65 +702,89 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
             <Zap size={20} /> Viral Posts Detected
           </h3>
           <div className="alerts-grid">
-            {viralAlerts.map((viral) => (
-              <button
-                key={viral.post_id}
-                type="button"
-                className="alert-card glass-panel severity-medium alert-card-interactive"
-                style={{ borderColor: "rgba(245, 158, 11, 0.5)" }}
-                aria-haspopup="dialog"
-                aria-expanded={selectedAlert?.post_id === viral.post_id}
-                aria-label={`Viral alert: ${viral.data_quality.title_available ? viral.title : viral.source} — ${viral.interactions} interactions`}
-                onClick={(e) =>
-                  handleOpenDetail(viral, e.currentTarget)
-                }
-              >
-                <div className="alert-card-header">
-                  <div className="alert-time">
-                    <Zap size={16} /> {viral.source}
-                  </div>
-                  <div className="alert-card-badges">
-                    {viral.data_quality.synthetic && (
-                      <span className="synthetic-data-badge">Synthetic data</span>
-                    )}
-                    <div
-                      className="alert-badge"
-                      style={{ background: "#f59e0b" }}
-                    >
-                      Viral
+            {sortPinnedFirst(viralClusters, (cluster) => cluster.id).map((cluster) => {
+              const state = workflowStates[cluster.id];
+              const viral = cluster.posts[0];
+              const isCluster = cluster.posts.length > 1;
+              return (
+                <div
+                  key={cluster.id}
+                  className={`alert-card-shell ${state?.acknowledged ? "acknowledged" : ""} ${state?.pinned ? "pinned" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="alert-card glass-panel severity-medium alert-card-interactive"
+                    style={{ borderColor: "rgba(245, 158, 11, 0.5)" }}
+                    aria-haspopup="dialog"
+                    aria-expanded={
+                      isCluster
+                        ? selectedCluster?.id === cluster.id
+                        : selectedAlert?.post_id === viral.post_id
+                    }
+                    aria-label={
+                      isCluster
+                        ? `${cluster.posts.length} viral posts from ${cluster.source}`
+                        : `Viral alert: ${viral.data_quality.title_available ? viral.title : viral.source} — ${viral.interactions} interactions`
+                    }
+                    onClick={(event) =>
+                      isCluster
+                        ? handleOpenCluster(cluster, event.currentTarget)
+                        : handleOpenDetail(viral, event.currentTarget)
+                    }
+                  >
+                    <div className="alert-card-header">
+                      <div className="alert-time">
+                        {isCluster ? <Layers3 size={16} /> : <Zap size={16} />}
+                        {cluster.source}
+                      </div>
+                      <div className="alert-card-badges">
+                        {cluster.posts.some((post) => post.data_quality.synthetic) && (
+                          <span className="synthetic-data-badge">Synthetic data</span>
+                        )}
+                        <div className="alert-badge" style={{ background: "#f59e0b" }}>
+                          {isCluster ? `${cluster.posts.length} posts` : "Viral"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                {viral.data_quality.title_available && viral.title && (
-                  <p className="alert-card-title">{viral.title}</p>
-                )}
-                {!viral.data_quality.title_available && (
-                  <p className="alert-card-title alert-title-unavailable">
-                    Trending post on {viral.source}
-                  </p>
-                )}
-                <div className="alert-stats" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
-                  <div className="stat-box highlight" style={{ flex: 1, padding: '10px', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-                    <span className="stat-label" style={{ color: "#f59e0b", fontSize: '10px' }}>
-                      INTERACTIONS
-                    </span>
-                    <span className="stat-value" style={{ color: "#f59e0b", fontSize: '20px' }}>
-                      {viral.interactions.toLocaleString()}
-                    </span>
-                  </div>
-                  {viral.publish_time && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#94a3b8', fontSize: '12px' }}>
-                      <Clock size={14} />
-                      {new Date(viral.publish_time).toLocaleTimeString(
-                        "vi-VN",
-                        { hour: "2-digit", minute: "2-digit" }
+                    <p className={`alert-card-title ${!viral.data_quality.title_available ? "alert-title-unavailable" : ""}`}>
+                      {isCluster
+                        ? `Viral activity cluster on ${cluster.source}`
+                        : viral.data_quality.title_available && viral.title
+                          ? viral.title
+                          : `Trending post on ${viral.source}`}
+                    </p>
+                    <div className="alert-stats alert-cluster-stats">
+                      <div className="stat-box highlight">
+                        <span className="stat-label" style={{ color: "#f59e0b" }}>
+                          {isCluster ? "TOTAL INTERACTIONS" : "INTERACTIONS"}
+                        </span>
+                        <span className="stat-value" style={{ color: "#f59e0b" }}>
+                          {cluster.interactions.toLocaleString()}
+                        </span>
+                      </div>
+                      {!isCluster && viral.publish_time && (
+                        <div className="alert-publish-time">
+                          <Clock size={14} />
+                          {new Date(viral.publish_time).toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
                       )}
                     </div>
-                  )}
+                    <div className="alert-card-hint">
+                      {isCluster ? "Explore clustered posts →" : "Click for details →"}
+                    </div>
+                  </button>
+                  <AlertCardActions
+                    state={state}
+                    onToggle={(field, value) =>
+                      void toggleWorkflowState(cluster.id, field, value)
+                    }
+                  />
                 </div>
-                <div className="alert-card-hint">Click for details →</div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -560,7 +812,9 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
               <p>No volume spikes detected recently.</p>
             </div>
           ) : (
-            spikes.map((spike, idx) => {
+            sortPinnedFirst(spikes, spikeAlertId).map((spike) => {
+              const alertId = spikeAlertId(spike);
+              const state = workflowStates[alertId];
               const multiplier =
                 spike.article_count / (spike.avg_count || 1);
               const severityClass =
@@ -570,44 +824,52 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
                   ? "severity-medium"
                   : "severity-low";
               return (
-                <button
-                  type="button"
-                  key={idx}
-                  className={`alert-card glass-panel ${severityClass} alert-card-interactive alert-card-spike`}
-                  aria-haspopup="dialog"
-                  aria-expanded={selectedSpike?.hour_slot === spike.hour_slot}
-                  onClick={(event) => handleOpenSpike(spike, event.currentTarget)}
+                <div
+                  key={alertId}
+                  className={`alert-card-shell ${state?.acknowledged ? "acknowledged" : ""} ${state?.pinned ? "pinned" : ""}`}
                 >
-                  <div className="alert-card-header">
-                    <div className="alert-time">
-                      <Clock size={16} />
-                      {new Date(spike.hour_slot).toLocaleString("vi-VN", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                  <button
+                    type="button"
+                    className={`alert-card glass-panel ${severityClass} alert-card-interactive alert-card-spike`}
+                    aria-haspopup="dialog"
+                    aria-expanded={selectedSpike?.hour_slot === spike.hour_slot}
+                    onClick={(event) => handleOpenSpike(spike, event.currentTarget)}
+                  >
+                    <div className="alert-card-header">
+                      <div className="alert-time">
+                        <Clock size={16} />
+                        {new Date(spike.hour_slot).toLocaleString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                      <div className="alert-badge">
+                        <AlertTriangle size={14} /> Spike Detected
+                      </div>
                     </div>
-                    <div className="alert-badge">
-                      <AlertTriangle size={14} /> Spike Detected
+                    <div className="alert-stats">
+                      <div className="stat-box primary">
+                        <span className="stat-label">Published</span>
+                        <span className="stat-value">{spike.article_count}</span>
+                      </div>
+                      <div className="stat-box highlight">
+                        <span className="stat-label">Surge</span>
+                        <span className="stat-value flex-center">
+                          <TrendingUp size={16} /> {multiplier.toFixed(1)}x
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="alert-stats">
-                    <div className="stat-box primary">
-                      <span className="stat-label">Published</span>
-                      <span className="stat-value">
-                        {spike.article_count}
-                      </span>
-                    </div>
-                    <div className="stat-box highlight">
-                      <span className="stat-label">Surge</span>
-                      <span className="stat-value flex-center">
-                        <TrendingUp size={16} /> {multiplier.toFixed(1)}x
-                      </span>
-                    </div>
-                  </div>
-                  <div className="alert-card-hint">Click for spike details →</div>
-                </button>
+                    <div className="alert-card-hint">Click for spike details →</div>
+                  </button>
+                  <AlertCardActions
+                    state={state}
+                    onToggle={(field, value) =>
+                      void toggleWorkflowState(alertId, field, value)
+                    }
+                  />
+                </div>
               );
             })
           )}
@@ -622,6 +884,13 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         detail={alertDetail}
         loading={detailLoading}
         error={detailError}
+      />
+      <ViralClusterModal
+        open={!!selectedCluster}
+        onClose={handleCloseCluster}
+        source={selectedCluster?.source || ""}
+        posts={selectedCluster?.posts || []}
+        onSelectPost={handleSelectClusterPost}
       />
       <CrisisDetailModal
         open={!!selectedCrisis}

@@ -12,6 +12,7 @@ import {
   FileWarning,
 } from "lucide-react";
 import Modal from "./ui/Modal";
+import InteractionTrendPanel from "./InteractionTrendPanel";
 import type { ViralPostDetail, ViralPostAlertSummary } from "@/lib/alert-types";
 
 interface AlertDetailModalProps {
@@ -267,6 +268,8 @@ export default function AlertDetailModal({
                 `This post exceeded the configured threshold of ${summary?.threshold ?? 50} interactions in the last hour.`}
             </p>
           </section>
+
+          <InteractionTrendPanel source={source} active={open} />
         </div>
       )}
     </Modal>

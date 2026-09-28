@@ -9,14 +9,17 @@ import {
   ExternalLink,
   ShieldAlert,
   TrendingUp,
+  Zap,
 } from "lucide-react";
 import Modal from "./ui/Modal";
+import InteractionTrendPanel from "./InteractionTrendPanel";
 import type {
   ArticleAlertFilter,
   SocialCrisisAlert,
   SocialCrisisDetail,
   SpikeAlert,
   VolumeSpikeDetail,
+  ViralPostAlertSummary,
 } from "@/lib/alert-types";
 
 interface SharedDetailProps {
@@ -140,6 +143,63 @@ export function CrisisDetailModal({
           </section>
         </div>
       )}
+    </Modal>
+  );
+}
+
+interface ViralClusterModalProps {
+  open: boolean;
+  onClose: () => void;
+  source: string;
+  posts: ViralPostAlertSummary[];
+  onSelectPost: (post: ViralPostAlertSummary) => void;
+}
+
+export function ViralClusterModal({
+  open,
+  onClose,
+  source,
+  posts,
+  onSelectPost,
+}: ViralClusterModalProps) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabelledBy="viral-cluster-title"
+      title={(
+        <div className="alert-modal-heading">
+          <Zap size={20} style={{ color: "#f59e0b" }} />
+          <span>{source} cluster</span>
+          <span className="alert-badge" style={{ background: "#f59e0b" }}>
+            {posts.length} posts
+          </span>
+        </div>
+      )}
+      footer={<button className="btn btn-secondary" onClick={onClose}>Close</button>}
+    >
+      <div className="detail-content">
+        <p className="detail-empty-copy">
+          Viral alerts from the same source are grouped to reduce duplicate triage work.
+        </p>
+        <div className="viral-cluster-posts">
+          {posts.map((post) => (
+            <button
+              key={post.post_id}
+              type="button"
+              onClick={() => onSelectPost(post)}
+            >
+              <span>
+                {post.data_quality.title_available && post.title
+                  ? post.title
+                  : `Trending post on ${post.source}`}
+              </span>
+              <strong>{post.interactions.toLocaleString()} interactions</strong>
+            </button>
+          ))}
+        </div>
+        <InteractionTrendPanel source={source} active={open} />
+      </div>
     </Modal>
   );
 }

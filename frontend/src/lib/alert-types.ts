@@ -8,6 +8,7 @@ export interface AlertDataQuality {
 }
 
 export interface ViralPostAlertSummary {
+  alert_id?: string;
   post_id: string;
   source: string;
   title: string;
@@ -40,6 +41,7 @@ export interface ViralPostDetail {
 }
 
 export interface SocialCrisisAlert {
+  alert_id?: string;
   source: string;
   total_posts: number;
   negative_posts: number;
@@ -50,6 +52,7 @@ export interface SocialCrisisAlert {
 }
 
 export interface SpikeAlert {
+  alert_id?: string;
   hour_slot: string;
   article_count: number;
   avg_count: number;
@@ -87,4 +90,25 @@ export interface ArticleAlertFilter {
   publishedFrom: string;
   publishedTo: string;
   label: string;
+}
+
+export interface AlertWorkflowState {
+  alert_id: string;
+  user_id?: string;
+  pinned: boolean;
+  acknowledged: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InteractionTrendPoint {
+  bucket: string;
+  interactions: number;
+  post_count: number;
+}
+
+export interface InteractionTrendResponse {
+  source?: string | null;
+  granularity: "15m" | "1h";
+  data: InteractionTrendPoint[];
 }
