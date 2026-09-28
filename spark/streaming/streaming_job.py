@@ -126,6 +126,9 @@ def main():
                 F.col("source"),
                 F.col("title"),
                 F.col("content"),
+                F.col("url"),
+                F.col("author"),
+                F.col("top_comments"),
                 F.col("like_count").cast("int"),
                 F.col("upvote_ratio").cast("float"),
                 F.col("reply_count").cast("int"),
@@ -137,6 +140,8 @@ def main():
             ).fillna({
                 "title": "",
                 "content": "",
+                "url": "",
+                "author": "",
                 "like_count": 0,
                 "upvote_ratio": 1.0,
                 "reply_count": 0,
