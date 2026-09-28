@@ -55,7 +55,7 @@ const AlertsPanel: React.FC = () => {
     try {
       setLoading(true);
       const [spikesData, socialData, configData] = await Promise.all([
-        apiFetch<any>(`${API_BASE}/alerts?threshold=1.0&limit=10`),
+        apiFetch<any>(`${API_BASE}/alerts?threshold=0.5&limit=10`),
         apiFetch<any>(`${API_BASE}/alerts/social`),
         apiFetch<AlertThresholds>(`${API_BASE}/alerts/config`),
       ]);
