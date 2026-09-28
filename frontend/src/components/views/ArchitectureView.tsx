@@ -211,6 +211,8 @@ const initialEdges: any[] = [
   { id: 'e-nlp-clickhouse', source: 'nlp', target: 'clickhouse', label: 'sink enriched', ...defaultEdgeOptions, style: amberLine, type: 'smoothstep' },
 ];
 
+import { API_BASE } from "@/lib/api";
+
 export default function ArchitectureTab() {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
@@ -218,8 +220,8 @@ export default function ArchitectureTab() {
 
   useEffect(() => {
     const checkHealth = async () => {
-      // In NewsPulse context, checking some endpoints for health indicator simulation
-      const targets = { api: '/api/v1/health/ready' };
+      const baseUrl = API_BASE.replace("/api/v1", "");
+      const targets = { api: `${baseUrl}/health/ready` };
       const results = await Promise.all(Object.entries(targets).map(async ([id, url]) => {
         try { const response = await fetch(url, { cache: 'no-store' }); return [id, response.ok ? 'healthy' : 'unhealthy']; }
         catch { return [id, 'unhealthy']; }
