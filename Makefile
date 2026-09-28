@@ -19,7 +19,7 @@ logs:
 # Run a single crawl manually
 crawl:
 	docker compose -f infrastructure/docker/docker-compose.yml exec airflow-scheduler \
-		python -c "from crawlers.newspulse_crawler.run import run_all; run_all()"
+		bash -c "cd /opt/airflow/crawlers && python -c 'from newspulse_crawler.run import run_all; run_all()'"
 
 # List Kafka topics
 topics:

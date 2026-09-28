@@ -50,7 +50,7 @@ class VozForumSpider(scrapy.Spider):
         meta = response.meta
         
         # Bài post đầu tiên (bài gốc điểm báo)
-        first_post = response.css("article.message--post").first()
+        first_post = response.css("article.message--post")[0] if response.css("article.message--post") else None
         if not first_post:
             return
 
