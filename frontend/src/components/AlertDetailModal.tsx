@@ -154,10 +154,12 @@ export default function AlertDetailModal({
       {!loading && !error && detail && (
         <div className="detail-content">
           {/* Title */}
-          {detail.data_quality.title_available ? (
+          {detail.data_quality.title_available && detail.title ? (
             <h3 className="detail-title">{detail.title}</h3>
           ) : (
-            <DataWarning message="Title unavailable — this post uses placeholder data" />
+            <h3 className="detail-title alert-title-unavailable">
+              Trending post on {source}
+            </h3>
           )}
 
           {/* Metadata row */}

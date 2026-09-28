@@ -405,31 +405,30 @@ const AlertsPanel: React.FC = () => {
                     Viral
                   </div>
                 </div>
-                {viral.data_quality.title_available && viral.title ? (
+                {viral.data_quality.title_available && viral.title && (
                   <p className="alert-card-title">{viral.title}</p>
-                ) : (
+                )}
+                {!viral.data_quality.title_available && (
                   <p className="alert-card-title alert-title-unavailable">
-                    Title unavailable
+                    Trending post on {viral.source}
                   </p>
                 )}
-                <div className="alert-stats">
-                  <div className="stat-box highlight">
-                    <span className="stat-label" style={{ color: "#f59e0b" }}>
-                      Interactions
+                <div className="alert-stats" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
+                  <div className="stat-box highlight" style={{ flex: 1, padding: '10px', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                    <span className="stat-label" style={{ color: "#f59e0b", fontSize: '10px' }}>
+                      INTERACTIONS
                     </span>
-                    <span className="stat-value" style={{ color: "#f59e0b" }}>
+                    <span className="stat-value" style={{ color: "#f59e0b", fontSize: '20px' }}>
                       {viral.interactions.toLocaleString()}
                     </span>
                   </div>
                   {viral.publish_time && (
-                    <div className="stat-box">
-                      <span className="stat-label">Time</span>
-                      <span className="stat-value" style={{ fontSize: "13px" }}>
-                        {new Date(viral.publish_time).toLocaleTimeString(
-                          "vi-VN",
-                          { hour: "2-digit", minute: "2-digit" }
-                        )}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#94a3b8', fontSize: '12px' }}>
+                      <Clock size={14} />
+                      {new Date(viral.publish_time).toLocaleTimeString(
+                        "vi-VN",
+                        { hour: "2-digit", minute: "2-digit" }
+                      )}
                     </div>
                   )}
                 </div>
