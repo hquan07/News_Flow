@@ -220,8 +220,7 @@ export default function ArchitectureTab() {
 
   useEffect(() => {
     const checkHealth = async () => {
-      const baseUrl = API_BASE.replace("/api/v1", "");
-      const targets = { api: `${baseUrl}/health/ready` };
+      const targets = { api: `${API_BASE}/public/summary` };
       const results = await Promise.all(Object.entries(targets).map(async ([id, url]) => {
         try { const response = await fetch(url, { cache: 'no-store' }); return [id, response.ok ? 'healthy' : 'unhealthy']; }
         catch { return [id, 'unhealthy']; }
