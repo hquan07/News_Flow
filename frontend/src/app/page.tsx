@@ -106,6 +106,7 @@ export default function Home() {
   const [adminUsers, setAdminUsers] = useState<any>(null);
   const [adminHealth, setAdminHealth] = useState<any>(null);
   const [adminOperations, setAdminOperations] = useState<any>(null);
+  const [adminAlertMetrics, setAdminAlertMetrics] = useState<any>(null);
   const [dataUpdatedAt, setDataUpdatedAt] = useState<string | null>(null);
 
   const [sentimentDist, setSentimentDist] = useState<any[] | null>(null);
@@ -309,18 +310,20 @@ export default function Home() {
     const token = localStorage.getItem("token");
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    const [latencyRes, clickbaitRes, usersRes, healthRes, operationsRes] = await Promise.all([
+    const [latencyRes, clickbaitRes, usersRes, healthRes, operationsRes, alertMetricsRes] = await Promise.all([
       apiFetch(`${API_BASE}/admin/metrics/latency`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/volume`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/users`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/health`, { headers }),
       apiFetch(`${API_BASE}/admin/metrics/operations`, { headers }),
+      apiFetch(`${API_BASE}/alerts/metrics`, { headers }),
     ]);
     setAdminLatency(latencyRes);
     setAdminClickbait(clickbaitRes);
     setAdminUsers(usersRes);
     setAdminHealth(healthRes);
     setAdminOperations(operationsRes);
+    setAdminAlertMetrics(alertMetricsRes);
   }, []);
 
   const fetchEntities = useCallback(async () => {
@@ -1044,6 +1047,7 @@ export default function Home() {
               adminUsers={adminUsers}
               adminHealth={adminHealth}
               adminOperations={adminOperations}
+              adminAlertMetrics={adminAlertMetrics}
               updatedAt={dataUpdatedAt}
             />
           )}

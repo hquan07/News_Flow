@@ -19,6 +19,7 @@ A real-time news analysis platform that collects and processes articles from Vie
 - **Nginx Reverse Proxy** — unified entrypoint for frontend and backend API.
 - **Monitoring** — Docker healthchecks and Python-based monitoring scripts.
 - **Alert Operations** — drill-downs, clustering, per-admin pin/acknowledge state, interaction trends, freshness indicators, and operator telemetry. See the [Alert Operations Runbook](docs/ALERT_OPERATIONS_RUNBOOK.md).
+- **Release Readiness** — admin-visible alert workflow health and a repeatable [Release Checklist](docs/RELEASE_CHECKLIST.md).
 - **100% Containerized** — a single `docker-compose up -d --build` brings up the entire infrastructure in Standalone Mode.
 
 ## Tech Stack

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpen, Server, Share2, Users } from "lucide-react";
+import { Activity, BellRing, BookOpen, Server, Share2, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import ChartCard from "../ui/ChartCard";
 import EmptyState from "../ui/EmptyState";
@@ -20,7 +20,26 @@ interface AdminViewProps {
   adminUsers: { total_users: number; standard_users: number; admin_users: number; generated_at?: string } | null;
   adminHealth: { status: string; services: Record<string, { status: string; latency_ms?: number }>; generated_at?: string } | null;
   adminOperations: { articles_last_24h: number; total_articles: number; nlp_linked_articles: number; nlp_coverage_pct: number; latest_loaded_at?: string; freshness_minutes: number | null; generated_at?: string } | null;
+  adminAlertMetrics: AlertMetrics | null;
   updatedAt?: string | null;
+}
+
+interface AlertOperationMetric {
+  requests: number;
+  successes: number;
+  not_found: number;
+  errors: number;
+  average_latency_ms: number;
+  max_latency_ms: number;
+}
+
+interface AlertMetrics {
+  scope: string;
+  started_at: string;
+  generated_at: string;
+  uptime_seconds: number;
+  totals: Pick<AlertOperationMetric, "requests" | "successes" | "not_found" | "errors">;
+  operations: Record<string, AlertOperationMetric>;
 }
 
 function rows(sources: string[] = [], values: number[] = [], key: string) {
@@ -35,7 +54,19 @@ function formatFreshness(minutes: number | null | undefined) {
   return `${(minutes / 1440).toFixed(1)} d`;
 }
 
-export default function AdminView({ adminLatency, adminClickbait, adminUsers, adminHealth, adminOperations, updatedAt }: AdminViewProps) {
+function formatUptime(seconds: number | undefined) {
+  if (!seconds) return "0 min";
+  if (seconds < 60) return "<1 min";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)} h`;
+  return `${(seconds / 86400).toFixed(1)} d`;
+}
+
+function formatOperationName(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export default function AdminView({ adminLatency, adminClickbait, adminUsers, adminHealth, adminOperations, adminAlertMetrics, updatedAt }: AdminViewProps) {
   const latencyRows = rows(adminLatency?.sources, adminLatency?.avg_latency, "latency");
   const newsRows = rows(adminClickbait?.news?.sources, adminClickbait?.news?.volumes, "total");
   const socialRows = rows(adminClickbait?.social?.sources, adminClickbait?.social?.volumes, "total");
@@ -53,6 +84,22 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
   const freshness = adminOperations?.freshness_minutes;
   const freshnessTone = freshness === null || freshness === undefined ? "danger" : freshness <= 60 ? "success" : freshness <= 360 ? "warning" : "danger";
   const healthTone = healthStatus === "healthy" ? "success" : healthStatus === "degraded" ? "warning" : "danger";
+  const alertTotals = adminAlertMetrics?.totals;
+  const alertRequests = Number(alertTotals?.requests ?? 0);
+  const alertErrors = Number(alertTotals?.errors ?? 0);
+  const alertFailureRate = alertRequests ? (alertErrors * 100) / alertRequests : 0;
+  const alertFailureTone = alertFailureRate >= 5 ? "danger" : alertFailureRate > 0 ? "warning" : "success";
+  const alertOperationRows = Object.entries(adminAlertMetrics?.operations ?? {})
+    .map(([operation, metric]) => ({
+      operation: formatOperationName(operation),
+      requests: Number(metric.requests || 0),
+      successes: Number(metric.successes || 0),
+      notFound: Number(metric.not_found || 0),
+      errors: Number(metric.errors || 0),
+      averageLatency: Number(metric.average_latency_ms || 0),
+      maxLatency: Number(metric.max_latency_ms || 0),
+    }))
+    .sort((left, right) => right.requests - left.requests);
 
   return <>
     <section className="overview-grid admin-metrics-grid" aria-label="Administrative summary metrics">
@@ -64,6 +111,10 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
       <MetricCard label="NLP coverage" value={formatPercent(coverage)} hint={`${formatCompactNumber(adminOperations?.nlp_linked_articles ?? 0)} of ${formatCompactNumber(adminOperations?.total_articles ?? 0)} articles`} loading={adminOperations === null} tone={coverageTone} />
       <MetricCard label="Data freshness" value={formatFreshness(freshness)} hint={adminOperations?.latest_loaded_at ? `Latest ingest ${formatDateTime(adminOperations.latest_loaded_at)}` : "No ingestion timestamp"} loading={adminOperations === null} tone={freshnessTone} />
       <MetricCard label="System health" value={healthStatus} hint={serviceCount ? `${healthyServices}/${serviceCount} dependencies available` : "Health data unavailable"} loading={adminHealth === null} tone={healthTone} title={healthDetails || undefined} />
+      <MetricCard label="Alert API requests" value={formatCompactNumber(alertRequests)} hint={`${alertOperationRows.length} observed workflows`} loading={adminAlertMetrics === null} />
+      <MetricCard label="Alert failures" value={formatPercent(alertFailureRate)} hint={`${alertErrors.toLocaleString()} failed requests`} loading={adminAlertMetrics === null} tone={alertFailureTone} />
+      <MetricCard label="Missing alert details" value={formatCompactNumber(alertTotals?.not_found ?? 0)} hint="Drill-down records no longer available" loading={adminAlertMetrics === null} tone={Number(alertTotals?.not_found ?? 0) ? "warning" : "success"} />
+      <MetricCard label="Alert telemetry uptime" value={formatUptime(adminAlertMetrics?.uptime_seconds)} hint={`${adminAlertMetrics?.scope ?? "process-local"} counters`} loading={adminAlertMetrics === null} />
     </section>
 
     <div className="charts-grid">
@@ -81,6 +132,14 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
 
       <ChartCard wide title={<><Users size={20} /> User Roles</>} description="How are registered accounts distributed by access level?" timeRange="Current snapshot" unit="Users and share" total={roleTotal} updatedAt={adminUsers?.generated_at ?? updatedAt}>
         {adminUsers === null ? <ChartSkeleton /> : roleTotal ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={roleRows} dataKey="count" nameKey="name" cx="50%" cy="45%" innerRadius="45%" outerRadius="72%">{roleRows.map((row) => <Cell key={row.name} fill={row.color} />)}</Pie><Tooltip formatter={(value, _name, item) => [`${Number(value).toLocaleString()} · ${formatPercent(Number(value) * 100 / roleTotal)}`, item.payload.name]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><Legend verticalAlign="bottom" /></PieChart></ResponsiveContainer> : <EmptyState message="No user data" />}
+      </ChartCard>
+
+      <ChartCard wide title={<><BellRing size={20} /> Alert Workflow Outcomes</>} description="Which alert workflows are succeeding, missing data, or failing?" timeRange="Since API process start" unit="Requests" total={alertRequests} updatedAt={adminAlertMetrics?.generated_at ?? updatedAt}>
+        {adminAlertMetrics === null ? <ChartSkeleton /> : alertOperationRows.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={alertOperationRows} margin={{ top: 12, right: 12, left: 0, bottom: 28 }}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)" /><XAxis dataKey="operation" stroke="#94a3b8" fontSize={10} angle={-12} textAnchor="end" interval={0} height={58} /><YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} /><Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><Legend /><Bar dataKey="successes" name="Succeeded" stackId="outcome" fill="#10b981" /><Bar dataKey="notFound" name="Not found" stackId="outcome" fill="#f59e0b" /><Bar dataKey="errors" name="Failed" stackId="outcome" fill="#ef4444" /></BarChart></ResponsiveContainer> : <EmptyState message="No alert workflow requests observed since the API started" />}
+      </ChartCard>
+
+      <ChartCard wide title={<><Activity size={20} /> Alert Workflow Latency</>} description="Where is alert investigation spending the most response time?" timeRange="Since API process start" unit="Milliseconds" total={alertOperationRows.length} updatedAt={adminAlertMetrics?.generated_at ?? updatedAt}>
+        {adminAlertMetrics === null ? <ChartSkeleton /> : alertOperationRows.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={alertOperationRows} margin={{ top: 12, right: 12, left: 0, bottom: 28 }}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)" /><XAxis dataKey="operation" stroke="#94a3b8" fontSize={10} angle={-12} textAnchor="end" interval={0} height={58} /><YAxis stroke="#94a3b8" fontSize={11} unit="ms" allowDecimals={false} /><Tooltip formatter={(value) => [`${Number(value).toFixed(2)} ms`]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,.15)" }} /><Legend /><Bar dataKey="averageLatency" name="Average" fill="#3b82f6" radius={[4, 4, 0, 0]} /><Bar dataKey="maxLatency" name="Maximum" fill="#8b5cf6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer> : <EmptyState message="No latency samples observed since the API started" />}
       </ChartCard>
     </div>
     <p className="chart-description admin-health-checked"><Server size={13} aria-hidden="true" /> Health checked {formatDateTime(adminHealth?.generated_at ?? updatedAt)}</p>
