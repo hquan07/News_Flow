@@ -1,8 +1,34 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { BookOpen, FileText, Search, X } from "lucide-react";
+import { BookOpen, FileText, Filter, Search, X } from "lucide-react";
 import type { ArticleAlertFilter } from "@/lib/alert-types";
+import {
+  EMPTY_ARTICLE_FILTERS,
+  type ArticleFilters,
+} from "@/lib/article-types";
+
+const ARTICLE_SOURCES = [
+  ["vnexpress", "VnExpress"],
+  ["tuoitre", "Tuổi Trẻ"],
+  ["thanhnien", "Thanh Niên"],
+  ["dantri", "Dân Trí"],
+  ["laodong", "Lao Động"],
+  ["tienphong", "Tiền Phong"],
+] as const;
+
+const ARTICLE_CATEGORIES = [
+  "general",
+  "sports",
+  "tech",
+  "economy",
+  "politics",
+  "entertainment",
+  "health",
+  "education",
+  "world",
+  "law",
+] as const;
 
 type Article = {
   article_id: string;
@@ -28,6 +54,8 @@ type ArticlesViewProps = {
   searchQuery: string;
   setSearchQuery: Dispatch<SetStateAction<string>>;
   loading: boolean;
+  filters: ArticleFilters;
+  setFilters: (filters: ArticleFilters) => void;
   contextFilter: ArticleAlertFilter | null;
   clearContextFilter: () => void;
   trackClick: (articleHash: string) => void | Promise<void>;
@@ -44,12 +72,23 @@ export default function ArticlesView({
   searchQuery,
   setSearchQuery,
   loading,
+  filters,
+  setFilters,
   contextFilter,
   clearContextFilter,
   trackClick,
   timeAgo,
   exportToCSV,
 }: ArticlesViewProps) {
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const invalidDateRange = Boolean(
+    filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo,
+  );
+
+  const updateFilter = (field: keyof ArticleFilters, value: string) => {
+    setFilters({ ...filters, [field]: value });
+  };
+
   return (
     <>
       <div className="glass-panel" style={{ minHeight: "600px" }}>
@@ -120,6 +159,70 @@ export default function ArticlesView({
               : `${articlesMeta.total ?? articles.length} article${(articlesMeta.total ?? articles.length) === 1 ? "" : "s"}`}
           </span>
         </div>
+        <div className="article-filter-panel" aria-label="Article filters">
+          <div className="article-filter-heading">
+            <span><Filter size={16} /> Filters</span>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilters({ ...EMPTY_ARTICLE_FILTERS })}
+              >
+                <X size={14} /> Clear all ({activeFilterCount})
+              </button>
+            )}
+          </div>
+          <div className="article-filter-grid">
+            <label>
+              <span>Source</span>
+              <select
+                value={filters.source}
+                onChange={(event) => updateFilter("source", event.target.value)}
+              >
+                <option value="">All sources</option>
+                {ARTICLE_SOURCES.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Category</span>
+              <select
+                value={filters.category}
+                onChange={(event) => updateFilter("category", event.target.value)}
+              >
+                <option value="">All categories</option>
+                {ARTICLE_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>From date</span>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                max={filters.dateTo || undefined}
+                onChange={(event) => updateFilter("dateFrom", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>To date</span>
+              <input
+                type="date"
+                value={filters.dateTo}
+                min={filters.dateFrom || undefined}
+                onChange={(event) => updateFilter("dateTo", event.target.value)}
+              />
+            </label>
+          </div>
+          {invalidDateRange && (
+            <p className="article-filter-error" role="alert">
+              From date must be earlier than or equal to the To date.
+            </p>
+          )}
+        </div>
         {contextFilter && (
           <div className="article-context-filter" role="status">
             <span>
@@ -189,8 +292,8 @@ export default function ArticlesView({
                 >
                   {loading
                     ? "Loading articles…"
-                    : searchQuery
-                      ? `No article titles match “${searchQuery.trim()}”.`
+                    : searchQuery || activeFilterCount > 0 || contextFilter
+                      ? "No articles match the current search and filters."
                       : "No articles found in the database."}
                 </td>
               </tr>

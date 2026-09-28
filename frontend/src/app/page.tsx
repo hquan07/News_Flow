@@ -28,6 +28,10 @@ import OverviewNewsView from "@/components/views/OverviewNewsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { readCachedUser } from "@/lib/auth-storage";
+import {
+  EMPTY_ARTICLE_FILTERS,
+  type ArticleFilters,
+} from "@/lib/article-types";
 import type {
   ArticleAlertFilter,
   SocialCrisisAlert,
@@ -76,6 +80,8 @@ export default function Home() {
   >("news");
   const [selectedSource, setSelectedSource] = useState<string>("");
   const [feed, setFeed] = useState<FeedEvent[]>([]);
+  const [isStreamPaused, setIsStreamPaused] = useState(false);
+  const [bufferedFeed, setBufferedFeed] = useState<FeedEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -88,6 +94,9 @@ export default function Home() {
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [articleAlertFilter, setArticleAlertFilter] =
     useState<ArticleAlertFilter | null>(null);
+  const [articleFilters, setArticleFilters] = useState<ArticleFilters>({
+    ...EMPTY_ARTICLE_FILTERS,
+  });
   const [liveSocialAlerts, setLiveSocialAlerts] =
     useState<LiveSocialAlerts | null>(null);
 
@@ -114,6 +123,7 @@ export default function Home() {
   const sseRef = useRef<EventSource | null>(null);
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
   const articlesAbortRef = useRef<AbortController | null>(null);
+  const streamPausedRef = useRef(false);
 
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [user, setUser] = useState<any>(null);
@@ -346,6 +356,10 @@ export default function Home() {
         page_size: "20",
       });
       if (articleSearchQuery) params.set("q", articleSearchQuery);
+      if (articleFilters.source) params.set("source", articleFilters.source);
+      if (articleFilters.category) params.set("category", articleFilters.category);
+      if (articleFilters.dateFrom) params.set("date_from", articleFilters.dateFrom);
+      if (articleFilters.dateTo) params.set("date_to", articleFilters.dateTo);
       if (articleAlertFilter) {
         params.set("published_from", articleAlertFilter.publishedFrom);
         params.set("published_to", articleAlertFilter.publishedTo);
@@ -369,7 +383,7 @@ export default function Home() {
         }
       }
     },
-    [articleAlertFilter, articleSearchQuery],
+    [articleAlertFilter, articleFilters, articleSearchQuery],
   );
 
   useEffect(() => {
@@ -475,15 +489,17 @@ export default function Home() {
           const crisis = Array.isArray(payload.crisis) ? payload.crisis : [];
           const viral = Array.isArray(payload.viral) ? payload.viral : [];
           setLiveSocialAlerts({ crisis, viral });
-          setFeed((prev) => [
-            {
-              timestamp: payload.timestamp || new Date().toISOString(),
-              type: "social_alerts",
-              message: `${crisis.length} crisis alert${crisis.length === 1 ? "" : "s"} · ${viral.length} viral post${viral.length === 1 ? "" : "s"}`,
-              data: { crisis, viral },
-            },
-            ...prev,
-          ].slice(0, 50));
+          const feedEvent: FeedEvent = {
+            timestamp: payload.timestamp || new Date().toISOString(),
+            type: "social_alerts",
+            message: `${crisis.length} crisis alert${crisis.length === 1 ? "" : "s"} · ${viral.length} viral post${viral.length === 1 ? "" : "s"}`,
+            data: { crisis, viral },
+          };
+          if (streamPausedRef.current) {
+            setBufferedFeed((prev) => [feedEvent, ...prev].slice(0, 50));
+          } else {
+            setFeed((prev) => [feedEvent, ...prev].slice(0, 50));
+          }
         } catch {}
       });
       es.onerror = () => {
@@ -945,6 +961,11 @@ export default function Home() {
               searchQuery={articleSearchInput}
               setSearchQuery={setArticleSearchInput}
               loading={articlesLoading}
+              filters={articleFilters}
+              setFilters={(filters) => {
+                setArticleFilters(filters);
+                setPage(1);
+              }}
               contextFilter={articleAlertFilter}
               clearContextFilter={() => {
                 setArticleAlertFilter(null);
@@ -957,7 +978,22 @@ export default function Home() {
           )}
 
           {activeTab === "stream" && (
-            <StreamView feed={feed} isConnected={isConnected} />
+            <StreamView
+              feed={feed}
+              isConnected={isConnected}
+              isPaused={isStreamPaused}
+              bufferedCount={bufferedFeed.length}
+              onPause={() => {
+                streamPausedRef.current = true;
+                setIsStreamPaused(true);
+              }}
+              onResume={() => {
+                streamPausedRef.current = false;
+                setIsStreamPaused(false);
+                setFeed((current) => [...bufferedFeed, ...current].slice(0, 50));
+                setBufferedFeed([]);
+              }}
+            />
           )}
 
           {activeTab === "alerts" && (
@@ -967,6 +1003,7 @@ export default function Home() {
                 setArticleAlertFilter(filter);
                 setArticleSearchInput("");
                 setArticleSearchQuery("");
+                setArticleFilters({ ...EMPTY_ARTICLE_FILTERS });
                 setPage(1);
                 setDashboardMode("news");
                 setActiveTab("articles");

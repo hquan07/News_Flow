@@ -34,6 +34,27 @@ async def test_list_articles_with_search(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_list_articles_combines_title_source_category_and_dates(
+    async_client: AsyncClient,
+):
+    response = await async_client.get(
+        "/api/v1/articles",
+        params={
+            "q": "AI",
+            "source": "vnexpress",
+            "category": "tech",
+            "date_from": "2026-09-26",
+            "date_to": "2026-09-26",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["data"][0]["article_id"] == "hash_test_1"
+
+
+@pytest.mark.asyncio
 async def test_list_articles_pagination(async_client: AsyncClient):
     response = await async_client.get("/api/v1/articles?page=1&page_size=2")
     assert response.status_code == 200

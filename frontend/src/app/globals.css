@@ -350,6 +350,82 @@ h1 {
   font-size: 0.85rem;
 }
 
+.article-filter-panel {
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.article-filter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.article-filter-heading > span,
+.article-filter-heading button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.article-filter-heading > span {
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.article-filter-heading button {
+  border: 0;
+  background: transparent;
+  color: #93c5fd;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.article-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.article-filter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.article-filter-grid select,
+.article-filter-grid input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.88);
+  color: var(--text-main);
+  color-scheme: dark;
+  font: inherit;
+}
+
+.article-filter-grid select:focus,
+.article-filter-grid input:focus {
+  border-color: var(--accent-blue);
+  outline: 0;
+}
+
+.article-filter-error {
+  margin: 0.6rem 0 0;
+  color: #fca5a5;
+  font-size: 0.78rem;
+}
+
 .article-context-filter button {
   display: inline-flex;
   align-items: center;
@@ -672,6 +748,83 @@ h1 {
   border-radius: 8px;
   padding: 1rem;
   animation: slideIn 0.3s ease-out;
+}
+
+.stream-header-actions,
+.feed-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.stream-header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.stream-control-button,
+.copy-payload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.65);
+  color: #cbd5e1;
+  cursor: pointer;
+  font: inherit;
+}
+
+.stream-control-button {
+  min-height: 34px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.stream-control-button.paused {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.copy-payload-button {
+  padding: 0.3rem 0.5rem;
+  color: #93c5fd;
+  font-size: 0.72rem;
+}
+
+.stream-control-button:hover,
+.copy-payload-button:hover {
+  border-color: rgba(59, 130, 246, 0.55);
+}
+
+.stream-paused-banner,
+.stream-copy-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+
+.stream-paused-banner {
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fcd34d;
+}
+
+.stream-paused-banner strong {
+  margin-left: auto;
+}
+
+.stream-copy-error {
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
 }
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-10px); }
@@ -1246,6 +1399,12 @@ h1 {
   grid-row: 1 / 3;
 }
 
+@media (max-width: 900px) {
+  .article-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 640px) {
   .article-search-row {
     align-items: stretch;
@@ -1259,6 +1418,35 @@ h1 {
   .article-context-filter {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .article-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stream-panel-header,
+  .stream-header-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stream-header-actions,
+  .stream-control-button {
+    width: 100%;
+  }
+
+  .feed-item-header {
+    align-items: flex-start;
+  }
+
+  .stream-paused-banner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .stream-paused-banner strong {
+    width: 100%;
+    margin-left: 0;
   }
 
   .sentiment-breakdown {

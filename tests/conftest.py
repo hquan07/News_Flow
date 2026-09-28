@@ -51,12 +51,27 @@ async def async_client():
 
 @pytest.fixture(autouse=True)
 def mock_data_services(monkeypatch):
-    def fake_articles(page=1, page_size=20, q=None, source=None, **_kwargs):
+    def fake_articles(
+        page=1,
+        page_size=20,
+        q=None,
+        source=None,
+        category=None,
+        date_from=None,
+        date_to=None,
+        **_kwargs,
+    ):
         rows = ARTICLES
         if q:
             rows = [row for row in rows if q.lower() in row["title"].lower()]
         if source:
             rows = [row for row in rows if row["source"] == source]
+        if category:
+            rows = [row for row in rows if row["category"] == category]
+        if date_from:
+            rows = [row for row in rows if row["publish_date"].date() >= date_from]
+        if date_to:
+            rows = [row for row in rows if row["publish_date"].date() <= date_to]
         start = (page - 1) * page_size
         data = rows[start:start + page_size]
         return {
