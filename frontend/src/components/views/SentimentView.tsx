@@ -19,7 +19,7 @@ function getSentimentValue(row: Record<string, unknown>, key: string): number {
   return Number(match ? row[match] : 0) || 0;
 }
 
-export default function SentimentView({ sentimentDist, sentimentTimeline, sentimentSources, updatedAt }: any) {
+export default function SentimentView({ sentimentDist, sentimentTimeline, sentimentSources, sentimentCoverage, updatedAt }: any) {
   const [sourceMode, setSourceMode] = useState<"percentage" | "count">("percentage");
   const distribution = useMemo(() => (sentimentDist ?? []).map((row: any) => {
     const key = String(row.sentiment_label ?? row.sentiment ?? "neutral").toLowerCase() as keyof typeof SENTIMENTS;
@@ -66,7 +66,7 @@ export default function SentimentView({ sentimentDist, sentimentTimeline, sentim
         <Tooltip formatter={(value, name, item) => { const key = String(name).replace("Pct", "").toLowerCase(); const count = item.payload[key] ?? 0; const pct = item.payload[`${key}Pct`] ?? 0; return [`${Number(count).toLocaleString()} · ${formatPercent(Number(pct))}`, SENTIMENTS[key as keyof typeof SENTIMENTS]?.label ?? name]; }} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
         <Legend formatter={(value) => SENTIMENTS[String(value).replace("Pct", "") as keyof typeof SENTIMENTS]?.label ?? value} />
         {(["positive", "neutral", "negative"] as const).map((key) => <Bar key={key} dataKey={sourceMode === "percentage" ? `${key}Pct` : key} name={sourceMode === "percentage" ? `${key}Pct` : key} stackId="sentiment" fill={SENTIMENTS[key].color} />)}
-      </BarChart></ResponsiveContainer> : !sentimentSources ? <ChartSkeleton /> : <EmptyState message="No source sentiment data" />}
+      </BarChart></ResponsiveContainer> : !sentimentSources ? <ChartSkeleton /> : <EmptyState message={sentimentCoverage?.unlinked ? `${sentimentCoverage.unlinked.toLocaleString()} sentiment records are not linked to current articles. Run the NLP backfill to restore source attribution.` : "No source sentiment data"} />}
     </ChartCard>
 
     <ChartCard wide title={<><Activity size={20} /> Sentiment Timeline</>} description="How has the volume of each sentiment changed over time?" timeRange="Last 7 days" unit="Articles per time bucket" total={timeline.reduce((sum: number, row: any) => sum + row.positive + row.neutral + row.negative, 0)} updatedAt={updatedAt}>
@@ -77,7 +77,7 @@ export default function SentimentView({ sentimentDist, sentimentTimeline, sentim
         <Tooltip labelFormatter={(value) => new Date(String(value)).toLocaleString()} formatter={(value, name) => [Number(value).toLocaleString(), SENTIMENTS[name as keyof typeof SENTIMENTS]?.label ?? name]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
         <Legend formatter={(value) => SENTIMENTS[value as keyof typeof SENTIMENTS]?.label ?? value} />
         {(["positive", "neutral", "negative"] as const).map((key) => <Line key={key} type="linear" dataKey={key} stroke={SENTIMENTS[key].color} strokeWidth={2} dot={false} connectNulls={false} />)}
-      </LineChart></ResponsiveContainer> : !sentimentTimeline ? <ChartSkeleton /> : <EmptyState message="No timeline data" />}
+      </LineChart></ResponsiveContainer> : !sentimentTimeline ? <ChartSkeleton /> : <EmptyState message={sentimentCoverage?.unlinked ? `Timeline unavailable because sentiment coverage is ${sentimentCoverage.coverage_pct}%. Run the NLP backfill to link publication dates.` : "No timeline data"} />}
     </ChartCard>
   </div>;
 }

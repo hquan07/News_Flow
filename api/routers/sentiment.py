@@ -6,6 +6,7 @@ from api.services.analytics import (
     get_sentiment_distribution,
     get_sentiment_timeline,
     get_sentiment_by_source,
+    get_sentiment_coverage,
 )
 
 router = APIRouter(prefix="/sentiment", tags=["Sentiment Intelligence"])
@@ -26,20 +27,34 @@ def sentiment_distribution(
 @router.get("/timeline")
 def sentiment_timeline(
         time_range: TimeRangeEnum = Query(default=TimeRangeEnum.week),
+        source: Optional[str] = Query(None),
+        category: Optional[str] = Query(None),
 ):
     """
     Returns sentiment counts by hour.
     """
-    data = get_sentiment_timeline(time_range=time_range.value)
+    data = get_sentiment_timeline(
+        time_range=time_range.value, source=source, category=category
+    )
     return {"data": data}
 
 
 @router.get("/sources")
 def sentiment_by_source(
         time_range: TimeRangeEnum = Query(default=TimeRangeEnum.week),
+        source: Optional[str] = Query(None),
+        category: Optional[str] = Query(None),
 ):
     """
     Returns sentiment breakdown grouped by source.
     """
-    data = get_sentiment_by_source(time_range=time_range.value)
+    data = get_sentiment_by_source(
+        time_range=time_range.value, source=source, category=category
+    )
     return {"data": data}
+
+
+@router.get("/coverage")
+def sentiment_coverage():
+    """Returns the share of sentiment rows linked to current articles."""
+    return get_sentiment_coverage()

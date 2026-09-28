@@ -81,6 +81,7 @@ export default function Home() {
   const [sentimentDist, setSentimentDist] = useState<any[] | null>(null);
   const [sentimentTimeline, setSentimentTimeline] = useState<any[] | null>(null);
   const [sentimentSources, setSentimentSources] = useState<any[] | null>(null);
+  const [sentimentCoverage, setSentimentCoverage] = useState<any>(null);
   const [entitiesData, setEntitiesData] = useState<any[] | null>(null);
   const [trendingKeywords, setTrendingKeywords] = useState<any[] | null>(null);
   const [entityTypeDist, setEntityTypeDist] = useState<any[] | null>(null);
@@ -238,6 +239,7 @@ export default function Home() {
         safeFetch(`${API_BASE}/sentiment/distribution${sourceParam}`),
         safeFetch(`${API_BASE}/sentiment/timeline${sourceParam}`),
         safeFetch(`${API_BASE}/sentiment/sources${sourceParam}`),
+        safeFetch(`${API_BASE}/sentiment/coverage`),
       ]);
       if (results[0].status === "fulfilled")
         setSentimentDist(results[0].value.data || []);
@@ -245,6 +247,8 @@ export default function Home() {
         setSentimentTimeline(results[1].value.data || []);
       if (results[2].status === "fulfilled")
         setSentimentSources(results[2].value.data || []);
+      if (results[3].status === "fulfilled")
+        setSentimentCoverage(results[3].value);
     } else if (dashboardMode === "social") {
       const result = await safeFetch(
         `${API_BASE}/social/sentiment${sourceParam.replace("?", "&time_range=all&").replace(/^&/, "?")}`,
@@ -252,6 +256,7 @@ export default function Home() {
       setSentimentDist(result.sentiment_distribution || []);
       setSentimentTimeline(result.sentiment_timeline || []);
       setSentimentSources(result.sentiment_by_source || []);
+      setSentimentCoverage(null);
     }
   }, [dashboardMode, selectedSource]);
 
@@ -748,6 +753,7 @@ export default function Home() {
               sentimentDist={sentimentDist}
               sentimentTimeline={sentimentTimeline}
               sentimentSources={sentimentSources}
+              sentimentCoverage={sentimentCoverage}
               updatedAt={dataUpdatedAt}
             />
           )}
