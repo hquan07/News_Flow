@@ -23,6 +23,7 @@ class AlertDataQuality(BaseModel):
     title_available: bool = True
     content_available: bool = True
     url_available: bool = False
+    synthetic: bool = False
 
 class ViralPostAlertSummary(BaseModel):
     post_id: str

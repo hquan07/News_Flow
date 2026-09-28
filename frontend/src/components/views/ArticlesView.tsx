@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { BookOpen, FileText } from "lucide-react";
+import { BookOpen, FileText, Search, X } from "lucide-react";
 
 type Article = {
   article_id: string;
@@ -15,23 +15,32 @@ type Article = {
 
 type ArticlesMeta = {
   total_pages: number;
+  total?: number;
 };
 
 type ArticlesViewProps = {
+  title: string;
   articles: Article[];
   articlesMeta: ArticlesMeta;
   page: number;
   setPage: Dispatch<SetStateAction<number>>;
+  searchQuery: string;
+  setSearchQuery: Dispatch<SetStateAction<string>>;
+  loading: boolean;
   trackClick: (articleHash: string) => void | Promise<void>;
   timeAgo: (date: string) => string;
   exportToCSV: (data: Record<string, unknown>[], filename: string) => void;
 };
 
 export default function ArticlesView({
+  title,
   articles,
   articlesMeta,
   page,
   setPage,
+  searchQuery,
+  setSearchQuery,
+  loading,
   trackClick,
   timeAgo,
   exportToCSV,
@@ -48,7 +57,7 @@ export default function ArticlesView({
           }}
         >
           <div className="panel-title">
-            <BookOpen size={20} /> Latest Articles
+            <BookOpen size={20} /> {title}
           </div>
           <button
             onClick={() => {
@@ -78,6 +87,33 @@ export default function ArticlesView({
           >
             <FileText size={14} /> CSV
           </button>
+        </div>
+        <div className="article-search-row">
+          <div className="article-search-field">
+            <Search size={17} aria-hidden="true" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search article titles..."
+              aria-label="Search articles by title"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear article search"
+                title="Clear search"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <span className="article-search-meta" role="status" aria-live="polite">
+            {loading
+              ? "Searching…"
+              : `${articlesMeta.total ?? articles.length} article${(articlesMeta.total ?? articles.length) === 1 ? "" : "s"}`}
+          </span>
         </div>
         <div className="table-scroll-container">
           <table className="data-table">
@@ -136,7 +172,11 @@ export default function ArticlesView({
                     color: "var(--text-muted)",
                   }}
                 >
-                  No articles found in the database.
+                  {loading
+                    ? "Loading articles…"
+                    : searchQuery
+                      ? `No article titles match “${searchQuery.trim()}”.`
+                      : "No articles found in the database."}
                 </td>
               </tr>
             )}

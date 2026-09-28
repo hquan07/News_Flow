@@ -84,7 +84,8 @@ async def event_generator(request: Request):
         yield f"event: update\ndata: {data}\n\n"
 
 
-@router.get("/")
+@router.get("")
+@router.get("/", include_in_schema=False)
 async def sse_stream(request: Request):
     return StreamingResponse(
         event_generator(request),

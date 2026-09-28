@@ -95,6 +95,9 @@ export default function AlertDetailModal({
       >
         Viral
       </span>
+      {(detail?.data_quality.synthetic || summary?.data_quality.synthetic) && (
+        <span className="synthetic-data-badge">Synthetic data</span>
+      )}
     </div>
   );
 
@@ -243,14 +246,16 @@ export default function AlertDetailModal({
           )}
 
           {/* Data quality banner */}
-          {(!detail.data_quality.title_available ||
+          {(detail.data_quality.synthetic ||
+            !detail.data_quality.title_available ||
             !detail.data_quality.content_available ||
             !detail.data_quality.url_available) && (
             <div className="detail-quality-notice">
               <AlertTriangle size={16} />
               <span>
-                Some fields contain placeholder data. Data quality will improve as
-                real crawl data flows in.
+                {detail.data_quality.synthetic
+                  ? "This is synthetic demo data and does not represent a production event."
+                  : "Some fields contain placeholder data. Data quality will improve as real crawl data flows in."}
               </span>
             </div>
           )}

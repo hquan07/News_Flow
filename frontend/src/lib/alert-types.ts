@@ -4,6 +4,7 @@ export interface AlertDataQuality {
   title_available: boolean;
   content_available?: boolean;
   url_available?: boolean;
+  synthetic?: boolean;
 }
 
 export interface ViralPostAlertSummary {

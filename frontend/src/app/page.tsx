@@ -28,12 +28,21 @@ import OverviewNewsView from "@/components/views/OverviewNewsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { readCachedUser } from "@/lib/auth-storage";
+import type {
+  SocialCrisisAlert,
+  ViralPostAlertSummary,
+} from "@/lib/alert-types";
 
 type FeedEvent = {
   timestamp: string;
   type: string;
   message: string;
   data?: any;
+};
+
+type LiveSocialAlerts = {
+  crisis: SocialCrisisAlert[];
+  viral: ViralPostAlertSummary[];
 };
 
 function timeAgo(dateStr: string): string {
@@ -73,6 +82,11 @@ export default function Home() {
   const [articles, setArticles] = useState<any[]>([]);
   const [articlesMeta, setArticlesMeta] = useState<any>({});
   const [page, setPage] = useState(1);
+  const [articleSearchInput, setArticleSearchInput] = useState("");
+  const [articleSearchQuery, setArticleSearchQuery] = useState("");
+  const [articlesLoading, setArticlesLoading] = useState(false);
+  const [liveSocialAlerts, setLiveSocialAlerts] =
+    useState<LiveSocialAlerts | null>(null);
 
   const [adminLatency, setAdminLatency] = useState<any>(null);
   const [adminClickbait, setAdminClickbait] = useState<any>(null);
@@ -96,6 +110,7 @@ export default function Home() {
 
   const sseRef = useRef<EventSource | null>(null);
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
+  const articlesAbortRef = useRef<AbortController | null>(null);
 
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [user, setUser] = useState<any>(null);
@@ -318,11 +333,49 @@ export default function Home() {
 
   const fetchArticles = useCallback(
     async (p: number) => {
-      const result = await safeFetch(
-        `${API_BASE}/articles?page=${p}&page_size=20`,
-      );
-      setArticles(result.data || []);
-      setArticlesMeta(result);
+      articlesAbortRef.current?.abort();
+      const controller = new AbortController();
+      articlesAbortRef.current = controller;
+      setArticlesLoading(true);
+
+      const params = new URLSearchParams({
+        page: String(p),
+        page_size: "20",
+      });
+      if (articleSearchQuery) params.set("q", articleSearchQuery);
+
+      try {
+        const result = await apiFetch<any>(
+          `${API_BASE}/articles?${params.toString()}`,
+          { signal: controller.signal },
+        );
+        if (!controller.signal.aborted) {
+          setArticles(result.data || []);
+          setArticlesMeta(result);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        throw error;
+      } finally {
+        if (articlesAbortRef.current === controller) {
+          setArticlesLoading(false);
+        }
+      }
+    },
+    [articleSearchQuery],
+  );
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPage(1);
+      setArticleSearchQuery(articleSearchInput.trim());
+    }, 350);
+    return () => clearTimeout(timeout);
+  }, [articleSearchInput]);
+
+  useEffect(
+    () => () => {
+      articlesAbortRef.current?.abort();
     },
     [],
   );
@@ -390,34 +443,62 @@ export default function Home() {
     fetchAdmin,
   ]);
 
-  // SSE with auto-reconnect
+  // One shared SSE connection for the debug feed and live alert cards.
   useEffect(() => {
+    let disposed = false;
+
     const connectSSE = () => {
+      if (disposed) return;
       if (sseRef.current) sseRef.current.close();
 
-      const es = new EventSource(`${API_BASE}/stream/`);
+      const es = new EventSource(`${API_BASE}/stream`);
       sseRef.current = es;
 
       es.onopen = () => setIsConnected(true);
-      es.addEventListener("update", (event) => {
+      es.addEventListener("update", () => {
+        // Heartbeats prove the connection is alive but are intentionally not
+        // rendered as business events in Live Stream Debug.
+        setIsConnected(true);
+      });
+      es.addEventListener("alert", (event) => {
         try {
-          const newEvent = JSON.parse(event.data);
-          setFeed((prev) => [newEvent, ...prev].slice(0, 50));
+          const payload = JSON.parse(event.data);
+          if (payload.type !== "social_alerts") return;
+
+          const crisis = Array.isArray(payload.crisis) ? payload.crisis : [];
+          const viral = Array.isArray(payload.viral) ? payload.viral : [];
+          setLiveSocialAlerts({ crisis, viral });
+          setFeed((prev) => [
+            {
+              timestamp: payload.timestamp || new Date().toISOString(),
+              type: "social_alerts",
+              message: `${crisis.length} crisis alert${crisis.length === 1 ? "" : "s"} · ${viral.length} viral post${viral.length === 1 ? "" : "s"}`,
+              data: { crisis, viral },
+            },
+            ...prev,
+          ].slice(0, 50));
         } catch {}
       });
       es.onerror = () => {
         setIsConnected(false);
         es.close();
-        reconnectTimer.current = setTimeout(connectSSE, 5000);
+        if (!disposed && !reconnectTimer.current) {
+          reconnectTimer.current = setTimeout(() => {
+            reconnectTimer.current = null;
+            connectSSE();
+          }, 5000);
+        }
       };
     };
 
     connectSSE();
     return () => {
+      disposed = true;
       sseRef.current?.close();
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
     };
-  }, [selectedSource, dashboardMode]);
+  }, []);
 
   // Auto-hide error toast after 5 seconds
   useEffect(() => {
@@ -847,10 +928,14 @@ export default function Home() {
 
           {activeTab === "articles" && (
             <ArticlesView
+              title={dashboardMode === "admin" ? "System Articles" : "Latest Articles"}
               articles={articles}
               articlesMeta={articlesMeta}
               page={page}
               setPage={setPage}
+              searchQuery={articleSearchInput}
+              setSearchQuery={setArticleSearchInput}
+              loading={articlesLoading}
               trackClick={trackClick}
               timeAgo={timeAgo}
               exportToCSV={exportToCSV}
@@ -861,7 +946,9 @@ export default function Home() {
             <StreamView feed={feed} isConnected={isConnected} />
           )}
 
-          {activeTab === "alerts" && <AlertsPanel />}
+          {activeTab === "alerts" && (
+            <AlertsPanel liveAlerts={liveSocialAlerts} />
+          )}
 
           {apiError && (
             <div className="error-toast">

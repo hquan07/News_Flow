@@ -27,7 +27,23 @@ interface AlertThresholds {
   viral_interactions: number;
 }
 
-const AlertsPanel: React.FC = () => {
+interface AlertsPanelProps {
+  liveAlerts?: {
+    crisis: SocialCrisisAlert[];
+    viral: ViralPostAlertSummary[];
+  } | null;
+}
+
+function deduplicateViralAlerts(alerts: ViralPostAlertSummary[]) {
+  const seen = new Set<string>();
+  return alerts.filter((alert) => {
+    if (seen.has(alert.post_id)) return false;
+    seen.add(alert.post_id);
+    return true;
+  });
+}
+
+const AlertsPanel: React.FC<AlertsPanelProps> = ({ liveAlerts }) => {
   const [spikes, setSpikes] = useState<SpikeAlert[]>([]);
   const [crisisAlerts, setCrisisAlerts] = useState<SocialCrisisAlert[]>([]);
   const [viralAlerts, setViralAlerts] = useState<ViralPostAlertSummary[]>([]);
@@ -40,7 +56,6 @@ const AlertsPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
-  const sseRef = useRef<EventSource | null>(null);
 
   // Drill-down state
   const [selectedAlert, setSelectedAlert] =
@@ -64,15 +79,7 @@ const AlertsPanel: React.FC = () => {
       setCrisisAlerts(socialData.crisis_alerts || []);
 
       // Deduplicate by post_id
-      const seen = new Set<string>();
-      const deduped = (socialData.viral_alerts || []).filter(
-        (v: ViralPostAlertSummary) => {
-          if (seen.has(v.post_id)) return false;
-          seen.add(v.post_id);
-          return true;
-        }
-      );
-      setViralAlerts(deduped);
+      setViralAlerts(deduplicateViralAlerts(socialData.viral_alerts || []));
       setThresholds(configData);
       setError(null);
     } catch {
@@ -84,37 +91,13 @@ const AlertsPanel: React.FC = () => {
 
   useEffect(() => {
     fetchAlerts();
-
-    // Setup SSE for real-time alerts
-    const es = new EventSource(`${API_BASE}/stream/`);
-    sseRef.current = es;
-
-    es.addEventListener("alert", (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "social_alerts") {
-          if (data.crisis) setCrisisAlerts(data.crisis);
-          if (data.viral) {
-            const seen = new Set<string>();
-            const deduped = (data.viral as ViralPostAlertSummary[]).filter(
-              (v) => {
-                if (seen.has(v.post_id)) return false;
-                seen.add(v.post_id);
-                return true;
-              }
-            );
-            setViralAlerts(deduped);
-          }
-        }
-      } catch {
-        /* ignore parse errors from SSE */
-      }
-    });
-
-    return () => {
-      es.close();
-    };
   }, []);
+
+  useEffect(() => {
+    if (!liveAlerts) return;
+    setCrisisAlerts(liveAlerts.crisis);
+    setViralAlerts(deduplicateViralAlerts(liveAlerts.viral));
+  }, [liveAlerts]);
 
   // --- Drill-down handlers ---
   const handleOpenDetail = useCallback(
@@ -398,11 +381,16 @@ const AlertsPanel: React.FC = () => {
                   <div className="alert-time">
                     <Zap size={16} /> {viral.source}
                   </div>
-                  <div
-                    className="alert-badge"
-                    style={{ background: "#f59e0b" }}
-                  >
-                    Viral
+                  <div className="alert-card-badges">
+                    {viral.data_quality.synthetic && (
+                      <span className="synthetic-data-badge">Synthetic data</span>
+                    )}
+                    <div
+                      className="alert-badge"
+                      style={{ background: "#f59e0b" }}
+                    >
+                      Viral
+                    </div>
                   </div>
                 </div>
                 {viral.data_quality.title_available && viral.title && (
