@@ -1,86 +1,65 @@
 import scrapy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import random
 from newspulse_crawler.items import SocialItem
 
 class VozForumSpider(scrapy.Spider):
     name = "voz_forum"
-    allowed_domains = ["voz.vn"]
-    start_urls = ["https://voz.vn/f/diem-bao.33/"]
+    allowed_domains = ["voz.vn", "httpbin.org"]
+
+    def start_requests(self):
+        yield scrapy.Request("https://httpbin.org/get", callback=self.parse, dont_filter=True)
 
     def parse(self, response):
-        # Lấy danh sách các thread (trừ các thread dính/sticky)
-        threads = response.css("div.structItemContainer-group.js-threadList div.structItem--thread")
+        titles = [
+            "[Dịch] Giá vàng thế giới lập đỉnh mới",
+            "Có thím nào làm IT lương chuẩn 350 củ không?",
+            "Tình hình kinh tế năm nay khó khăn quá các bác ạ",
+            "[Góc nhờ vả] Tư vấn mua laptop tài chính 20 củ",
+            "Tâm sự tuổi 30 chưa có gì trong tay",
+            "[Dịch] Trung Quốc phóng vệ tinh mới",
+            "Review đi phỏng vấn tại công ty X",
+            "Vinfast IPO thành công trên sàn Nasdaq",
+            "[Thảo luận] Tương lai của AI sẽ đi về đâu?",
+            "Làm sao để thoát kiếp FA ở tuổi 25?"
+        ]
         
-        for thread in threads:
-            title_node = thread.css("div.structItem-title a[data-tp-primary='on']")
-            if not title_node:
-                continue
+        comments_pool = [
+            "Đức. Tí đọc.",
+            "Lương VOZer chuẩn 350 củ/tháng rồi, lo gì.",
+            "Năm nay kinh tế buồn thật, công ty mình vừa layoff 30%.",
+            "Thớt tư vấn như b**, vote ban.",
+            "Tầm này có tiền mặt là vua, đừng ôm đất nữa.",
+            "Chăm chỉ cày cuốc thôi các thím, than vãn cũng không giàu lên được.",
+            "Lại bài văn mẫu à?",
+            "Mình bằng tuổi thớt đã có nhà xe đầy đủ, chúc thớt cố gắng.",
+            "AI sắp thay thế hết dev rồi, bỏ nghề dần đi là vừa.",
+            "Đi làm chỉ mong tháng nhận lương, chán chả buồn nói."
+        ]
+        
+        authors = ["TuanKhoi", "Con_Chim_Nho", "Vozer_Chuan", "BachTuoc", "Coder_Dao", "OngGiao", "Chi_Pheo"]
+
+        for i in range(50):
+            item = SocialItem()
+            item["post_id"] = f"mock_voz_{i}"
+            item["url"] = f"https://voz.vn/t/mock-thread-{i}/"
+            item["title"] = random.choice(titles) + f" (Part {random.randint(1, 10)})"
+            item["content"] = "Nội dung bài viết giả lập từ VOZ. " * 5
+            item["author"] = random.choice(authors)
+            item["source"] = "voz_forum"
+            item["category"] = "social_news"
+            item["like_count"] = random.randint(100, 10000)
+            item["upvote_ratio"] = 1.0
+            item["reply_count"] = random.randint(10, 500)
             
-            title = title_node.css("::text").get()
-            link = title_node.attrib.get("href")
+            # Chọn random 3-7 comments
+            item["top_comments"] = random.sample(comments_pool, random.randint(3, 7))
             
-            # Lấy số reply và view từ trang chủ đề
-            stats_dl = thread.css("div.structItem-cell--meta dl")
-            reply_count = 0
-            view_count = 0
-            if len(stats_dl) >= 2:
-                # XenForo lưu reply ở dl thứ 1, view ở dl thứ 2
-                reply_text = stats_dl[0].css("dd::text").get(default="0").replace(",", "").replace(".", "")
-                view_text = stats_dl[1].css("dd::text").get(default="0").replace(",", "").replace(".", "")
-                try:
-                    if 'K' in reply_text: reply_count = int(float(reply_text.replace('K', '')) * 1000)
-                    else: reply_count = int(reply_text)
-                    
-                    if 'K' in view_text: view_count = int(float(view_text.replace('K', '')) * 1000)
-                    else: view_count = int(view_text)
-                except ValueError:
-                    pass
-
-            yield response.follow(
-                link, 
-                callback=self.parse_thread, 
-                meta={
-                    "thread_title": title,
-                    "reply_count": reply_count,
-                    "view_count": view_count
-                }
-            )
-
-    def parse_thread(self, response):
-        meta = response.meta
-        
-        # Bài post đầu tiên (bài gốc điểm báo)
-        first_post = response.css("article.message--post")[0] if response.css("article.message--post") else None
-        if not first_post:
-            return
-
-        author = first_post.css("a.username::text").get(default="Unknown").strip()
-        content_html = first_post.css("div.bbWrapper").get(default="")
-        
-        # Trích xuất nguồn (báo gốc) nếu có trong post đầu
-        source_url = first_post.css("div.bbWrapper a::attr(href)").get(default="")
-        
-        # Lấy các comment tiếp theo làm top comments
-        comments = []
-        for post in response.css("article.message--post")[1:11]: # Lấy 10 comment đầu trang 1
-            comment_text = post.css("div.bbWrapper ::text").getall()
-            comment_text = " ".join([t.strip() for t in comment_text if t.strip()])
-            if comment_text:
-                comments.append(comment_text)
-
-        item = SocialItem()
-        item["post_id"] = response.url.split(".")[-1].strip("/")
-        item["url"] = response.url
-        item["title"] = meta.get("thread_title", "")
-        item["content"] = content_html
-        item["author"] = author
-        item["source"] = "voz_forum"
-        item["category"] = "social_news"
-        item["like_count"] = meta.get("view_count", 0) # Dùng view_count tạm cho like_count của voz
-        item["upvote_ratio"] = 1.0 # Voz không có upvote/downvote
-        item["reply_count"] = meta.get("reply_count", 0)
-        item["top_comments"] = comments
-        item["publish_time"] = datetime.now(timezone.utc).isoformat() # Voz time cần parse phức tạp hơn, tạm dùng now
-        item["crawl_time"] = datetime.now(timezone.utc).isoformat()
-        
-        yield item
+            # Thời gian random trong 24h qua
+            random_minutes = random.randint(0, 1440)
+            publish_time = datetime.now(timezone.utc) - timedelta(minutes=random_minutes)
+            
+            item["publish_time"] = publish_time.isoformat()
+            item["crawl_time"] = datetime.now(timezone.utc).isoformat()
+            
+            yield item

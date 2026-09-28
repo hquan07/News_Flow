@@ -332,6 +332,7 @@ services:
       - ../../.env
     environment:
       - PYTHONPATH=/opt/spark-apps
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ../../spark:/opt/spark-apps/spark
       - ../../config:/opt/spark-apps/config
@@ -360,6 +361,7 @@ services:
       - SPARK_WORKER_MEMORY=4g
       - SPARK_WORKER_CORES=2
       - PYTHONPATH=/opt/spark-apps
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       spark-master:
         condition: service_healthy

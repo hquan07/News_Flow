@@ -225,12 +225,15 @@ export default function Home() {
     } catch {}
   };
 
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Load UI state on mount
   useEffect(() => {
     const savedMode = localStorage.getItem("newsFlowMode");
     const savedTab = localStorage.getItem("newsFlowTab");
     if (savedMode) setDashboardMode(savedMode as any);
     if (savedTab) setActiveTab(savedTab);
+    setIsInitialized(true);
   }, []);
 
   // Save UI state on change
@@ -419,6 +422,8 @@ export default function Home() {
 
   // Tab-aware polling
   useEffect(() => {
+    if (!isInitialized) return;
+    
     let cancelled = false;
 
     const poll = async () => {
@@ -466,6 +471,7 @@ export default function Home() {
     fetchForYou,
     fetchDebates,
     fetchAdmin,
+    isInitialized,
   ]);
 
   // One shared SSE connection for the debug feed and live alert cards.

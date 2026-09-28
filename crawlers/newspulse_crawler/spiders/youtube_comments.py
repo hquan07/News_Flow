@@ -1,93 +1,69 @@
 import scrapy
-import os
-import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import random
 from newspulse_crawler.items import SocialItem
-from dotenv import load_dotenv
-
-try:
-    from googleapiclient.discovery import build
-except ImportError:
-    build = None
-
-load_dotenv()
-logger = logging.getLogger(__name__)
 
 class YoutubeCommentsSpider(scrapy.Spider):
     name = "youtube_comments"
-    allowed_domains = ["youtube.com"]
-    # Bắt đầu bằng 1 video ID hoặc danh sách các video ID thời sự
-    start_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"] # Placeholder, can be dynamically fed
+    allowed_domains = ["youtube.com", "httpbin.org"]
     
-    def __init__(self, *args, **kwargs):
-        super(YoutubeCommentsSpider, self).__init__(*args, **kwargs)
-        self.api_key = os.getenv("YOUTUBE_API_KEY")
-        
-        if build and self.api_key:
-            try:
-                self.youtube = build('youtube', 'v3', developerKey=self.api_key)
-            except Exception as e:
-                self.youtube = None
-                logger.error(f"Failed to initialize YouTube API: {e}")
-        else:
-            self.youtube = None
+    def start_requests(self):
+        yield scrapy.Request("https://httpbin.org/get", callback=self.parse, dont_filter=True)
 
     def parse(self, response):
-        if not self.youtube:
-            logger.error("YouTube API configuration is missing (YOUTUBE_API_KEY) or google-api-python-client not installed.")
-            return
-
-        # Extract video_id from URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)
-        video_id = response.url.split("v=")[-1].split("&")[0]
+        titles = [
+            "Toàn cảnh bão siêu cấp Yagi đổ bộ",
+            "Review iPhone 16 Pro Max sau 1 tháng sử dụng",
+            "Làng Trong Phố Tập Cuối - Phim Truyền Hình VTV",
+            "MẸO: 5 cách học Tiếng Anh cho người mất gốc",
+            "Ca khúc mới nhất của Sơn Tùng M-TP [Official Video]",
+            "Trực tiếp Bóng đá Việt Nam - Thái Lan Chung kết",
+            "Vlog 1 ngày làm việc của Data Engineer tại VNG",
+            "Sự thật về các khoá học làm giàu trên mạng",
+            "Hướng dẫn nấu Phở Bò chuẩn vị Hà Nội",
+            "Phân tích thị trường chứng khoán VN-Index tuần này"
+        ]
         
-        try:
-            # 1. Lấy thông tin video (Title, View count)
-            video_response = self.youtube.videos().list(
-                part="snippet,statistics",
-                id=video_id
-            ).execute()
-            
-            if not video_response.get("items"):
-                return
-                
-            video_info = video_response["items"][0]
-            video_title = video_info["snippet"]["title"]
-            video_desc = video_info["snippet"]["description"]
-            channel_name = video_info["snippet"]["channelTitle"]
-            
-            # 2. Lấy top comments
-            comment_response = self.youtube.commentThreads().list(
-                part="snippet",
-                videoId=video_id,
-                order="relevance",
-                maxResults=20
-            ).execute()
+        comments_pool = [
+            "Video rất hay và ý nghĩa, cảm ơn tác giả.",
+            "Tôi thấy chưa đồng tình với quan điểm ở phút 3:45.",
+            "Tuyệt vời quá Việt Nam ơi!!!",
+            "Xem xong thấy cuộc đời thật tươi đẹp hơn.",
+            "Cho mình hỏi nhạc nền đoạn 2:10 là bài gì vậy ạ?",
+            "Thực sự thất vọng về nội dung video này.",
+            "Chúc kênh ngày càng phát triển nhé.",
+            "Nội dung này rất bổ ích cho những người mới.",
+            "Đừng clickbait nữa bạn ơi, nội dung không đúng tiêu đề.",
+            "Hay quá, hóng phần 2 ạ."
+        ]
+        
+        channels = ["VTV24", "Vật Vờ Studio", "Sơn Tùng M-TP Official", "Web5Ngay", "FAP TV", "PewPew", "MixiGaming"]
+
+        for i in range(50):
+            item = SocialItem()
+            item["post_id"] = f"mock_yt_{i}"
+            item["url"] = f"https://www.youtube.com/watch?v=mock{i}"
+            item["title"] = random.choice(titles)
+            item["content"] = "Mô tả video YouTube giả lập. " * 3
+            item["author"] = random.choice(channels)
+            item["source"] = "youtube_comments"
+            item["category"] = "social_news"
+            item["like_count"] = random.randint(1000, 1000000)
+            item["upvote_ratio"] = 1.0
+            item["reply_count"] = random.randint(100, 50000)
             
             top_comments = []
-            for item in comment_response.get("items", []):
-                snippet = item["snippet"]["topLevelComment"]["snippet"]
-                text = snippet["textDisplay"]
-                like_count = snippet["likeCount"]
-                # Ưu tiên những comment có like cao làm Social Sentiment
-                if text:
-                    top_comments.append(f"[{like_count} likes] {text}")
-
-            social_item = SocialItem()
-            social_item["post_id"] = video_id
-            social_item["url"] = response.url
-            social_item["title"] = video_title
-            social_item["content"] = video_desc
-            social_item["author"] = channel_name
-            social_item["source"] = "youtube_comments"
-            social_item["category"] = "social_news"
-            social_item["like_count"] = int(video_info["statistics"].get("likeCount", 0))
-            social_item["upvote_ratio"] = 1.0 # YouTube đã bỏ đếm dislike public
-            social_item["reply_count"] = int(video_info["statistics"].get("commentCount", 0))
-            social_item["top_comments"] = top_comments
-            social_item["publish_time"] = video_info["snippet"]["publishedAt"]
-            social_item["crawl_time"] = datetime.now(timezone.utc).isoformat()
+            for _ in range(random.randint(3, 8)):
+                likes = random.randint(0, 5000)
+                text = random.choice(comments_pool)
+                top_comments.append(f"[{likes} likes] {text}")
+                
+            item["top_comments"] = top_comments
             
-            yield social_item
+            random_hours = random.randint(0, 72)
+            publish_time = datetime.now(timezone.utc) - timedelta(hours=random_hours)
             
-        except Exception as e:
-            logger.error(f"Error fetching YouTube data for {video_id}: {e}")
+            item["publish_time"] = publish_time.isoformat()
+            item["crawl_time"] = datetime.now(timezone.utc).isoformat()
+            
+            yield item
