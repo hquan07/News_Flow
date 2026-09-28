@@ -65,8 +65,9 @@ def get_settings() -> Settings:
     return Settings()
 
 
+@lru_cache()
 def get_ch_client():
-    """Return a new ClickHouse client instance per request to avoid concurrency errors."""
+    """Return a singleton ClickHouse client instance to prevent FD leak."""
     s = get_settings()
     return clickhouse_connect.get_client(
         host=s.CLICKHOUSE_HOST,
@@ -77,3 +78,4 @@ def get_ch_client():
         connect_timeout=s.HEALTHCHECK_TIMEOUT_SECONDS,
         send_receive_timeout=10,
     )
+

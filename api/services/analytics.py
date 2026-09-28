@@ -56,9 +56,6 @@ def _query(sql, params=None):
                 delay,
             )
             time.sleep(delay)
-        finally:
-            if client is not None and hasattr(client, "close"):
-                client.close()
 
 
 def _query_one(sql, params=None):
