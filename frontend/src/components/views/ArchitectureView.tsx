@@ -9,7 +9,8 @@ import {
   Handle,
   Position,
   NodeChange,
-  EdgeChange
+  EdgeChange,
+  BackgroundVariant
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -271,7 +272,7 @@ export default function ArchitectureTab() {
           attributionPosition="bottom-left"
           defaultEdgeOptions={defaultEdgeOptions}
         >
-          <Background variant="dots" gap={20} size={1} color="#334155" />
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#334155" />
           <Controls style={{ background: '#1e293b', color: '#fff', fill: '#fff', border: '1px solid #334155' }} />
         </ReactFlow>
       </div>
