@@ -520,6 +520,20 @@ export default function Home() {
   useEffect(() => {
     let disposed = false;
 
+    const socialPostToFeedEvent = (post: LiveSocialPost, timestamp?: string): FeedEvent => {
+      const headline =
+        post.title?.trim() ||
+        post.content?.trim().slice(0, 120) ||
+        `New post from ${post.source}`;
+
+      return {
+        timestamp: timestamp || post.publish_time || new Date().toISOString(),
+        type: "social_post",
+        message: `${post.source} · ${post.author || "Unknown author"}: ${headline}`,
+        data: post,
+      };
+    };
+
     const appendFeedEvent = (feedEvent: FeedEvent, dedupeId?: string) => {
       const append = (current: FeedEvent[]) => [
         feedEvent,
@@ -584,17 +598,8 @@ export default function Home() {
             return [post, ...withoutDuplicate].slice(0, 100);
           });
 
-          const headline =
-            post.title?.trim() ||
-            post.content?.trim().slice(0, 120) ||
-            `New post from ${post.source}`;
           appendFeedEvent(
-            {
-              timestamp: payload.timestamp || post.publish_time || new Date().toISOString(),
-              type: "social_post",
-              message: `${post.source} · ${post.author || "Unknown author"}: ${headline}`,
-              data: post,
-            },
+            socialPostToFeedEvent(post, payload.timestamp),
             post.post_id,
           );
         } catch {}
@@ -612,6 +617,32 @@ export default function Home() {
     };
 
     connectSSE();
+    void apiFetch<any>(`${API_BASE}/social/feed?limit=20`)
+      .then((result) => {
+        if (disposed || !Array.isArray(result.posts)) return;
+
+        const snapshotEvents = result.posts
+          .filter((post: LiveSocialPost) => post?.post_id)
+          .map((post: LiveSocialPost) => socialPostToFeedEvent(post));
+
+        setFeed((current) => {
+          const existingPostIds = new Set(
+            current
+              .filter((item) => item.type === "social_post")
+              .map((item) => item.data?.post_id)
+              .filter(Boolean),
+          );
+          const unseenSnapshotEvents = snapshotEvents.filter(
+            (item: FeedEvent) => !existingPostIds.has(item.data?.post_id),
+          );
+          return [...current, ...unseenSnapshotEvents].slice(0, 50);
+        });
+      })
+      .catch(() => {
+        // SSE remains the primary source; an unavailable snapshot must not
+        // mark an otherwise healthy realtime connection as disconnected.
+      });
+
     return () => {
       disposed = true;
       sseRef.current?.close();
