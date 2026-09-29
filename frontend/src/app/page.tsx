@@ -213,14 +213,10 @@ export default function Home() {
   const fetchForYou = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    try {
-      const data = await apiFetch<any>(`${API_BASE}/recommendations/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setForYouArticles(data.articles || []);
-    } catch (e) {
-      console.error(e);
-    }
+    const data = await apiFetch<any>(`${API_BASE}/recommendations`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setForYouArticles(data.articles || []);
   }, []);
 
   const trackClick = async (article_hash: string) => {

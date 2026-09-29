@@ -5,7 +5,9 @@ from api.security import get_current_user
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
-@router.get("/")
+
+@router.get("")
+@router.get("/", include_in_schema=False)
 def get_recommendations(user: dict = Depends(get_current_user)):
     user_id = user.get("sub")
     
@@ -20,7 +22,7 @@ def get_recommendations(user: dict = Depends(get_current_user)):
         # Fallback: Just return trending articles
         articles = _query(
             "SELECT url_hash, url, title, content, author, source, category, publish_time "
-            "FROM newspulse.raw_articles ORDER BY publish_time DESC LIMIT 20"
+            "FROM newspulse.raw_articles FINAL ORDER BY publish_time DESC LIMIT 20"
         )
     else:
         # In a real app, we would join with raw_articles to find categories and recommend
@@ -29,7 +31,7 @@ def get_recommendations(user: dict = Depends(get_current_user)):
         
         articles = _query(
             "SELECT url_hash, url, title, content, author, source, category, publish_time "
-            "FROM newspulse.raw_articles "
+            "FROM newspulse.raw_articles FINAL "
             "WHERE url_hash NOT IN {hashes:Array(String)} "
             "ORDER BY publish_time DESC LIMIT 20",
             {"hashes": hashes},
