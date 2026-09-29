@@ -26,6 +26,7 @@ import SentimentView from "@/components/views/SentimentView";
 import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
+import MockDataGenerator from "@/components/views/MockDataGenerator";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { readCachedUser } from "@/lib/auth-storage";
 import {
@@ -765,106 +766,6 @@ export default function Home() {
               next.click();
             }}
           >
-            {dashboardMode === "news" && (
-              <>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "overview"}
-                  className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
-                  onClick={() => setActiveTab("overview")}
-                >
-                  <Activity size={18} /> Overview
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "sentiment"}
-                  className={`tab-btn ${activeTab === "sentiment" ? "active" : ""}`}
-                  onClick={() => setActiveTab("sentiment")}
-                >
-                  <ThumbsUp size={18} /> Sentiment
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "entities"}
-                  className={`tab-btn ${activeTab === "entities" ? "active" : ""}`}
-                  onClick={() => setActiveTab("entities")}
-                >
-                  <Hash size={18} /> Entities & NLP
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "network"}
-                  className={`tab-btn ${activeTab === "network" ? "active" : ""}`}
-                  onClick={() => setActiveTab("network")}
-                >
-                  <Share2 size={18} /> Network
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "articles"}
-                  className={`tab-btn ${activeTab === "articles" ? "active" : ""}`}
-                  onClick={() => {
-                    setActiveTab("articles");
-                    setPage(1);
-                    setArticleAlertFilter(null);
-                  }}
-                >
-                  <BookOpen size={18} /> Latest News
-                </button>
-                {user && (
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === "foryou"}
-                    className={`tab-btn ${activeTab === "foryou" ? "active" : ""}`}
-                    onClick={() => setActiveTab("foryou")}
-                    style={{
-                      background: "linear-gradient(90deg, #8b5cf6, #3b82f6)",
-                      color: "white",
-                    }}
-                  >
-                    ✨ For You
-                  </button>
-                )}
-              </>
-            )}
-
-            {dashboardMode === "social" && (
-              <>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "overview"}
-                  className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
-                  onClick={() => setActiveTab("overview")}
-                >
-                  <Activity size={18} /> Overview
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "sentiment"}
-                  className={`tab-btn ${activeTab === "sentiment" ? "active" : ""}`}
-                  onClick={() => setActiveTab("sentiment")}
-                >
-                  <ThumbsUp size={18} /> Sentiment
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "debates"}
-                  className={`tab-btn ${activeTab === "debates" ? "active" : ""}`}
-                  onClick={() => setActiveTab("debates")}
-                >
-                  <MessageSquare size={18} /> Top Debates
-                </button>
-              </>
-            )}
 
             {dashboardMode === "admin" && (<></>)}
           </div>
@@ -922,6 +823,8 @@ export default function Home() {
                 >
                   <Server size={18} /> Architecture
                 </button>
+
+                <MockDataGenerator />
               </aside>
               <div className="admin-content">
 
@@ -1019,9 +922,76 @@ export default function Home() {
             </div>
           )}
 
-          {/* Non-admin content */}
-          {dashboardMode !== "admin" && (
-            <>
+          {/* News sidebar layout */}
+          {dashboardMode === "news" && (
+            <div className="admin-layout">
+              <aside className="admin-sidebar" role="tablist" aria-label="News navigation">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "overview"}
+                  className={`admin-sidebar-btn ${activeTab === "overview" ? "active" : ""}`}
+                  onClick={() => setActiveTab("overview")}
+                >
+                  <Activity size={18} /> Overview
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "sentiment"}
+                  className={`admin-sidebar-btn ${activeTab === "sentiment" ? "active" : ""}`}
+                  onClick={() => setActiveTab("sentiment")}
+                >
+                  <ThumbsUp size={18} /> Sentiment
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "entities"}
+                  className={`admin-sidebar-btn ${activeTab === "entities" ? "active" : ""}`}
+                  onClick={() => setActiveTab("entities")}
+                >
+                  <Hash size={18} /> Entities & NLP
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "network"}
+                  className={`admin-sidebar-btn ${activeTab === "network" ? "active" : ""}`}
+                  onClick={() => setActiveTab("network")}
+                >
+                  <Share2 size={18} /> Network
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "articles"}
+                  className={`admin-sidebar-btn ${activeTab === "articles" ? "active" : ""}`}
+                  onClick={() => {
+                    setActiveTab("articles");
+                    setPage(1);
+                    setArticleAlertFilter(null);
+                  }}
+                >
+                  <BookOpen size={18} /> Latest News
+                </button>
+                {user && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "foryou"}
+                    className={`admin-sidebar-btn ${activeTab === "foryou" ? "active" : ""}`}
+                    onClick={() => setActiveTab("foryou")}
+                    style={{
+                      background: activeTab === "foryou" ? "linear-gradient(90deg, #8b5cf6, #3b82f6)" : undefined,
+                      color: activeTab === "foryou" ? "white" : undefined,
+                    }}
+                  >
+                    ✨ For You
+                  </button>
+                )}
+              </aside>
+              <div className="admin-content">
 
           {activeTab === "overview" && dashboardMode === "news" && (
             <OverviewNewsView
@@ -1034,16 +1004,8 @@ export default function Home() {
               updatedAt={dataUpdatedAt}
             />
           )}
-          {activeTab === "overview" && dashboardMode === "social" && (
-            <OverviewSocialView
-              overviewData={overviewData}
-              activeCard={activeCard}
-              setActiveCard={setActiveCard}
-              updatedAt={dataUpdatedAt}
-            />
-          )}
 
-          {activeTab === "sentiment" && (
+          {activeTab === "sentiment" && dashboardMode === "news" && (
             <SentimentView
               sentimentDist={sentimentDist}
               sentimentTimeline={sentimentTimeline}
@@ -1053,7 +1015,7 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "entities" && (
+          {activeTab === "entities" && dashboardMode === "news" && (
             <EntitiesView
               entitiesData={entitiesData}
               trendingKeywords={trendingKeywords}
@@ -1063,11 +1025,11 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "network" && (
+          {activeTab === "network" && dashboardMode === "news" && (
             <NetworkView knowledgeGraph={knowledgeGraph} updatedAt={dataUpdatedAt} />
           )}
 
-          {activeTab === "articles" && (
+          {activeTab === "articles" && dashboardMode === "news" && (
             <ArticlesView
               title="Latest Articles"
               articles={articles}
@@ -1093,13 +1055,85 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "foryou" && (
+          {activeTab === "foryou" && dashboardMode === "news" && (
             <ForYouView
               forYouArticles={forYouArticles}
               trackClick={trackClick}
               timeAgo={timeAgo}
             />
           )}
+
+          {apiError && (
+            <div className="error-toast">
+              <AlertTriangle
+                size={16}
+                style={{
+                  display: "inline",
+                  verticalAlign: "middle",
+                  marginRight: "0.5rem",
+                }}
+              />
+              {apiError}
+            </div>
+          )}
+
+              </div>
+            </div>
+          )}
+
+          {/* Social sidebar layout */}
+          {dashboardMode === "social" && (
+            <div className="admin-layout">
+              <aside className="admin-sidebar" role="tablist" aria-label="Social navigation">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "overview"}
+                  className={`admin-sidebar-btn ${activeTab === "overview" ? "active" : ""}`}
+                  onClick={() => setActiveTab("overview")}
+                >
+                  <Activity size={18} /> Overview
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "sentiment"}
+                  className={`admin-sidebar-btn ${activeTab === "sentiment" ? "active" : ""}`}
+                  onClick={() => setActiveTab("sentiment")}
+                >
+                  <ThumbsUp size={18} /> Sentiment
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "debates"}
+                  className={`admin-sidebar-btn ${activeTab === "debates" ? "active" : ""}`}
+                  onClick={() => setActiveTab("debates")}
+                >
+                  <MessageSquare size={18} /> Top Debates
+                </button>
+              </aside>
+              <div className="admin-content">
+
+          {activeTab === "overview" && dashboardMode === "social" && (
+            <OverviewSocialView
+              overviewData={overviewData}
+              activeCard={activeCard}
+              setActiveCard={setActiveCard}
+              updatedAt={dataUpdatedAt}
+            />
+          )}
+
+          {activeTab === "sentiment" && dashboardMode === "social" && (
+            <SentimentView
+              sentimentDist={sentimentDist}
+              sentimentTimeline={sentimentTimeline}
+              sentimentSources={sentimentSources}
+              sentimentCoverage={sentimentCoverage}
+              updatedAt={dataUpdatedAt}
+            />
+          )}
+
           {activeTab === "debates" && dashboardMode === "social" && (
             <DebatesView overviewData={overviewData} />
           )}
@@ -1118,7 +1152,8 @@ export default function Home() {
             </div>
           )}
 
-            </>
+              </div>
+            </div>
           )}
         </>
       )}

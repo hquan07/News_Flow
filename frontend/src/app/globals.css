@@ -138,23 +138,24 @@ h1 {
 /* Admin Sidebar Layout */
 .admin-layout {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 1.5rem;
   min-height: calc(100vh - 180px);
 }
 
 .admin-sidebar {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
+  width: 200px;
+  min-width: 200px;
+  padding: 0.75rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  position: static;
-  align-items: center;
+  position: sticky;
+  top: 1rem;
+  align-self: flex-start;
 }
 
 .admin-sidebar-btn {
@@ -193,6 +194,108 @@ h1 {
   overflow-x: hidden;
 }
 
+/* Mock Data Generator (sidebar widget) */
+.mock-data-generator {
+  margin-top: auto;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mock-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text-main);
+}
+
+.mock-description {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.mock-controls {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.mock-input {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.25);
+  color: white;
+  width: 60px;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+
+.mock-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+.mock-btn {
+  flex: 1;
+  padding: 0.35rem 0.6rem;
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-family: inherit;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  transition: all 0.2s ease;
+}
+
+.mock-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.mock-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mock-btn .spin {
+  animation: spin 1s linear infinite;
+}
+
+.mock-result {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  animation: fadeIn 0.3s ease;
+}
+
+.mock-result.success {
+  color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.mock-result.error {
+  color: var(--accent-red);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 @media (max-width: 768px) {
   .admin-layout {
     flex-direction: column;
@@ -209,6 +312,11 @@ h1 {
     font-size: 0.8rem;
     padding: 0.5rem 0.75rem;
     flex-shrink: 0;
+  }
+  .mock-data-generator {
+    margin-top: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 }
 

@@ -160,6 +160,9 @@ class AlertMetrics:
             (worker.get("started_at", now) for worker in workers),
             default=now,
         )
+        # Ensure started_at is timezone-aware
+        if started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=timezone.utc)
         return {
             "scope": "shared-mongodb",
             "workers": len(workers),

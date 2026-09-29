@@ -1,13 +1,72 @@
 from datetime import datetime, timezone
+from random import choice, randint, uniform
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from api.database import get_mongo_db
 from api.security import get_admin_user
 from api.services.analytics import _query, _query_one
+from api.services.clickhouse_resilience import execute_clickhouse
 from api.services.health import dependency_health
 
 router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
+
+
+@router.post("/mock/social")
+def inject_mock_social_posts(
+    count: int = Query(default=10, ge=1, le=1000),
+    user: dict = Depends(get_admin_user),
+):
+    """Insert synthetic social posts for local/demo alert testing."""
+    del user
+    sources = ("reddit_vn", "facebook", "voz_forum", "youtube_comments")
+    topics = (
+        "AI và tương lai việc làm",
+        "Thị trường công nghệ hôm nay",
+        "Cộng đồng bàn luận về sản phẩm mới",
+        "Xu hướng nổi bật trên mạng xã hội",
+    )
+    sentiments = ("positive", "neutral", "negative")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    rows = []
+    for _ in range(count):
+        post_id = f"live_post_{uuid4().hex}"
+        source = choice(sources)
+        title = choice(topics)
+        rows.append([
+            post_id,
+            source,
+            title,
+            f"Synthetic demo post about {title.lower()}.",
+            randint(20, 500),
+            round(uniform(0.75, 1.0), 4),
+            randint(5, 180),
+            round(uniform(-1.0, 1.0), 4),
+            choice(sentiments),
+            now,
+            now,
+            now,
+        ])
+
+    execute_clickhouse(
+        lambda client: client.insert(
+            "newspulse.social_sentiment_metrics",
+            rows,
+            column_names=[
+                "post_id", "source", "title", "content", "like_count",
+                "upvote_ratio", "reply_count", "sentiment_score",
+                "sentiment_label", "publish_time", "crawled_at", "loaded_at",
+            ],
+        )
+    )
+
+    return {
+        "status": "success",
+        "count": count,
+        "synthetic": True,
+        "message": f"Injected {count} synthetic social posts",
+    }
 
 
 @router.get("/metrics/latency")
