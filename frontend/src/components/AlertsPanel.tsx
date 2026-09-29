@@ -487,9 +487,13 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
 
   const handleSaveConfig = async () => {
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_BASE}/alerts/config`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(thresholds),
       });
       if (res.ok) {

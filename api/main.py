@@ -2,12 +2,14 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import asyncio
 
 from api.config import close_ch_client, get_settings
 from api.database import lifespan_db
 from api.exceptions import DependencyUnavailableError
 from api.middleware import RequestContextMiddleware, request_id_context
 from api.services.health import dependency_health
+from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
 from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public
 
 settings = get_settings()
@@ -15,10 +17,18 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    metrics_stop = asyncio.Event()
+    metrics_task = asyncio.create_task(alert_metrics_flush_loop(metrics_stop))
     try:
         async with lifespan_db():
             yield
     finally:
+        metrics_stop.set()
+        await metrics_task
+        try:
+            await alert_metrics.flush_to_mongo()
+        except Exception:
+            pass
         close_ch_client()
 
 

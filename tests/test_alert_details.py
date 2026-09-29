@@ -68,6 +68,14 @@ def test_volume_spike_detail_returns_exact_hour_articles(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_crisis_detail_endpoint(async_client: AsyncClient, monkeypatch):
+    async def thresholds():
+        return {
+            "crisis_negative_pct": 30.0,
+            "crisis_min_posts": 10,
+            "viral_interactions": 50,
+        }
+
+    monkeypatch.setattr("api.routers.alerts.get_alert_thresholds", thresholds)
     monkeypatch.setattr(
         "api.routers.alerts.get_social_crisis_detail",
         lambda *_args, **_kwargs: {

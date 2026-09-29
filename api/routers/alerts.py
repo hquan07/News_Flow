@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Query, Body, Depends, HTTPException
+import asyncio
+
+from fastapi import APIRouter, Query, Depends, HTTPException
 from api.services.analytics import (
     get_alerts,
     get_social_crisis_alerts,
@@ -11,6 +13,7 @@ from api.services.analytics import (
 from api.security import get_admin_user
 from api.services.alert_state import get_alert_states, update_alert_state
 from api.services.alert_metrics import alert_metrics
+from api.services.alert_config import get_alert_thresholds, update_alert_thresholds
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Literal, Optional
 from datetime import datetime, timezone
@@ -146,20 +149,18 @@ class InteractionTrendResponse(BaseModel):
     granularity: Literal["15m", "1h"]
     data: List[InteractionTrendPoint] = Field(default_factory=list)
 
-# In-memory config for MVP
-current_thresholds = AlertThresholds()
-
 router = APIRouter(prefix="/alerts", tags=["Alerts & Anomalies"])
 
 @router.get("/config", response_model=AlertThresholds)
-def get_config():
-    return current_thresholds
+async def get_config():
+    return await get_alert_thresholds()
 
 @router.post("/config", response_model=AlertThresholds)
-def update_config(config: AlertThresholds = Body(...)):
-    global current_thresholds
-    current_thresholds = config
-    return current_thresholds
+async def update_config(
+    config: AlertThresholds,
+    user: dict = Depends(get_admin_user),
+):
+    return await update_alert_thresholds(config.model_dump(), user["sub"])
 
 @router.get("", response_model=dict)
 def alerts(
@@ -170,16 +171,21 @@ def alerts(
     return {"spikes": results}
 
 @router.get("/social", response_model=SocialAlertsResponse)
-def social_alerts():
+async def social_alerts():
     started = monotonic()
     outcome = "success"
     try:
-        crisis = get_social_crisis_alerts(
-            negative_pct_threshold=current_thresholds.crisis_negative_pct,
-            min_posts=current_thresholds.crisis_min_posts
-        )
-        viral = get_viral_post_alerts(
-            interaction_threshold=current_thresholds.viral_interactions
+        thresholds = await get_alert_thresholds()
+        crisis, viral = await asyncio.gather(
+            asyncio.to_thread(
+                get_social_crisis_alerts,
+                thresholds["crisis_negative_pct"],
+                thresholds["crisis_min_posts"],
+            ),
+            asyncio.to_thread(
+                get_viral_post_alerts,
+                thresholds["viral_interactions"],
+            ),
         )
         return SocialAlertsResponse(
             crisis_alerts=crisis,
@@ -210,9 +216,9 @@ def social_interaction_trend(
 
 
 @router.get("/metrics", response_model=dict)
-def get_alert_metrics(_user: dict = Depends(get_admin_user)):
-    """Return process-local alert workflow telemetry for operators."""
-    return alert_metrics.snapshot()
+async def get_alert_metrics(_user: dict = Depends(get_admin_user)):
+    """Return telemetry aggregated from active API workers."""
+    return await alert_metrics.shared_snapshot()
 
 
 @router.post("/state/query", response_model=List[AlertState])
@@ -273,14 +279,16 @@ def get_social_post_detail(post_id: str):
 
 
 @router.get("/social/crisis/{source}", response_model=SocialCrisisDetail)
-def get_crisis_detail(source: str):
+async def get_crisis_detail(source: str):
     started = monotonic()
     outcome = "success"
     try:
-        detail = get_social_crisis_detail(
+        thresholds = await get_alert_thresholds()
+        detail = await asyncio.to_thread(
+            get_social_crisis_detail,
             source,
-            negative_pct_threshold=current_thresholds.crisis_negative_pct,
-            min_posts=current_thresholds.crisis_min_posts,
+            thresholds["crisis_negative_pct"],
+            thresholds["crisis_min_posts"],
         )
     except Exception as exc:
         outcome = "error"

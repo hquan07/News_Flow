@@ -7,9 +7,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from api.services.analytics import get_social_crisis_alerts, get_viral_post_alerts
-from api.routers.alerts import current_thresholds
 from api.config import get_settings
 from api.services.alert_metrics import alert_metrics
+from api.services.alert_config import get_alert_thresholds
 
 router = APIRouter(prefix="/stream", tags=["Stream"])
 logger = logging.getLogger("newspulse.stream")
@@ -33,15 +33,16 @@ class AlertCache:
                 return self._value
 
             try:
+                thresholds = await get_alert_thresholds()
                 crisis, viral = await asyncio.gather(
                     asyncio.to_thread(
                         get_social_crisis_alerts,
-                        current_thresholds.crisis_negative_pct,
-                        current_thresholds.crisis_min_posts,
+                        thresholds["crisis_negative_pct"],
+                        thresholds["crisis_min_posts"],
                     ),
                     asyncio.to_thread(
                         get_viral_post_alerts,
-                        current_thresholds.viral_interactions,
+                        thresholds["viral_interactions"],
                     ),
                 )
             except Exception:
