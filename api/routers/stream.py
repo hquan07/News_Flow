@@ -7,7 +7,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from api.services.analytics import get_social_crisis_alerts, get_viral_post_alerts
+from api.services.analytics import (
+    get_recent_social_posts,
+    get_social_crisis_alerts,
+    get_viral_post_alerts,
+)
 from api.config import get_settings
 from api.services.alert_metrics import alert_metrics
 from api.services.alert_config import get_alert_thresholds
@@ -41,7 +45,7 @@ class AlertCache:
     def __init__(self):
         self._lock = asyncio.Lock()
         self._updated_at = 0.0
-        self._value = {"crisis": [], "viral": []}
+        self._value = {"crisis": [], "viral": [], "posts": []}
 
     async def get(self) -> dict:
         ttl = get_settings().SSE_ALERT_CACHE_SECONDS
@@ -56,7 +60,7 @@ class AlertCache:
 
             try:
                 thresholds = await get_alert_thresholds()
-                crisis, viral = await asyncio.gather(
+                crisis, viral, posts = await asyncio.gather(
                     asyncio.to_thread(
                         get_social_crisis_alerts,
                         thresholds["crisis_negative_pct"],
@@ -66,12 +70,13 @@ class AlertCache:
                         get_viral_post_alerts,
                         thresholds["viral_interactions"],
                     ),
+                    asyncio.to_thread(get_recent_social_posts, 20),
                 )
             except Exception:
                 # Back off all connected clients together when a dependency is down.
                 self._updated_at = time.monotonic()
                 raise
-            self._value = {"crisis": crisis, "viral": viral}
+            self._value = {"crisis": crisis, "viral": viral, "posts": posts}
             self._updated_at = time.monotonic()
             return self._value
 
@@ -81,6 +86,7 @@ alert_cache = AlertCache()
 
 async def event_generator(request: Request):
     """Stream shared alert snapshots and per-connection heartbeats."""
+    seen_post_ids: set[str] = set()
     while True:
         await asyncio.sleep(get_settings().SSE_HEARTBEAT_SECONDS)
         if await request.is_disconnected():
@@ -90,6 +96,7 @@ async def event_generator(request: Request):
             alerts = await alert_cache.get()
             crisis = alerts["crisis"]
             viral = alerts["viral"]
+            posts = alerts["posts"]
             if crisis or viral:
                 data = json.dumps({
                     "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -99,6 +106,20 @@ async def event_generator(request: Request):
                 }, default=str)
                 yield _format_sse("alert", data)
                 alert_metrics.observe("sse_snapshot", "success", 0)
+
+            for post in reversed(posts):
+                post_id = str(post.get("post_id", ""))
+                if not post_id or post_id in seen_post_ids:
+                    continue
+                data = json.dumps({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "type": "social_post",
+                    "post": post,
+                }, default=str)
+                yield _format_sse("social_post", data)
+                seen_post_ids.add(post_id)
+            if len(seen_post_ids) > 500:
+                seen_post_ids = {str(post.get("post_id", "")) for post in posts}
         except Exception:
             alert_metrics.observe("sse_snapshot", "error", 0)
             logger.exception("Failed to refresh SSE alerts")

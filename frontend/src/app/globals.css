@@ -2233,3 +2233,139 @@ h1 {
 .btn-secondary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.15);
 }
+
+/* Social influencer leaderboard and realtime feed */
+.influencers-panel, .live-social-panel {
+  min-height: 520px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--card-bg);
+}
+.social-view-loading { min-height: 520px; }
+.social-view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.social-view-header h2 { display: flex; align-items: center; gap: .6rem; margin: 0 0 .35rem; font-size: 1.2rem; }
+.social-view-header p { margin: 0; color: var(--text-muted); font-size: .88rem; }
+.live-count, .stream-status {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .38rem .7rem;
+  border-radius: 999px;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, .14);
+  border: 1px solid rgba(139, 92, 246, .35);
+  font-size: .76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.stream-status.connected { color: #34d399; background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.35); }
+.stream-status.connected svg { animation: livePulse 1.5s ease-in-out infinite; }
+.stream-status.disconnected { color: #fca5a5; background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); }
+.influencer-list, .social-feed-list { display: flex; flex-direction: column; gap: .65rem; }
+.influencer-row {
+  display: grid;
+  grid-template-columns: 44px 46px minmax(170px, 1fr) repeat(3, minmax(76px, .55fr)) minmax(100px, .7fr);
+  align-items: center;
+  gap: .85rem;
+  padding: .85rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(15,23,42,.4);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+.influencer-row:hover { transform: translateY(-2px); border-color: rgba(139,92,246,.5); background: rgba(30,41,59,.75); }
+.influencer-row.rank-1 { border-color: rgba(250,204,21,.45); background: linear-gradient(90deg, rgba(250,204,21,.1), rgba(15,23,42,.4) 35%); }
+.influencer-row.rank-2 { border-color: rgba(203,213,225,.38); }
+.influencer-row.rank-3 { border-color: rgba(251,146,60,.38); }
+.influencer-rank {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #94a3b8;
+  background: rgba(148,163,184,.1);
+  font-weight: 800;
+}
+.rank-1 .influencer-rank { color: #facc15; background: rgba(250,204,21,.13); }
+.rank-2 .influencer-rank { color: #cbd5e1; }
+.rank-3 .influencer-rank { color: #fb923c; background: rgba(251,146,60,.12); }
+.platform-avatar, .feed-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+  font-weight: 800;
+}
+.platform-avatar.platform-youtube, .platform-avatar.platform-youtube-comments { background: #dc2626; }
+.platform-avatar.platform-reddit, .platform-avatar.platform-reddit-vn { background: #f97316; }
+.platform-avatar.platform-facebook { background: #2563eb; }
+.platform-avatar.platform-voz, .platform-avatar.platform-voz-forum { background: #0891b2; }
+.influencer-identity { min-width: 0; display: flex; flex-direction: column; gap: .35rem; }
+.influencer-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.platform-badge {
+  width: fit-content;
+  padding: .15rem .45rem;
+  border-radius: 999px;
+  color: #cbd5e1;
+  background: rgba(148,163,184,.12);
+  font-size: .68rem;
+}
+.platform-badge.platform-youtube, .platform-badge.platform-youtube-comments { color: #fca5a5; background: rgba(220,38,38,.12); }
+.platform-badge.platform-reddit, .platform-badge.platform-reddit-vn { color: #fdba74; background: rgba(249,115,22,.12); }
+.platform-badge.platform-facebook { color: #93c5fd; background: rgba(37,99,235,.12); }
+.influencer-stat, .influencer-engagement { display: flex; flex-direction: column; gap: .2rem; }
+.influencer-stat span, .influencer-engagement span { display: flex; align-items: center; gap: .25rem; color: var(--text-muted); font-size: .7rem; }
+.influencer-stat strong, .influencer-engagement strong { font-size: .95rem; }
+.influencer-engagement strong { color: #a78bfa; font-size: 1.05rem; }
+.social-feed-list { max-height: 680px; overflow-y: auto; padding-right: .35rem; }
+.social-feed-item {
+  display: flex;
+  gap: .9rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid #94a3b8;
+  border-radius: 12px;
+  background: rgba(15,23,42,.42);
+  animation: socialPostEnter 280ms ease-out;
+}
+.social-feed-item.sentiment-positive { border-left-color: #10b981; background: linear-gradient(90deg, rgba(16,185,129,.07), transparent 35%); }
+.social-feed-item.sentiment-negative { border-left-color: #ef4444; background: linear-gradient(90deg, rgba(239,68,68,.07), transparent 35%); }
+.feed-content { min-width: 0; flex: 1; }
+.feed-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; color: var(--text-muted); font-size: .76rem; }
+.feed-meta strong { color: var(--text-main); font-size: .9rem; }
+.feed-content h3 { margin: .55rem 0 .3rem; font-size: .98rem; }
+.feed-content p { margin: 0; color: #cbd5e1; line-height: 1.55; font-size: .86rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.feed-engagement { display: flex; gap: 1rem; align-items: center; margin-top: .8rem; color: var(--text-muted); font-size: .78rem; }
+.feed-engagement > span { display: inline-flex; align-items: center; gap: .3rem; }
+.sentiment-pill, .synthetic-badge { padding: .18rem .48rem; border-radius: 999px; font-size: .66rem; font-weight: 700; text-transform: capitalize; }
+.sentiment-pill.positive { color: #34d399; background: rgba(16,185,129,.12); }
+.sentiment-pill.negative { color: #f87171; background: rgba(239,68,68,.12); }
+.sentiment-pill.neutral { color: #cbd5e1; background: rgba(148,163,184,.12); }
+.synthetic-badge { color: #fbbf24; background: rgba(245,158,11,.12); }
+@keyframes socialPostEnter { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes livePulse { 50% { opacity: .35; transform: scale(.86); } }
+@media (max-width: 1100px) {
+  .influencer-row { grid-template-columns: 38px 42px minmax(150px, 1fr) repeat(2, minmax(70px, .45fr)) minmax(95px, .6fr); }
+  .influencer-stat:nth-of-type(3) { display: none; }
+}
+@media (max-width: 760px) {
+  .influencers-panel, .live-social-panel { padding: 1rem; }
+  .social-view-header { flex-direction: column; }
+  .influencer-row { grid-template-columns: 34px 40px minmax(0, 1fr) auto; }
+  .influencer-stat { display: none; }
+  .influencer-engagement { align-items: flex-end; }
+  .feed-avatar { width: 36px; height: 36px; flex: 0 0 36px; }
+}

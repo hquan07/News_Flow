@@ -151,3 +151,38 @@ def social_debates(
     return {
         "top_debates": top_debates_data
     }
+
+
+@router.get("/influencers")
+def social_influencers(
+        time_range: str = Query("7d"),
+        source: Optional[str] = Query(None),
+        limit: int = Query(20, ge=1, le=100),
+):
+    """Rank social authors/channels by total likes and replies."""
+    where = _resolve_time_range(time_range, "publish_time")
+    params = {"limit": limit}
+    if source:
+        where += " AND source = {source:String}"
+        params["source"] = source
+
+    rows = _query(
+        f"SELECT "
+        f"if(empty(trim(author)), concat(source, ' channel'), author) AS author, "
+        f"source, count() AS post_count, "
+        f"sum(like_count) AS total_likes, "
+        f"sum(reply_count) AS total_replies, "
+        f"sum(like_count + reply_count) AS total_interactions, "
+        f"round(avg(sentiment_score), 3) AS avg_sentiment "
+        f"FROM newspulse.social_sentiment_metrics WHERE {where} "
+        f"GROUP BY author, source "
+        f"ORDER BY total_interactions DESC, post_count DESC "
+        f"LIMIT {{limit:UInt32}}",
+        params,
+    )
+
+    return {
+        "influencers": rows,
+        "total": len(rows),
+        "time_range": time_range,
+    }

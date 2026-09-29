@@ -12,6 +12,7 @@ import {
   Share2,
   Download,
   Server,
+  Users,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AlertsPanel from "@/components/AlertsPanel";
@@ -27,6 +28,12 @@ import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
 import MockDataGenerator from "@/components/views/MockDataGenerator";
+import SocialInfluencersView, {
+  type SocialInfluencer,
+} from "@/components/views/SocialInfluencersView";
+import LiveSocialFeedView, {
+  type LiveSocialPost,
+} from "@/components/views/LiveSocialFeedView";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { readCachedUser } from "@/lib/auth-storage";
 import {
@@ -73,6 +80,7 @@ const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
   overview: true,
   sentiment: true,
   debates: true,
+  influencers: true,
 };
 
 export default function Home() {
@@ -101,6 +109,9 @@ export default function Home() {
   });
   const [liveSocialAlerts, setLiveSocialAlerts] =
     useState<LiveSocialAlerts | null>(null);
+  const [socialInfluencers, setSocialInfluencers] =
+    useState<SocialInfluencer[] | null>(null);
+  const [liveSocialPosts, setLiveSocialPosts] = useState<LiveSocialPost[]>([]);
 
   const [adminLatency, setAdminLatency] = useState<any>(null);
   const [adminClickbait, setAdminClickbait] = useState<any>(null);
@@ -310,6 +321,17 @@ export default function Home() {
     }
   }, [dashboardMode, selectedSource]);
 
+  const fetchInfluencers = useCallback(async () => {
+    if (dashboardMode !== "social") return;
+    const sourceParam = selectedSource
+      ? `&source=${encodeURIComponent(selectedSource)}`
+      : "";
+    const result = await safeFetch(
+      `${API_BASE}/social/influencers?time_range=all&limit=20${sourceParam}`,
+    );
+    setSocialInfluencers(result.influencers || []);
+  }, [dashboardMode, selectedSource]);
+
   const fetchAdmin = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -419,6 +441,7 @@ export default function Home() {
     setTrendingKeywords(null);
     setEntityTypeDist(null);
     setEntitySentiment(null);
+    setSocialInfluencers(null);
   }, [selectedSource, activeTab]);
 
   // Tab-aware polling
@@ -436,6 +459,7 @@ export default function Home() {
         else if (activeTab === "articles") await fetchArticles(page);
         else if (activeTab === "foryou") await fetchForYou();
         else if (activeTab === "debates") await fetchDebates();
+        else if (activeTab === "influencers") await fetchInfluencers();
         else if (activeTab === "admin_dashboard") await fetchAdmin();
         if (!cancelled) {
           setApiError(null);
@@ -471,6 +495,7 @@ export default function Home() {
     fetchArticles,
     fetchForYou,
     fetchDebates,
+    fetchInfluencers,
     fetchAdmin,
     isInitialized,
   ]);
@@ -515,6 +540,19 @@ export default function Home() {
           } else {
             setFeed((prev) => [feedEvent, ...prev].slice(0, 50));
           }
+        } catch {}
+      });
+      es.addEventListener("social_post", (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type !== "social_post" || !payload.post?.post_id) return;
+          const post = payload.post as LiveSocialPost;
+          setLiveSocialPosts((current) => {
+            const withoutDuplicate = current.filter(
+              (item) => item.post_id !== post.post_id,
+            );
+            return [post, ...withoutDuplicate].slice(0, 100);
+          });
         } catch {}
       });
       es.onerror = () => {
@@ -1112,6 +1150,24 @@ export default function Home() {
                 >
                   <MessageSquare size={18} /> Top Debates
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "influencers"}
+                  className={`admin-sidebar-btn ${activeTab === "influencers" ? "active" : ""}`}
+                  onClick={() => setActiveTab("influencers")}
+                >
+                  <Users size={18} /> Top Influencers
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "live_social"}
+                  className={`admin-sidebar-btn ${activeTab === "live_social" ? "active" : ""}`}
+                  onClick={() => setActiveTab("live_social")}
+                >
+                  <Radio size={18} /> Live Feed
+                </button>
               </aside>
               <div className="admin-content">
 
@@ -1138,6 +1194,17 @@ export default function Home() {
             <DebatesView overviewData={overviewData} />
           )}
 
+          {activeTab === "influencers" && dashboardMode === "social" && (
+            <SocialInfluencersView influencers={socialInfluencers} />
+          )}
+
+          {activeTab === "live_social" && dashboardMode === "social" && (
+            <LiveSocialFeedView
+              posts={liveSocialPosts}
+              connected={isConnected}
+            />
+          )}
+
           {apiError && (
             <div className="error-toast">
               <AlertTriangle
@@ -1160,4 +1227,3 @@ export default function Home() {
     </div>
   );
 }
-

@@ -193,6 +193,27 @@ def _is_synthetic_post(post_id: str) -> bool:
     return bool(post_id and post_id.startswith("live_post_"))
 
 
+def get_recent_social_posts(limit: int = 20):
+    """Return recent social posts for the live SSE timeline."""
+    rows = _query(
+        "SELECT post_id, source, author, title, content, like_count, "
+        "reply_count, sentiment_score, sentiment_label, publish_time "
+        "FROM newspulse.social_sentiment_metrics "
+        "ORDER BY loaded_at DESC LIMIT {limit:UInt32}",
+        {"limit": max(1, min(limit, 50))},
+    )
+    return [
+        {
+            **row,
+            "author": row.get("author") or f"{row.get('source', 'social')} channel",
+            "interactions": int(row.get("like_count", 0) or 0)
+            + int(row.get("reply_count", 0) or 0),
+            "synthetic": _is_synthetic_post(row.get("post_id", "")),
+        }
+        for row in rows
+    ]
+
+
 def get_viral_post_alerts(interaction_threshold=50):
     """Detect individual social posts with high interactions in the last hour."""
     rows = _query(
