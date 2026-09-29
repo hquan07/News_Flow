@@ -79,7 +79,7 @@ def write_to_clickhouse_batch(df: DataFrame, table: str):
     df.foreachPartition(lambda rows: _write_partition(rows, table, columns))
 
 
-def create_dead_letter_writer(df: DataFrame, checkpoint_name: str):
+def create_dead_letter_writer(df: DataFrame, checkpoint_location: str):
     payload = df.select(
         F.concat_ws(
             ":",
@@ -101,7 +101,7 @@ def create_dead_letter_writer(df: DataFrame, checkpoint_name: str):
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("topic", KAFKA_DLQ_TOPIC)
-        .option("checkpointLocation", f"/tmp/spark-checkpoints/{checkpoint_name}-dlq")
+        .option("checkpointLocation", checkpoint_location)
         .outputMode("append")
         .start()
     )

@@ -372,13 +372,18 @@ phase2() {
         fi
         ok "Spark UI: http://localhost:8082"
         
-        log "Submitting NLP Spark Streaming Job..."
-        dc_exec spark-master bash -c "nohup /opt/spark/bin/spark-submit \\
-            --master spark://spark-master:7077 \\
-            --conf spark.jars.ivy=/tmp/.ivy2 \\
-            --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,com.clickhouse:clickhouse-jdbc:0.4.6 \\
-            /opt/spark-apps/spark/streaming/streaming_job.py > /tmp/spark_streaming.log 2>&1 &"
-        ok "Spark Streaming Job submitted to background"
+        if has_service "spark-streaming"; then
+            log "Starting managed Spark Streaming service..."
+            $COMPOSE up -d spark-streaming
+            sleep 10
+            if [ "$($COMPOSE ps --status running -q spark-streaming | wc -l)" -eq 1 ]; then
+                ok "Spark Streaming service is managed by Docker Compose"
+            else
+                warn "Spark Streaming service is not running — check: docker compose logs spark-streaming"
+            fi
+        else
+            warn "spark-streaming service is missing from docker-compose.yml"
+        fi
     elif [ -f "$PROJECT_DIR/infrastructure/docker/docker-compose.spark.yml" ]; then
         docker compose -f "$PROJECT_DIR/infrastructure/docker/docker-compose.spark.yml" up -d 2>/dev/null || {
             warn "Spark failed to start — check docker-compose.spark.yml"

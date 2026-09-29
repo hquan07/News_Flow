@@ -74,3 +74,24 @@ def write_sentiment_to_clickhouse(df: DataFrame) -> int:
     except Exception as e:
         logger.error(f"[Sentiment] Failed to write: {e}")
         raise
+
+
+def write_clickbait_to_clickhouse(df: DataFrame) -> int:
+    if df.isEmpty():
+        return 0
+
+    try:
+        clickbait_df = df.select(
+            F.col("url_hash"),
+            F.col("clickbait_score"),
+            F.current_timestamp().alias("processed_at"),
+        ).dropDuplicates(["url_hash"])
+
+        if clickbait_df.isEmpty():
+            return 0
+
+        write_to_clickhouse_batch(clickbait_df, "raw_article_clickbait")
+        return clickbait_df.count()
+    except Exception as e:
+        logger.error(f"[Clickbait] Failed to write: {e}")
+        raise

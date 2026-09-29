@@ -147,6 +147,27 @@ services:
       retries: 5
       start_period: 15s
 
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        clickhouse-client
+        --host clickhouse
+        --user "$${CLICKHOUSE_USER}"
+        --password "$${CLICKHOUSE_PASSWORD}"
+        --multiquery
+        < /schema/clickhouse_schema.sql
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-admin123}
+    volumes:
+      - ../../data_platform/warehouse/clickhouse_schema.sql:/schema/clickhouse_schema.sql:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: "no"
+
   mongo:
     image: mongo:7.0
     ports:
@@ -391,6 +412,52 @@ services:
       - ../../config:/opt/spark-apps/config
       - ../../data_platform/warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
+
+  spark-streaming:
+    build:
+      context: spark
+      dockerfile: Dockerfile
+    container_name: newspulse-spark-streaming
+    entrypoint: ["/usr/bin/tini", "-s", "--"]
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - spark://spark-master:7077
+      - --conf
+      - spark.jars.ivy=/tmp/.ivy2
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.clickhouse:clickhouse-jdbc:0.4.6
+      - /opt/spark-apps/spark/streaming/streaming_job.py
+    env_file:
+      - ../../.env
+    environment:
+      PYTHONPATH: /opt/spark-apps
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      SPARK_MASTER: spark://spark-master:7077
+      SPARK_CHECKPOINT_ROOT: /tmp/spark-checkpoints
+      RAW_MAX_OFFSETS_PER_TRIGGER: ${RAW_MAX_OFFSETS_PER_TRIGGER:-500}
+      NLP_MAX_OFFSETS_PER_TRIGGER: ${NLP_MAX_OFFSETS_PER_TRIGGER:-100}
+      SOCIAL_MAX_OFFSETS_PER_TRIGGER: ${SOCIAL_MAX_OFFSETS_PER_TRIGGER:-250}
+      RAW_STARTING_OFFSETS: ${RAW_STARTING_OFFSETS:-latest}
+      GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-10}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_healthy
+      spark-worker:
+        condition: service_started
+    volumes:
+      - ../../spark:/opt/spark-apps/spark
+      - ../../config:/opt/spark-apps/config
+      - ../../data_platform/warehouse:/opt/spark-apps/warehouse
+      - spark-checkpoints:/tmp/spark-checkpoints
+    stop_grace_period: 60s
+    restart: unless-stopped
 
   frontend:
     build:

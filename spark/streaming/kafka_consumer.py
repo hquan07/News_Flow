@@ -6,7 +6,10 @@ from pyspark.sql.types import StructType, StructField, StringType, ArrayType
 from config.spark_config import (
     KAFKA_BOOTSTRAP_SERVERS,
     KAFKA_TOPICS,
-    KAFKA_CONSUMER_GROUP,
+    NLP_MAX_OFFSETS_PER_TRIGGER,
+    NLP_STARTING_OFFSETS,
+    SOCIAL_MAX_OFFSETS_PER_TRIGGER,
+    SOCIAL_STARTING_OFFSETS,
 )
 
 ARTICLE_SCHEMA = StructType([
@@ -32,15 +35,20 @@ def md5_hash_udf(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
-def create_kafka_stream(spark: SparkSession) -> DataFrame:
+def create_kafka_stream(
+    spark: SparkSession,
+    *,
+    max_offsets_per_trigger: int = NLP_MAX_OFFSETS_PER_TRIGGER,
+    starting_offsets: str = NLP_STARTING_OFFSETS,
+) -> DataFrame:
     raw_stream = (
         spark.readStream
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("subscribe", ",".join(KAFKA_TOPICS))
-        .option("startingOffsets", "earliest")
+        .option("startingOffsets", starting_offsets)
         .option("failOnDataLoss", "false")
-        .option("maxOffsetsPerTrigger", 500)
+        .option("maxOffsetsPerTrigger", max_offsets_per_trigger)
         .load()
     )
 
@@ -88,15 +96,20 @@ SOCIAL_SCHEMA = StructType([
     StructField("crawl_time", StringType(), True),
 ])
 
-def create_social_kafka_stream(spark: SparkSession) -> DataFrame:
+def create_social_kafka_stream(
+    spark: SparkSession,
+    *,
+    max_offsets_per_trigger: int = SOCIAL_MAX_OFFSETS_PER_TRIGGER,
+    starting_offsets: str = SOCIAL_STARTING_OFFSETS,
+) -> DataFrame:
     raw_stream = (
         spark.readStream
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("subscribe", "social_posts")
-        .option("startingOffsets", "earliest")
+        .option("startingOffsets", starting_offsets)
         .option("failOnDataLoss", "false")
-        .option("maxOffsetsPerTrigger", 500)
+        .option("maxOffsetsPerTrigger", max_offsets_per_trigger)
         .load()
     )
 

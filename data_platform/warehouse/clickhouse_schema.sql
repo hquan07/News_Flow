@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_sentiment (
 ) ENGINE = ReplacingMergeTree(loaded_at)
 ORDER BY (url_hash);
 
+-- Clickbait enrichment is stored separately so raw ingestion never waits for an LLM.
+CREATE TABLE IF NOT EXISTS newspulse.raw_article_clickbait (
+    url_hash String,
+    clickbait_score Float32,
+    processed_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(processed_at)
+ORDER BY (url_hash);
+
 -- Raw AI Summaries (Groq LLM)
 CREATE TABLE IF NOT EXISTS newspulse.raw_article_summaries (
     url_hash String,
