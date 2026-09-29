@@ -1,8 +1,7 @@
 from typing import Optional
 from datetime import date, datetime
 import logging
-from api.config import get_ch_client
-from api.exceptions import DependencyUnavailableError
+from api.services.clickhouse_resilience import execute_clickhouse
 
 
 logger = logging.getLogger("newspulse.crud")
@@ -79,7 +78,6 @@ def get_articles(
         entity: Optional[str] = None,
         keyword: Optional[str] = None,
 ) -> dict:
-    client = get_ch_client()
     where_clause, params = _build_article_filters(
         q=q,
         source=source,
@@ -92,10 +90,10 @@ def get_articles(
         keyword=keyword,
     )
     try:
-        count_result = client.query(
+        count_result = execute_clickhouse(lambda client: client.query(
             f"SELECT count() AS total FROM newspulse.raw_articles FINAL {where_clause}",
             parameters=params,
-        ).first_row
+        ).first_row)
         total = count_result[0] if count_result else 0
 
         query_params = {
@@ -124,8 +122,11 @@ def get_articles(
             LIMIT {{page_size:UInt32}} OFFSET {{offset:UInt64}}
         """
 
-        result = client.query(data_sql, parameters=query_params)
-        rows = list(result.named_results())
+        rows = execute_clickhouse(
+            lambda client: list(
+                client.query(data_sql, parameters=query_params).named_results()
+            )
+        )
 
         return {
             "total": total,
@@ -134,13 +135,12 @@ def get_articles(
             "total_pages": (total + page_size - 1) // page_size if total else 0,
             "data": rows,
         }
-    except Exception as exc:
+    except Exception:
         logger.exception("Failed to list articles")
-        raise DependencyUnavailableError("clickhouse") from exc
+        raise
 
 
 def get_article_detail(article_id: str) -> Optional[dict]:
-    client = get_ch_client()
     sql = """
         SELECT
             url_hash as article_id, title, url, source, category,
@@ -160,36 +160,44 @@ def get_article_detail(article_id: str) -> Optional[dict]:
         WHERE url_hash = {article_id:String}
     """
     try:
-        res = list(client.query(sql, parameters={"article_id": article_id}).named_results())
+        res = execute_clickhouse(
+            lambda client: list(
+                client.query(sql, parameters={"article_id": article_id}).named_results()
+            )
+        )
         if not res:
             return None
         article = res[0]
 
-        kw_res = list(client.query(
-            """
-            SELECT keyword
-            FROM newspulse.raw_article_keywords
-            WHERE url_hash = {article_id:String}
-            GROUP BY keyword
-            ORDER BY max(score) DESC
-            """,
-            parameters={"article_id": article_id},
-        ).named_results())
+        kw_res = execute_clickhouse(
+            lambda client: list(client.query(
+                """
+                SELECT keyword
+                FROM newspulse.raw_article_keywords
+                WHERE url_hash = {article_id:String}
+                GROUP BY keyword
+                ORDER BY max(score) DESC
+                """,
+                parameters={"article_id": article_id},
+            ).named_results())
+        )
         article["keywords"] = [r["keyword"] for r in kw_res]
 
-        ent_res = list(client.query(
-            """
-            SELECT entity AS entity_name, entity_type
-            FROM newspulse.raw_article_entities
-            WHERE url_hash = {article_id:String}
-            GROUP BY entity, entity_type
-            ORDER BY entity_type, entity
-            """,
-            parameters={"article_id": article_id},
-        ).named_results())
+        ent_res = execute_clickhouse(
+            lambda client: list(client.query(
+                """
+                SELECT entity AS entity_name, entity_type
+                FROM newspulse.raw_article_entities
+                WHERE url_hash = {article_id:String}
+                GROUP BY entity, entity_type
+                ORDER BY entity_type, entity
+                """,
+                parameters={"article_id": article_id},
+            ).named_results())
+        )
         article["entities"] = ent_res
 
         return article
-    except Exception as exc:
+    except Exception:
         logger.exception("Failed to load article detail article_id=%s", article_id)
-        raise DependencyUnavailableError("clickhouse") from exc
+        raise

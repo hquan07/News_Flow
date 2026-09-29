@@ -2,6 +2,7 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 import clickhouse_connect
+from clickhouse_connect import common as clickhouse_common
 
 
 class Settings(BaseSettings):
@@ -37,7 +38,14 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
     CORS_ORIGINS: str = "http://localhost,http://localhost:3000"
     CLICKHOUSE_QUERY_RETRIES: int = 3
+    CLICKHOUSE_QUERY_TIMEOUT_SECONDS: int = 10
     RETRY_BASE_DELAY_SECONDS: float = 0.2
+    RETRY_MAX_DELAY_SECONDS: float = 2.0
+    RETRY_JITTER_SECONDS: float = 0.1
+    CLICKHOUSE_MAX_CONCURRENCY: int = 8
+    CLICKHOUSE_ACQUIRE_TIMEOUT_SECONDS: float = 1.0
+    CLICKHOUSE_CIRCUIT_FAILURE_THRESHOLD: int = 5
+    CLICKHOUSE_CIRCUIT_RECOVERY_SECONDS: float = 15.0
     HEALTHCHECK_TIMEOUT_SECONDS: float = 3.0
     SSE_ALERT_CACHE_SECONDS: float = 5.0
 
@@ -69,6 +77,9 @@ def get_settings() -> Settings:
 def get_ch_client():
     """Return a singleton ClickHouse client instance to prevent FD leak."""
     s = get_settings()
+    # ClickHouse sessions reject concurrent queries. The shared HTTP client is
+    # safe to reuse when requests do not share a server-side session.
+    clickhouse_common.set_setting("autogenerate_session_id", False)
     return clickhouse_connect.get_client(
         host=s.CLICKHOUSE_HOST,
         port=s.CLICKHOUSE_PORT,
@@ -76,7 +87,9 @@ def get_ch_client():
         password=s.CLICKHOUSE_PASSWORD,
         database=s.CLICKHOUSE_DB,
         connect_timeout=s.HEALTHCHECK_TIMEOUT_SECONDS,
-        send_receive_timeout=10,
+        send_receive_timeout=s.CLICKHOUSE_QUERY_TIMEOUT_SECONDS,
+        query_retries=0,
+        client_name="newspulse-api",
     )
 
 

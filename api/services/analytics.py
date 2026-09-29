@@ -1,10 +1,8 @@
 import logging
-import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from api.config import get_ch_client
-from api.exceptions import DependencyUnavailableError
+from api.services.clickhouse_resilience import execute_clickhouse
 
 
 logger = logging.getLogger("newspulse.analytics")
@@ -31,32 +29,11 @@ def _resolve_time_range(time_range, date_column="publish_time"):
 
 
 def _query(sql, params=None):
-    from api.config import get_settings
-
-    settings = get_settings()
-    attempts = max(settings.CLICKHOUSE_QUERY_RETRIES, 1)
-    for attempt in range(1, attempts + 1):
-        client = None
-        try:
-            client = get_ch_client()
-            result = client.query(sql, parameters=params or {})
-            return list(result.named_results())
-        except Exception as exc:
-            if attempt == attempts:
-                logger.error(
-                    "ClickHouse query failed after %s attempts: %s",
-                    attempts,
-                    exc,
-                )
-                raise DependencyUnavailableError("clickhouse") from exc
-            delay = settings.RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
-            logger.warning(
-                "ClickHouse query attempt %s/%s failed; retrying in %.2fs",
-                attempt,
-                attempts,
-                delay,
-            )
-            time.sleep(delay)
+    return execute_clickhouse(
+        lambda client: list(
+            client.query(sql, parameters=params or {}).named_results()
+        )
+    )
 
 
 def _query_one(sql, params=None):

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from api.services.analytics import _query
-from api.exceptions import DependencyUnavailableError
+from api.services.clickhouse_resilience import execute_clickhouse
 from api.security import get_current_user
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
@@ -46,18 +46,13 @@ def track_interaction(
     user_id = user.get("sub")
     
     # Write to ClickHouse user_interactions
-    from api.config import get_ch_client
     from datetime import datetime
-    
-    client = get_ch_client()
-    try:
-        client.insert('newspulse.user_interactions', [[
+
+    execute_clickhouse(lambda client: client.insert('newspulse.user_interactions', [[
             user_id,
             article_hash,
             interaction_type,
             1.0,
             datetime.now()
-        ]], column_names=['user_id', 'article_hash', 'interaction_type', 'interaction_weight', 'timestamp'])
-        return {"status": "success"}
-    except Exception as exc:
-        raise DependencyUnavailableError("clickhouse") from exc
+        ]], column_names=['user_id', 'article_hash', 'interaction_type', 'interaction_weight', 'timestamp']))
+    return {"status": "success"}

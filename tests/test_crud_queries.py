@@ -36,7 +36,7 @@ def test_article_filters_and_sentiment_are_applied(monkeypatch):
             "sentiment_label": "positive",
         }]),
     ])
-    monkeypatch.setattr(crud, "get_ch_client", lambda: client)
+    monkeypatch.setattr(crud, "execute_clickhouse", lambda operation: operation(client))
 
     response = crud.get_articles(
         page=2,
@@ -65,7 +65,7 @@ def test_article_detail_deduplicates_enrichment_rows(monkeypatch):
         _Result(rows=[{"keyword": "AI"}]),
         _Result(rows=[{"entity_name": "OpenAI", "entity_type": "ORG"}]),
     ])
-    monkeypatch.setattr(crud, "get_ch_client", lambda: client)
+    monkeypatch.setattr(crud, "execute_clickhouse", lambda operation: operation(client))
 
     article = crud.get_article_detail("hash-1")
 
