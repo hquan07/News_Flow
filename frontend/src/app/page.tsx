@@ -520,6 +520,24 @@ export default function Home() {
   useEffect(() => {
     let disposed = false;
 
+    const appendFeedEvent = (feedEvent: FeedEvent, dedupeId?: string) => {
+      const append = (current: FeedEvent[]) => [
+        feedEvent,
+        ...current.filter(
+          (item) =>
+            !dedupeId ||
+            item.type !== feedEvent.type ||
+            item.data?.post_id !== dedupeId,
+        ),
+      ].slice(0, 50);
+
+      if (streamPausedRef.current) {
+        setBufferedFeed(append);
+      } else {
+        setFeed(append);
+      }
+    };
+
     const connectSSE = () => {
       if (disposed) return;
       if (sseRef.current) sseRef.current.close();
@@ -551,11 +569,7 @@ export default function Home() {
             message: `${crisis.length} crisis alert${crisis.length === 1 ? "" : "s"} · ${viral.length} viral post${viral.length === 1 ? "" : "s"}`,
             data: { crisis, viral },
           };
-          if (streamPausedRef.current) {
-            setBufferedFeed((prev) => [feedEvent, ...prev].slice(0, 50));
-          } else {
-            setFeed((prev) => [feedEvent, ...prev].slice(0, 50));
-          }
+          appendFeedEvent(feedEvent);
         } catch {}
       });
       es.addEventListener("social_post", (event) => {
@@ -569,6 +583,20 @@ export default function Home() {
             );
             return [post, ...withoutDuplicate].slice(0, 100);
           });
+
+          const headline =
+            post.title?.trim() ||
+            post.content?.trim().slice(0, 120) ||
+            `New post from ${post.source}`;
+          appendFeedEvent(
+            {
+              timestamp: payload.timestamp || post.publish_time || new Date().toISOString(),
+              type: "social_post",
+              message: `${post.source} · ${post.author || "Unknown author"}: ${headline}`,
+              data: post,
+            },
+            post.post_id,
+          );
         } catch {}
       });
       es.onerror = () => {
