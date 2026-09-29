@@ -56,7 +56,7 @@ def test_article_filters_and_sentiment_are_applied(monkeypatch):
     assert data_params["page_size"] == 10
     assert data_params["offset"] == 10
     assert response["data"][0]["sentiment_score"] == 0.75
-    assert client.closed is True
+    assert client.closed is False
 
 
 def test_article_detail_deduplicates_enrichment_rows(monkeypatch):
@@ -74,7 +74,7 @@ def test_article_detail_deduplicates_enrichment_rows(monkeypatch):
     assert article["entities"] == [{"entity_name": "OpenAI", "entity_type": "ORG"}]
     assert "GROUP BY keyword" in client.calls[1][0]
     assert "GROUP BY entity, entity_type" in client.calls[2][0]
-    assert client.closed is True
+    assert client.closed is False
 
 
 def test_article_filters_support_alert_time_window():

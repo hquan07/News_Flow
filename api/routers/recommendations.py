@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 from api.services.analytics import _query
+from api.exceptions import DependencyUnavailableError
 from api.security import get_current_user
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
@@ -58,8 +59,5 @@ def track_interaction(
             datetime.now()
         ]], column_names=['user_id', 'article_hash', 'interaction_type', 'interaction_weight', 'timestamp'])
         return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if hasattr(client, 'close'):
-            client.close()
+    except Exception as exc:
+        raise DependencyUnavailableError("clickhouse") from exc

@@ -79,3 +79,13 @@ def get_ch_client():
         send_receive_timeout=10,
     )
 
+
+def close_ch_client() -> None:
+    """Close and evict the process-wide ClickHouse client at shutdown only."""
+    if get_ch_client.cache_info().currsize == 0:
+        return
+    client = get_ch_client()
+    try:
+        client.close()
+    finally:
+        get_ch_client.cache_clear()

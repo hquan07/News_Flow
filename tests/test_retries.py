@@ -1,5 +1,7 @@
 from api.services import analytics
 from api.config import get_settings
+from api.exceptions import DependencyUnavailableError
+import pytest
 
 
 class _Result:
@@ -28,3 +30,15 @@ def test_clickhouse_query_retries_transient_failures(monkeypatch):
     monkeypatch.setattr(settings, "CLICKHOUSE_QUERY_RETRIES", 3)
 
     assert analytics._query("SELECT 1") == [{"value": 1}]
+
+
+def test_clickhouse_query_raises_after_retries_are_exhausted(monkeypatch):
+    monkeypatch.setattr(analytics, "get_ch_client", lambda: _Client(True))
+    monkeypatch.setattr(analytics.time, "sleep", lambda _seconds: None)
+    settings = get_settings()
+    monkeypatch.setattr(settings, "CLICKHOUSE_QUERY_RETRIES", 2)
+
+    with pytest.raises(DependencyUnavailableError) as error:
+        analytics._query("SELECT 1")
+
+    assert error.value.dependency == "clickhouse"

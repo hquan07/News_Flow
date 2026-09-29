@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from api.config import get_ch_client
+from api.exceptions import DependencyUnavailableError
 
 
 logger = logging.getLogger("newspulse.analytics")
@@ -47,7 +48,7 @@ def _query(sql, params=None):
                     attempts,
                     exc,
                 )
-                return []
+                raise DependencyUnavailableError("clickhouse") from exc
             delay = settings.RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
             logger.warning(
                 "ClickHouse query attempt %s/%s failed; retrying in %.2fs",

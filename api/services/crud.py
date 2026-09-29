@@ -2,6 +2,7 @@ from typing import Optional
 from datetime import date, datetime
 import logging
 from api.config import get_ch_client
+from api.exceptions import DependencyUnavailableError
 
 
 logger = logging.getLogger("newspulse.crud")
@@ -91,15 +92,11 @@ def get_articles(
         keyword=keyword,
     )
     try:
-        try:
-            count_result = client.query(
-                f"SELECT count() AS total FROM newspulse.raw_articles FINAL {where_clause}",
-                parameters=params,
-            ).first_row
-            total = count_result[0] if count_result else 0
-        except Exception:
-            logger.exception("Failed to count articles")
-            total = 0
+        count_result = client.query(
+            f"SELECT count() AS total FROM newspulse.raw_articles FINAL {where_clause}",
+            parameters=params,
+        ).first_row
+        total = count_result[0] if count_result else 0
 
         query_params = {
             **params,
@@ -127,12 +124,8 @@ def get_articles(
             LIMIT {{page_size:UInt32}} OFFSET {{offset:UInt64}}
         """
 
-        try:
-            result = client.query(data_sql, parameters=query_params)
-            rows = list(result.named_results())
-        except Exception:
-            logger.exception("Failed to list articles")
-            rows = []
+        result = client.query(data_sql, parameters=query_params)
+        rows = list(result.named_results())
 
         return {
             "total": total,
@@ -141,8 +134,9 @@ def get_articles(
             "total_pages": (total + page_size - 1) // page_size if total else 0,
             "data": rows,
         }
-    finally:
-        client.close()
+    except Exception as exc:
+        logger.exception("Failed to list articles")
+        raise DependencyUnavailableError("clickhouse") from exc
 
 
 def get_article_detail(article_id: str) -> Optional[dict]:
@@ -196,8 +190,6 @@ def get_article_detail(article_id: str) -> Optional[dict]:
         article["entities"] = ent_res
 
         return article
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to load article detail article_id=%s", article_id)
-        return None
-    finally:
-        client.close()
+        raise DependencyUnavailableError("clickhouse") from exc

@@ -9,11 +9,7 @@ async def _check_clickhouse() -> dict:
     started = time.monotonic()
 
     def ping() -> None:
-        client = get_ch_client()
-        try:
-            client.command("SELECT 1")
-        finally:
-            client.close()
+        get_ch_client().command("SELECT 1")
 
     await asyncio.to_thread(ping)
     return {

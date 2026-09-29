@@ -1,11 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from api.config import get_settings
+from api.config import close_ch_client, get_settings
 from api.database import lifespan_db
-from api.middleware import RequestContextMiddleware
+from api.exceptions import DependencyUnavailableError
+from api.middleware import RequestContextMiddleware, request_id_context
 from api.services.health import dependency_health
 from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public
 
@@ -14,8 +15,11 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with lifespan_db():
-        yield
+    try:
+        async with lifespan_db():
+            yield
+    finally:
+        close_ch_client()
 
 
 app = FastAPI(
@@ -40,6 +44,25 @@ app.add_middleware(
 )
 app.add_middleware(RequestContextMiddleware)
 
+
+@app.exception_handler(DependencyUnavailableError)
+async def dependency_unavailable_handler(
+    _request: Request,
+    exc: DependencyUnavailableError,
+):
+    request_id = request_id_context.get()
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error": {
+                "code": "DEPENDENCY_UNAVAILABLE",
+                "message": "Required data service is temporarily unavailable",
+                "dependency": exc.dependency,
+                "request_id": request_id,
+            }
+        },
+    )
+
 prefix = settings.API_V1_PREFIX
 app.include_router(articles.router, prefix=prefix)
 app.include_router(overview.router, prefix=prefix)
@@ -58,6 +81,7 @@ app.include_router(public.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])
+@app.get("/health/live", tags=["Health"])
 async def health_check():
     return {
         "status": "healthy",
