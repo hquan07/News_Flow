@@ -332,6 +332,24 @@ export default function Home() {
     setSocialInfluencers(result.influencers || []);
   }, [dashboardMode, selectedSource]);
 
+  const fetchLiveSocialFeed = useCallback(async () => {
+    if (dashboardMode !== "social") return;
+    const result = await safeFetch(`${API_BASE}/social/feed?limit=50`);
+    setLiveSocialPosts((current) => {
+      const byId = new Map<string, LiveSocialPost>();
+      for (const post of [...current, ...(result.posts || [])]) {
+        if (post?.post_id) byId.set(post.post_id, post);
+      }
+      return Array.from(byId.values())
+        .sort((left, right) =>
+          String(right.publish_time || "").localeCompare(
+            String(left.publish_time || ""),
+          ),
+        )
+        .slice(0, 100);
+    });
+  }, [dashboardMode]);
+
   const fetchAdmin = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -460,6 +478,7 @@ export default function Home() {
         else if (activeTab === "foryou") await fetchForYou();
         else if (activeTab === "debates") await fetchDebates();
         else if (activeTab === "influencers") await fetchInfluencers();
+        else if (activeTab === "live_social") await fetchLiveSocialFeed();
         else if (activeTab === "admin_dashboard") await fetchAdmin();
         if (!cancelled) {
           setApiError(null);
@@ -496,6 +515,7 @@ export default function Home() {
     fetchForYou,
     fetchDebates,
     fetchInfluencers,
+    fetchLiveSocialFeed,
     fetchAdmin,
     isInitialized,
   ]);

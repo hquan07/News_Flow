@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Query
 from typing import Optional
 from collections import defaultdict
-from api.services.analytics import _query, _resolve_time_range, _append_filters
+from api.services.analytics import (
+    _query,
+    _resolve_time_range,
+    _append_filters,
+    get_recent_social_posts,
+)
 
 router = APIRouter(prefix="/social", tags=["Social"])
 
@@ -186,3 +191,10 @@ def social_influencers(
         "total": len(rows),
         "time_range": time_range,
     }
+
+
+@router.get("/feed")
+def social_feed(limit: int = Query(50, ge=1, le=100)):
+    """Return a recent snapshot used to hydrate the realtime social feed."""
+    posts = get_recent_social_posts(limit)
+    return {"posts": posts, "total": len(posts)}
