@@ -36,7 +36,7 @@ export default function EntitiesView({ entitiesData, trendingKeywords, entityTyp
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
         <XAxis type="number" stroke="#94a3b8" fontSize={11} allowDecimals={false} tickFormatter={formatCompactNumber} />
         <YAxis type="category" dataKey="entity_name" width={112} stroke="#94a3b8" fontSize={11} tickFormatter={(label) => truncateLabel(String(label), 18)} />
-        <Tooltip formatter={(count, _name, item) => [`${Number(count).toLocaleString()} mentions`, `${item.payload.entity_name} · ${item.payload.entity_type}`]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
+        <Tooltip cursor={false} formatter={(count, _name, item) => [`${Number(count).toLocaleString()} mentions`, `${item.payload.entity_name} · ${item.payload.entity_type}`]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
         <Bar dataKey="mention_count" name="Mentions" radius={[0, 4, 4, 0]}>{entities.map((row: any) => <Cell key={row.entity_name} fill={TYPE_COLORS[String(row.entity_type).toUpperCase()] ?? "#3b82f6"} />)}<LabelList dataKey="mention_count" position="right" fill="#cbd5e1" fontSize={10} formatter={(count) => formatCompactNumber(Number(count))} /></Bar>
       </BarChart></ResponsiveContainer> : !entitiesData ? <ChartSkeleton /> : <EmptyState message="No entity data" />}
     </ChartCard>
@@ -46,7 +46,7 @@ export default function EntitiesView({ entitiesData, trendingKeywords, entityTyp
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
         <XAxis type="number" stroke="#94a3b8" fontSize={11} allowDecimals={false} tickFormatter={formatCompactNumber} />
         <YAxis type="category" dataKey="keyword" width={105} stroke="#94a3b8" fontSize={11} tickFormatter={(label) => truncateLabel(String(label), 17)} />
-        <Tooltip formatter={(count, _name, item) => [`${Number(count).toLocaleString()} occurrences`, item.payload.keyword]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
+        <Tooltip cursor={false} formatter={(count, _name, item) => [`${Number(count).toLocaleString()} occurrences`, item.payload.keyword]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
         <Bar dataKey="count" fill="#38bdf8" radius={[0, 4, 4, 0]}><LabelList dataKey="count" position="right" fill="#cbd5e1" fontSize={10} /></Bar>
       </BarChart></ResponsiveContainer> : !trendingKeywords ? <ChartSkeleton /> : <EmptyState message="No keyword data" />}
     </ChartCard>
@@ -60,7 +60,7 @@ export default function EntitiesView({ entitiesData, trendingKeywords, entityTyp
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
         <XAxis type="number" domain={[0, 100]} tickFormatter={(tick) => `${tick}%`} stroke="#94a3b8" fontSize={11} />
         <YAxis type="category" dataKey="entity" width={112} tickFormatter={(label) => truncateLabel(String(label), 18)} stroke="#94a3b8" fontSize={11} />
-        <Tooltip formatter={(_pct, name, item) => { const key = String(name).replace("Pct", ""); return [`${item.payload[key].toLocaleString()} · ${formatPercent(item.payload[`${key}Pct`])}`, key]; }} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
+        <Tooltip cursor={false} formatter={(_pct, name, item) => { const key = String(name).replace("Pct", ""); return [`${item.payload[key].toLocaleString()} · ${formatPercent(item.payload[`${key}Pct`])}`, key]; }} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
         <Legend formatter={(name) => String(name).replace("Pct", "")} />
         {(Object.keys(SENTIMENT_COLORS) as Array<keyof typeof SENTIMENT_COLORS>).map((key) => <Bar key={key} dataKey={`${key}Pct`} stackId="sentiment" fill={SENTIMENT_COLORS[key]} />)}
       </BarChart></ResponsiveContainer> : !entitySentiment ? <ChartSkeleton /> : <EmptyState message="No entity sentiment data" />}

@@ -64,7 +64,7 @@ export default function OverviewNewsView({ overviewData, chartData, sourceData, 
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
             <XAxis type="number" stroke="#94a3b8" fontSize={11} allowDecimals={false} tickFormatter={formatCompactNumber} />
             <YAxis type="category" dataKey="label" width={92} stroke="#94a3b8" fontSize={11} tickFormatter={(value) => truncateLabel(String(value), 14)} />
-            <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} formatter={(value, _name, item) => [`${Number(value).toLocaleString()} articles (${formatPercent(item.payload.percentage)})`, item.payload.label]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
+            <Tooltip cursor={false} formatter={(value, _name, item) => [`${Number(value).toLocaleString()} articles (${formatPercent(item.payload.percentage)})`, item.payload.label]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
             <Bar dataKey="count" name="Articles" fill="#8b5cf6" radius={[0, 4, 4, 0]}><LabelList dataKey="percentage" position="right" fill="#cbd5e1" fontSize={10} formatter={(value) => formatPercent(Number(value), 0)} /></Bar>
           </BarChart></ResponsiveContainer> : !overviewData ? <ChartSkeleton /> : <EmptyState message="No category data" />}
         </ChartCard>
