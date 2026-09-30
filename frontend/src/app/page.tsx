@@ -806,10 +806,15 @@ export default function Home() {
                 </button>
               )}
             </div>
-            {TAB_FILTER_CAPABILITIES[activeTab] && (
+            <div
+              className={`source-filter-slot ${TAB_FILTER_CAPABILITIES[activeTab] ? "" : "is-hidden"}`}
+              aria-hidden={!TAB_FILTER_CAPABILITIES[activeTab]}
+            >
               <select
                 value={selectedSource}
                 onChange={(e) => setSelectedSource(e.target.value)}
+                disabled={!TAB_FILTER_CAPABILITIES[activeTab]}
+                tabIndex={TAB_FILTER_CAPABILITIES[activeTab] ? 0 : -1}
               style={{
                 padding: "8px 16px",
                 borderRadius: "8px",
@@ -841,7 +846,7 @@ export default function Home() {
                 </>
               )}
               </select>
-            )}
+            </div>
             <button
               onClick={() => void handleExportPdf()}
               className="print-hide"

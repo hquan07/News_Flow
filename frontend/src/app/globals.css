@@ -58,6 +58,29 @@ header {
   align-items: center;
 }
 
+.mode-toggle {
+  flex: 0 0 auto;
+}
+
+.mode-toggle button {
+  min-width: 126px;
+  white-space: nowrap;
+}
+
+.source-filter-slot {
+  flex: 0 0 120px;
+  width: 120px;
+}
+
+.source-filter-slot select {
+  width: 100%;
+}
+
+.source-filter-slot.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 @media (max-width: 768px) {
   .dashboard-header {
     flex-direction: column;
@@ -66,6 +89,19 @@ header {
   .header-controls {
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  .mode-toggle {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .mode-toggle button {
+    min-width: max-content;
+  }
+
+  .source-filter-slot.is-hidden {
+    display: none;
   }
 }
 
