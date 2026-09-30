@@ -57,6 +57,21 @@ async def test_http_only_cookie_can_authenticate_event_source(async_client: Asyn
 
 
 @pytest.mark.asyncio
+async def test_me_bootstraps_http_only_cookie_from_bearer(async_client: AsyncClient):
+    response = await async_client.get("/api/v1/auth/me")
+    assert response.status_code == 200
+    assert "access_token=" in response.headers["set-cookie"]
+    assert "HttpOnly" in response.headers["set-cookie"]
+
+
+@pytest.mark.asyncio
+async def test_crawler_collection_route_does_not_redirect(async_client: AsyncClient):
+    response = await async_client.get("/api/v1/admin/crawlers")
+    assert response.status_code == 200
+    assert len(response.json()["crawlers"]) > 0
+
+
+@pytest.mark.asyncio
 async def test_operator_can_read_system_metrics(
     async_client: AsyncClient,
     monkeypatch,

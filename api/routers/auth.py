@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -31,6 +33,18 @@ def _create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return create_access_token(to_encode)
 
+
+def _set_access_cookie(response: Response, access_token: str) -> None:
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=get_settings().ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/api",
+    )
+
 @router.post("/register")
 async def register(user: UserCreate):
     db = get_mongo_db()
@@ -58,15 +72,7 @@ async def login(user: UserLogin, response: Response):
         
     role = db_user.get("role", "user")
     access_token = _create_access_token(data={"sub": str(db_user["_id"]), "email": db_user["email"], "role": role})
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        max_age=get_settings().ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        httponly=True,
-        samesite="lax",
-        secure=False,
-        path="/api",
-    )
+    _set_access_cookie(response, access_token)
     return {
         "access_token": access_token, 
         "token_type": "bearer", 
@@ -81,7 +87,15 @@ async def login(user: UserLogin, response: Response):
 
 
 @router.get("/me")
-async def me(user: dict = Depends(get_current_user)):
+async def me(
+    response: Response,
+    user: dict = Depends(get_current_user),
+    authorization: Annotated[str | None, Header()] = None,
+):
+    if authorization and authorization.startswith("Bearer "):
+        access_token = authorization.removeprefix("Bearer ").strip()
+        if access_token:
+            _set_access_cookie(response, access_token)
     return {
         "id": user["sub"],
         "email": user.get("email", ""),

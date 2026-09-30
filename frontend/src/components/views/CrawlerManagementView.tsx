@@ -26,7 +26,7 @@ export default function CrawlerManagementView({ canRun }: { canRun: boolean }) {
     setLoading(true);
     try {
       const data = await apiFetch<{ crawlers: Crawler[]; dag_state: string }>(
-        `${API_BASE}/admin/crawlers/`,
+        `${API_BASE}/admin/crawlers`,
       );
       setCrawlers(data.crawlers ?? []);
       setDagState(data.dag_state ?? "unknown");

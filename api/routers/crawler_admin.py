@@ -76,7 +76,8 @@ async def _airflow_post(path: str, json_body: dict = None) -> dict:
             raise HTTPException(status_code=503, detail="Airflow webserver is not reachable")
 
 
-@router.get("/")
+@router.get("")
+@router.get("/", include_in_schema=False)
 async def list_crawlers(user: dict = Depends(require_permission("crawler.read"))):
     """
     Trả về danh sách tất cả crawler spiders cùng trạng thái chạy cuối cùng từ Airflow.
