@@ -21,7 +21,8 @@ KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "newspulse.dlq")
 
 # Keep raw ingestion responsive while bounding the CPU-heavy NLP backlog.
 RAW_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("RAW_MAX_OFFSETS_PER_TRIGGER", "500")), 1)
-NLP_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("NLP_MAX_OFFSETS_PER_TRIGGER", "100")), 1)
+NLP_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("NLP_MAX_OFFSETS_PER_TRIGGER", "50")), 1)
+NLP_PROCESSING_PARTITIONS = max(int(os.getenv("NLP_PROCESSING_PARTITIONS", "8")), 1)
 SOCIAL_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("SOCIAL_MAX_OFFSETS_PER_TRIGGER", "250")), 1)
 RAW_STARTING_OFFSETS = os.getenv("RAW_STARTING_OFFSETS", "latest")
 NLP_STARTING_OFFSETS = os.getenv("NLP_STARTING_OFFSETS", "earliest")
@@ -63,10 +64,11 @@ CHECKPOINT_PATHS = {
 
 SPARK_CONF = {
     "spark.sql.streaming.checkpointLocation": "/tmp/spark-checkpoints",
-    "spark.sql.shuffle.partitions": "4",
+    "spark.sql.shuffle.partitions": os.getenv("SPARK_SQL_SHUFFLE_PARTITIONS", "8"),
     "spark.scheduler.mode": "FAIR",
-    "spark.executor.memory": "1g",
-    "spark.driver.memory": "1g",
+    "spark.executor.cores": os.getenv("SPARK_EXECUTOR_CORES", "4"),
+    "spark.executor.memory": os.getenv("SPARK_EXECUTOR_MEMORY", "2g"),
+    "spark.driver.memory": os.getenv("SPARK_DRIVER_MEMORY", "2g"),
     "spark.jars.packages": (
         "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,"
         "org.mongodb.spark:mongo-spark-connector_2.12:10.4.0"
@@ -76,7 +78,7 @@ SPARK_CONF = {
 
 # Processing Configuration
 RAW_STREAMING_TRIGGER_INTERVAL = os.getenv("RAW_STREAMING_TRIGGER_INTERVAL", "5 seconds")
-NLP_STREAMING_TRIGGER_INTERVAL = os.getenv("NLP_STREAMING_TRIGGER_INTERVAL", "30 seconds")
+NLP_STREAMING_TRIGGER_INTERVAL = os.getenv("NLP_STREAMING_TRIGGER_INTERVAL", "60 seconds")
 SOCIAL_STREAMING_TRIGGER_INTERVAL = os.getenv("SOCIAL_STREAMING_TRIGGER_INTERVAL", "10 seconds")
 # Backward-compatible alias for batch utilities that still import the old name.
 STREAMING_TRIGGER_INTERVAL = NLP_STREAMING_TRIGGER_INTERVAL

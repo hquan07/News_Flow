@@ -46,6 +46,7 @@ services:
   # ==================== MESSAGE BROKER ====================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
+    restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -61,6 +62,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
+    restart: unless-stopped
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -110,6 +112,7 @@ services:
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.5.0
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -129,6 +132,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3-alpine
+    restart: unless-stopped
     container_name: clickhouse
     ports:
       - "8123:8123"
@@ -170,6 +174,7 @@ services:
 
   mongo:
     image: mongo:7.0
+    restart: unless-stopped
     ports:
       - "${MONGO_PORT:-27017}:27017"
     volumes:
@@ -184,6 +189,7 @@ services:
 
   minio:
     image: quay.io/minio/minio:latest
+    restart: unless-stopped
     container_name: newspulse-minio
     ports:
       - "${MINIO_PORT:-9000}:9000"
@@ -203,6 +209,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     ports:
       - "5433:5432"
     environment:
@@ -247,6 +254,7 @@ services:
   # ==================== ORCHESTRATION ====================
   airflow-db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: airflow
       POSTGRES_USER: airflow
@@ -276,9 +284,15 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    command: airflow webserver --port 8080
+    command:
+      - bash
+      - -c
+      - |
+        rm -f /opt/airflow/airflow-webserver.pid
+        exec airflow webserver --port 8080
     ports:
       - "${AIRFLOW_PORT:-8080}:8080"
+    restart: unless-stopped
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -292,6 +306,7 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     command: airflow scheduler
+    restart: unless-stopped
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -357,6 +372,7 @@ services:
       context: spark
       dockerfile: Dockerfile
     container_name: newspulse-spark-master
+    restart: unless-stopped
     entrypoint: ["/usr/bin/tini", "-s", "--"]
     command:
       - /opt/spark/bin/spark-class
@@ -392,6 +408,7 @@ services:
       context: spark
       dockerfile: Dockerfile
     container_name: newspulse-spark-worker
+    restart: unless-stopped
     entrypoint: ["/usr/bin/tini", "-s", "--"]
     command:
       - /opt/spark/bin/spark-class
@@ -400,8 +417,8 @@ services:
     env_file:
       - ../../.env
     environment:
-      - SPARK_WORKER_MEMORY=4g
-      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=6g
+      - SPARK_WORKER_CORES=4
       - PYTHONPATH=/opt/spark-apps
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
@@ -412,6 +429,12 @@ services:
       - ../../config:/opt/spark-apps/config
       - ../../data_platform/warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   spark-streaming:
     build:
@@ -438,7 +461,9 @@ services:
       SPARK_MASTER: spark://spark-master:7077
       SPARK_CHECKPOINT_ROOT: /tmp/spark-checkpoints
       RAW_MAX_OFFSETS_PER_TRIGGER: ${RAW_MAX_OFFSETS_PER_TRIGGER:-500}
-      NLP_MAX_OFFSETS_PER_TRIGGER: ${NLP_MAX_OFFSETS_PER_TRIGGER:-100}
+      NLP_MAX_OFFSETS_PER_TRIGGER: ${NLP_MAX_OFFSETS_PER_TRIGGER:-50}
+      NLP_PROCESSING_PARTITIONS: ${NLP_PROCESSING_PARTITIONS:-8}
+      NLP_STREAMING_TRIGGER_INTERVAL: ${NLP_STREAMING_TRIGGER_INTERVAL:-60 seconds}
       SOCIAL_MAX_OFFSETS_PER_TRIGGER: ${SOCIAL_MAX_OFFSETS_PER_TRIGGER:-250}
       RAW_STARTING_OFFSETS: ${RAW_STARTING_OFFSETS:-latest}
       GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-10}
@@ -450,7 +475,7 @@ services:
       spark-master:
         condition: service_healthy
       spark-worker:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - ../../spark:/opt/spark-apps/spark
       - ../../config:/opt/spark-apps/config
@@ -458,6 +483,12 @@ services:
       - spark-checkpoints:/tmp/spark-checkpoints
     stop_grace_period: 60s
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'streaming_job.py' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
 
   frontend:
     build:

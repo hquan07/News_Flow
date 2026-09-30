@@ -8,6 +8,7 @@ from pyspark.sql import functions as F
 from config.spark_config import (
     CHECKPOINT_PATHS,
     NLP_MAX_OFFSETS_PER_TRIGGER,
+    NLP_PROCESSING_PARTITIONS,
     NLP_STARTING_OFFSETS,
     NLP_STREAMING_TRIGGER_INTERVAL,
     RAW_MAX_OFFSETS_PER_TRIGGER,
@@ -228,7 +229,14 @@ def main() -> None:
             max_offsets_per_trigger=NLP_MAX_OFFSETS_PER_TRIGGER,
             starting_offsets=NLP_STARTING_OFFSETS,
         )
-        enriched_stream = apply_text_cleaning(_valid_records(nlp_input))
+        # Kafka partitions can be highly skewed by source. Repartition by the
+        # stable article key before Python NLP/Groq UDFs so one hot topic does
+        # not leave a single executor task processing most of the micro-batch.
+        balanced_nlp_input = _valid_records(nlp_input).repartition(
+            NLP_PROCESSING_PARTITIONS,
+            "url_hash",
+        )
+        enriched_stream = apply_text_cleaning(balanced_nlp_input)
         enriched_stream = apply_keyword_extraction(enriched_stream)
         enriched_stream = apply_ner_extraction(enriched_stream)
         enriched_stream = apply_sentiment_analysis(enriched_stream)
