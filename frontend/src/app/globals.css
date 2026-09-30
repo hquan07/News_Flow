@@ -74,6 +74,15 @@ header {
 
 .source-filter-slot select {
   width: 100%;
+  min-height: 36px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(15, 23, 42, 0.8);
+  color: #fff;
+  color-scheme: dark;
+  cursor: pointer;
 }
 
 .source-filter-slot.is-hidden {

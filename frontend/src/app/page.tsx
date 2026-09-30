@@ -807,10 +807,32 @@ export default function Home() {
               )}
             </div>
             <div
-              className={`source-filter-slot ${TAB_FILTER_CAPABILITIES[activeTab] ? "" : "is-hidden"}`}
-              aria-hidden={!TAB_FILTER_CAPABILITIES[activeTab]}
+              className={`source-filter-slot ${dashboardMode === "admin" || TAB_FILTER_CAPABILITIES[activeTab] ? "" : "is-hidden"}`}
+              aria-hidden={dashboardMode !== "admin" && !TAB_FILTER_CAPABILITIES[activeTab]}
             >
-              <select
+              {dashboardMode === "admin" ? (
+                <select
+                  aria-label="Operations system"
+                  value={activeTab}
+                  onChange={(event) => {
+                    setActiveTab(event.target.value);
+                    if (event.target.value === "articles") {
+                      setPage(1);
+                      setArticleAlertFilter(null);
+                    }
+                  }}
+                >
+                  {hasPermission(user, "system.read") && <option value="admin_dashboard">All Systems</option>}
+                  {hasPermission(user, "system.read") && <option value="articles">System Articles</option>}
+                  {hasPermission(user, "system.read") && <option value="stream">Live Stream</option>}
+                  {hasPermission(user, "alerts.read") && <option value="alerts">Alerts</option>}
+                  {hasPermission(user, "crawler.read") && <option value="crawlers">Crawlers</option>}
+                  {hasPermission(user, "system.read") && <option value="architecture">Architecture</option>}
+                  {canManageUsers && <option value="users">User Access</option>}
+                </select>
+              ) : (
+                <select
+                  aria-label={dashboardMode === "news" ? "News source" : "Social platform"}
                 value={selectedSource}
                 onChange={(e) => setSelectedSource(e.target.value)}
                 disabled={!TAB_FILTER_CAPABILITIES[activeTab]}
@@ -846,6 +868,7 @@ export default function Home() {
                 </>
               )}
               </select>
+              )}
             </div>
             <button
               onClick={() => void handleExportPdf()}
