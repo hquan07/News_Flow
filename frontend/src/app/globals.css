@@ -687,8 +687,28 @@ h1 {
   cursor: pointer;
 }
 
+.chart-toggle {
+  flex-wrap: nowrap;
+  gap: 0;
+  padding: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.72);
+  white-space: nowrap;
+}
+
+.chart-toggle button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0.3rem 0.7rem;
+  color: var(--text-muted);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
 .chart-toggle button.active {
-  border-color: var(--accent-blue);
+  border-color: transparent;
   background: rgba(59, 130, 246, 0.2);
   color: #93c5fd;
 }
