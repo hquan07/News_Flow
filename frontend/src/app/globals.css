@@ -682,6 +682,36 @@ h1 {
   font: inherit;
 }
 
+.top-n-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 36px;
+  padding: 0.18rem 0.25rem 0.18rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.top-n-control select {
+  min-height: 30px;
+  border: 0;
+  border-left: 1px solid var(--border-color);
+  border-radius: 0 5px 5px 0;
+  background: transparent;
+  color: inherit;
+  padding: 0.25rem 1.65rem 0.25rem 0.55rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.top-n-control select:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 1px;
+}
+
 .chart-toggle button,
 .graph-controls button {
   cursor: pointer;
