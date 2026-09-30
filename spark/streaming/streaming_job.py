@@ -7,6 +7,7 @@ from pyspark.sql import functions as F
 
 from config.spark_config import (
     CHECKPOINT_PATHS,
+    NLP_ENABLED,
     NLP_MAX_OFFSETS_PER_TRIGGER,
     NLP_PROCESSING_PARTITIONS,
     NLP_STARTING_OFFSETS,
@@ -19,14 +20,6 @@ from config.spark_config import (
     SOCIAL_STREAMING_TRIGGER_INTERVAL,
     SPARK_SINGLETON_LOCK,
 )
-from spark.processing.clickbait_detector import apply_clickbait_detection
-from spark.processing.keyword_extractor import apply_keyword_extraction
-from spark.processing.ner_pipeline import apply_ner_extraction
-from spark.processing.sentiment_pipeline import (
-    apply_sentiment_analysis,
-    apply_social_sentiment_analysis,
-)
-from spark.processing.text_processor import apply_text_cleaning
 from spark.streaming.kafka_consumer import create_kafka_stream, create_social_kafka_stream
 from spark.streaming.nlp_writers import (
     write_clickbait_to_clickhouse,
@@ -223,32 +216,45 @@ def main() -> None:
         )
         logger.info("Raw article ingest writer started")
 
-        # Slow path: resume the historical checkpoint and enrich independently.
-        nlp_input = create_kafka_stream(
-            spark,
-            max_offsets_per_trigger=NLP_MAX_OFFSETS_PER_TRIGGER,
-            starting_offsets=NLP_STARTING_OFFSETS,
-        )
-        # Kafka partitions can be highly skewed by source. Repartition by the
-        # stable article key before Python NLP/Groq UDFs so one hot topic does
-        # not leave a single executor task processing most of the micro-batch.
-        balanced_nlp_input = _valid_records(nlp_input).repartition(
-            NLP_PROCESSING_PARTITIONS,
-            "url_hash",
-        )
-        enriched_stream = apply_text_cleaning(balanced_nlp_input)
-        enriched_stream = apply_keyword_extraction(enriched_stream)
-        enriched_stream = apply_ner_extraction(enriched_stream)
-        enriched_stream = apply_sentiment_analysis(enriched_stream)
-        enriched_stream = apply_clickbait_detection(enriched_stream)
-        queries.append(
-            enriched_stream.writeStream.foreachBatch(_write_nlp_batch)
-            .outputMode("append")
-            .trigger(processingTime=NLP_STREAMING_TRIGGER_INTERVAL)
-            .option("checkpointLocation", CHECKPOINT_PATHS["news_nlp"])
-            .start()
-        )
-        logger.info("NLP enrichment writer started")
+        if NLP_ENABLED:
+            # Keep expensive NLP dependencies out of the disabled startup path.
+            from spark.processing.clickbait_detector import apply_clickbait_detection
+            from spark.processing.keyword_extractor import apply_keyword_extraction
+            from spark.processing.ner_pipeline import apply_ner_extraction
+            from spark.processing.sentiment_pipeline import (
+                apply_sentiment_analysis,
+                apply_social_sentiment_analysis,
+            )
+            from spark.processing.text_processor import apply_text_cleaning
+
+            # Slow path: resume the historical checkpoint and enrich independently.
+            nlp_input = create_kafka_stream(
+                spark,
+                max_offsets_per_trigger=NLP_MAX_OFFSETS_PER_TRIGGER,
+                starting_offsets=NLP_STARTING_OFFSETS,
+            )
+            # Kafka partitions can be highly skewed by source. Repartition by the
+            # stable article key before Python NLP/Groq UDFs so one hot topic does
+            # not leave a single executor task processing most of the micro-batch.
+            balanced_nlp_input = _valid_records(nlp_input).repartition(
+                NLP_PROCESSING_PARTITIONS,
+                "url_hash",
+            )
+            enriched_stream = apply_text_cleaning(balanced_nlp_input)
+            enriched_stream = apply_keyword_extraction(enriched_stream)
+            enriched_stream = apply_ner_extraction(enriched_stream)
+            enriched_stream = apply_sentiment_analysis(enriched_stream)
+            enriched_stream = apply_clickbait_detection(enriched_stream)
+            queries.append(
+                enriched_stream.writeStream.foreachBatch(_write_nlp_batch)
+                .outputMode("append")
+                .trigger(processingTime=NLP_STREAMING_TRIGGER_INTERVAL)
+                .option("checkpointLocation", CHECKPOINT_PATHS["news_nlp"])
+                .start()
+            )
+            logger.info("NLP enrichment writer started")
+        else:
+            logger.warning("NLP enrichment is disabled by NLP_ENABLED=false")
 
         social_input = create_social_kafka_stream(
             spark,
@@ -261,7 +267,16 @@ def main() -> None:
                 CHECKPOINT_PATHS["social_dlq"],
             )
         )
-        social_enriched = apply_social_sentiment_analysis(_valid_records(social_input))
+        valid_social_input = _valid_records(social_input)
+        if NLP_ENABLED:
+            social_enriched = apply_social_sentiment_analysis(valid_social_input)
+        else:
+            social_enriched = (
+                valid_social_input
+                .withColumn("sentiment_score", F.lit(0.0).cast("float"))
+                .withColumn("sentiment_label", F.lit("neutral"))
+            )
+            logger.warning("Social sentiment inference is disabled by NLP_ENABLED=false")
         queries.append(
             social_enriched.writeStream.foreachBatch(_write_social_batch)
             .outputMode("append")

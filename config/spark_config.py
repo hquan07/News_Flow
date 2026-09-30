@@ -21,6 +21,7 @@ KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "newspulse.dlq")
 
 # Keep raw ingestion responsive while bounding the CPU-heavy NLP backlog.
 RAW_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("RAW_MAX_OFFSETS_PER_TRIGGER", "500")), 1)
+NLP_ENABLED = os.getenv("NLP_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 NLP_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("NLP_MAX_OFFSETS_PER_TRIGGER", "50")), 1)
 NLP_PROCESSING_PARTITIONS = max(int(os.getenv("NLP_PROCESSING_PARTITIONS", "8")), 1)
 SOCIAL_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("SOCIAL_MAX_OFFSETS_PER_TRIGGER", "250")), 1)
