@@ -800,6 +800,16 @@ h1 {
   cursor: default;
   min-height: 148px;
 }
+.metric-card-interactive {
+  min-height: 148px;
+}
+.metric-card-interactive:disabled {
+  cursor: wait;
+}
+.metric-card-interactive:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 3px;
+}
 .metric-tone-success .metric-value {
   background: none;
   color: var(--accent-green);
@@ -829,6 +839,11 @@ h1 {
   width: 100%;
   text-align: left;
   animation: fadeIn 0.3s ease-out;
+}
+.metric-details-heading {
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 .metric-details-list {
   list-style: none;

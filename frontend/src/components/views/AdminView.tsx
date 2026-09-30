@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Activity, BellRing, BookOpen, Server, Share2, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import ChartCard from "../ui/ChartCard";
@@ -66,7 +67,13 @@ function formatOperationName(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function DetailList({ rows, emptyMessage = "No detail data available" }: { rows: Array<{ label: string; value: string | number }>; emptyMessage?: string }) {
+  if (!rows.length) return <p className="chart-description">{emptyMessage}</p>;
+  return <ul className="metric-details-list">{rows.map((row) => <li key={row.label}><span>{row.label}</span><strong>{row.value}</strong></li>)}</ul>;
+}
+
 export default function AdminView({ adminLatency, adminClickbait, adminUsers, adminHealth, adminOperations, adminAlertMetrics, updatedAt }: AdminViewProps) {
+  const [activeMetric, setActiveMetric] = useState<string | null>(null);
   const latencyRows = rows(adminLatency?.sources, adminLatency?.avg_latency, "latency");
   const newsRows = rows(adminClickbait?.news?.sources, adminClickbait?.news?.volumes, "total");
   const socialRows = rows(adminClickbait?.social?.sources, adminClickbait?.social?.volumes, "total");
@@ -100,21 +107,46 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
       maxLatency: Number(metric.max_latency_ms || 0),
     }))
     .sort((left, right) => right.requests - left.requests);
+  const toggleMetric = (metric: string) => setActiveMetric((current) => current === metric ? null : metric);
+  const interactiveMetric = (metric: string) => ({
+    expanded: activeMetric === metric,
+    onToggle: () => toggleMetric(metric),
+  });
+  const topRows = (data: Array<Record<string, unknown>>, labelKey: string, valueKey: string, suffix = "") => data.slice(0, 6).map((row) => ({
+    label: String(row[labelKey]),
+    value: `${Number(row[valueKey] || 0).toLocaleString()}${suffix}`,
+  }));
 
   return <>
     <section className="overview-grid admin-metrics-grid" aria-label="Administrative summary metrics">
-      <MetricCard label="Total users" value={formatCompactNumber(adminUsers?.total_users ?? 0)} hint={`${adminUsers?.admin_users ?? 0} administrators`} loading={adminUsers === null} />
-      <MetricCard label="News articles" value={formatCompactNumber(adminClickbait?.news?.total ?? 0)} hint={`${newsRows.length} active sources`} loading={adminClickbait === null} />
-      <MetricCard label="Social posts" value={formatCompactNumber(adminClickbait?.social?.total ?? 0)} hint={`${socialRows.length} active platforms`} loading={adminClickbait === null} />
-      <MetricCard label="Articles ingested (24h)" value={formatCompactNumber(adminOperations?.articles_last_24h ?? 0)} hint="New warehouse records" loading={adminOperations === null} />
-      <MetricCard label="Average crawl latency" value={`${latency.toFixed(1)} min`} hint={`SLA target ≤ ${adminLatency?.sla_target ?? 5} min`} loading={adminLatency === null} tone={latencyTone} />
-      <MetricCard label="NLP coverage" value={formatPercent(coverage)} hint={`${formatCompactNumber(adminOperations?.nlp_linked_articles ?? 0)} of ${formatCompactNumber(adminOperations?.total_articles ?? 0)} articles`} loading={adminOperations === null} tone={coverageTone} />
-      <MetricCard label="Data freshness" value={formatFreshness(freshness)} hint={adminOperations?.latest_loaded_at ? `Latest ingest ${formatDateTime(adminOperations.latest_loaded_at)}` : "No ingestion timestamp"} loading={adminOperations === null} tone={freshnessTone} />
-      <MetricCard label="System health" value={healthStatus} hint={serviceCount ? `${healthyServices}/${serviceCount} dependencies available` : "Health data unavailable"} loading={adminHealth === null} tone={healthTone} title={healthDetails || undefined} />
-      <MetricCard label="Alert API requests" value={formatCompactNumber(alertRequests)} hint={`${alertOperationRows.length} observed workflows`} loading={adminAlertMetrics === null} />
-      <MetricCard label="Alert failures" value={formatPercent(alertFailureRate)} hint={`${alertErrors.toLocaleString()} failed requests`} loading={adminAlertMetrics === null} tone={alertFailureTone} />
-      <MetricCard label="Missing alert details" value={formatCompactNumber(alertTotals?.not_found ?? 0)} hint="Drill-down records no longer available" loading={adminAlertMetrics === null} tone={Number(alertTotals?.not_found ?? 0) ? "warning" : "success"} />
-      <MetricCard label="Alert telemetry uptime" value={formatUptime(adminAlertMetrics?.uptime_seconds)} hint={`${adminAlertMetrics?.scope ?? "process-local"} counters`} loading={adminAlertMetrics === null} />
+      <MetricCard {...interactiveMetric("users")} label="Total users" value={formatCompactNumber(adminUsers?.total_users ?? 0)} hint={`${adminUsers?.admin_users ?? 0} administrators`} loading={adminUsers === null} details={<DetailList rows={roleRows.map((row) => ({ label: row.name, value: row.count.toLocaleString() }))} />} />
+      <MetricCard {...interactiveMetric("news")} label="News articles" value={formatCompactNumber(adminClickbait?.news?.total ?? 0)} hint={`${newsRows.length} active sources`} loading={adminClickbait === null} details={<DetailList rows={topRows(newsRows, "source", "total")} emptyMessage="No active news sources" />} />
+      <MetricCard {...interactiveMetric("social")} label="Social posts" value={formatCompactNumber(adminClickbait?.social?.total ?? 0)} hint={`${socialRows.length} active platforms`} loading={adminClickbait === null} details={<DetailList rows={topRows(socialRows, "source", "total")} emptyMessage="No active social platforms" />} />
+      <MetricCard {...interactiveMetric("ingested")} label="Articles ingested (24h)" value={formatCompactNumber(adminOperations?.articles_last_24h ?? 0)} hint="New warehouse records" loading={adminOperations === null} details={<DetailList rows={[
+        { label: "Last 24 hours", value: Number(adminOperations?.articles_last_24h ?? 0).toLocaleString() },
+        { label: "All warehouse articles", value: Number(adminOperations?.total_articles ?? 0).toLocaleString() },
+        { label: "Latest ingest", value: adminOperations?.latest_loaded_at ? formatDateTime(adminOperations.latest_loaded_at) : "Unavailable" },
+      ]} />} />
+      <MetricCard {...interactiveMetric("latency")} label="Average crawl latency" value={`${latency.toFixed(1)} min`} hint={`SLA target ≤ ${adminLatency?.sla_target ?? 5} min`} loading={adminLatency === null} tone={latencyTone} details={<DetailList rows={topRows(latencyRows, "source", "latency", " min")} emptyMessage="No crawl latency samples" />} />
+      <MetricCard {...interactiveMetric("nlp")} label="NLP coverage" value={formatPercent(coverage)} hint={`${formatCompactNumber(adminOperations?.nlp_linked_articles ?? 0)} of ${formatCompactNumber(adminOperations?.total_articles ?? 0)} articles`} loading={adminOperations === null} tone={coverageTone} details={<DetailList rows={[
+        { label: "NLP enriched", value: Number(adminOperations?.nlp_linked_articles ?? 0).toLocaleString() },
+        { label: "Pending NLP", value: Math.max(Number(adminOperations?.total_articles ?? 0) - Number(adminOperations?.nlp_linked_articles ?? 0), 0).toLocaleString() },
+        { label: "Coverage", value: formatPercent(coverage) },
+      ]} />} />
+      <MetricCard {...interactiveMetric("freshness")} label="Data freshness" value={formatFreshness(freshness)} hint={adminOperations?.latest_loaded_at ? `Latest ingest ${formatDateTime(adminOperations.latest_loaded_at)}` : "No ingestion timestamp"} loading={adminOperations === null} tone={freshnessTone} details={<DetailList rows={[
+        { label: "Latest warehouse ingest", value: adminOperations?.latest_loaded_at ? formatDateTime(adminOperations.latest_loaded_at) : "Unavailable" },
+        { label: "Age", value: freshness === null || freshness === undefined ? "Unknown" : `${freshness.toFixed(1)} min` },
+        { label: "Metrics generated", value: adminOperations?.generated_at ? formatDateTime(adminOperations.generated_at) : "Unavailable" },
+      ]} />} />
+      <MetricCard {...interactiveMetric("health")} label="System health" value={healthStatus} hint={serviceCount ? `${healthyServices}/${serviceCount} dependencies available` : "Health data unavailable"} loading={adminHealth === null} tone={healthTone} title={healthDetails || undefined} details={<DetailList rows={Object.entries(adminHealth?.services ?? {}).map(([name, service]) => ({ label: formatSourceName(name), value: `${service.status}${service.latency_ms !== undefined ? ` · ${service.latency_ms.toFixed(1)} ms` : ""}` }))} emptyMessage="No dependency health data" />} />
+      <MetricCard {...interactiveMetric("alert-requests")} label="Alert API requests" value={formatCompactNumber(alertRequests)} hint={`${alertOperationRows.length} observed workflows`} loading={adminAlertMetrics === null} details={<DetailList rows={topRows(alertOperationRows, "operation", "requests")} emptyMessage="No alert workflows observed" />} />
+      <MetricCard {...interactiveMetric("alert-failures")} label="Alert failures" value={formatPercent(alertFailureRate)} hint={`${alertErrors.toLocaleString()} failed requests`} loading={adminAlertMetrics === null} tone={alertFailureTone} details={<DetailList rows={alertOperationRows.filter((row) => row.errors > 0).slice(0, 6).map((row) => ({ label: row.operation, value: `${row.errors.toLocaleString()} failed` }))} emptyMessage="No alert failures observed" />} />
+      <MetricCard {...interactiveMetric("missing-alerts")} label="Missing alert details" value={formatCompactNumber(alertTotals?.not_found ?? 0)} hint="Drill-down records no longer available" loading={adminAlertMetrics === null} tone={Number(alertTotals?.not_found ?? 0) ? "warning" : "success"} details={<DetailList rows={alertOperationRows.filter((row) => row.notFound > 0).slice(0, 6).map((row) => ({ label: row.operation, value: `${row.notFound.toLocaleString()} missing` }))} emptyMessage="No missing alert detail records" />} />
+      <MetricCard {...interactiveMetric("alert-uptime")} label="Alert telemetry uptime" value={formatUptime(adminAlertMetrics?.uptime_seconds)} hint={`${adminAlertMetrics?.scope ?? "process-local"} counters`} loading={adminAlertMetrics === null} details={<DetailList rows={[
+        { label: "Counter scope", value: adminAlertMetrics?.scope ?? "Unknown" },
+        { label: "Started", value: adminAlertMetrics?.started_at ? formatDateTime(adminAlertMetrics.started_at) : "Unavailable" },
+        { label: "Last updated", value: adminAlertMetrics?.generated_at ? formatDateTime(adminAlertMetrics.generated_at) : "Unavailable" },
+      ]} />} />
     </section>
 
     <div className="charts-grid">
