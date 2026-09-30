@@ -188,6 +188,24 @@ export default function Home() {
     setActiveTab("overview");
   };
 
+  const handleExportPdf = async () => {
+    if (apiError) {
+      alert("Dashboard data is not ready for export. Please resolve the API error and try again.");
+      return;
+    }
+
+    if (document.querySelector('[aria-busy="true"]')) {
+      alert("Dashboard data is still loading. Please wait a moment and try again.");
+      return;
+    }
+
+    if (document.fonts?.ready) await document.fonts.ready;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    window.print();
+  };
+
   const exportToCSV = (data: any[], filename: string) => {
     if (!data || !data.length) {
       alert("No data available to export");
@@ -789,7 +807,7 @@ export default function Home() {
               </select>
             )}
             <button
-              onClick={() => window.print()}
+              onClick={() => void handleExportPdf()}
               className="print-hide"
               style={{
                 background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",

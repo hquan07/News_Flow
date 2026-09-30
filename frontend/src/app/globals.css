@@ -1348,14 +1348,32 @@ h1 {
 }
 
 /* Print Optimization for PDF Export */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
 @media print {
   body {
-    background: #ffffff !important;
-    color: #000000 !important;
-    background-image: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: var(--bg-dark) !important;
+    color: var(--text-main) !important;
+    background-image:
+      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%) !important;
   }
   
-  .print-hide, .tabs, .mode-toggle, header select, header button, .auth-modal {
+  .print-hide,
+  .tabs,
+  .mode-toggle,
+  header select,
+  header button,
+  .header-controls,
+  .admin-sidebar,
+  .mock-data-generator,
+  .auth-modal {
     display: none !important;
   }
   
@@ -1363,21 +1381,52 @@ h1 {
     padding: 0 !important;
     max-width: 100% !important;
   }
+
+  .dashboard-header {
+    display: block !important;
+    margin-bottom: 1rem !important;
+    page-break-after: avoid !important;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.6rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .dashboard-header .subtitle {
+    font-size: 0.95rem !important;
+  }
+
+  .admin-layout {
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  .admin-content {
+    width: 100% !important;
+    overflow: visible !important;
+  }
   
   .glass-panel, .metric-card {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    color: #000000 !important;
+    background: var(--panel-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-main) !important;
     box-shadow: none !important;
     page-break-inside: avoid !important;
     margin-bottom: 20px !important;
   }
-  
-  h1, h2, h3, h4, .panel-title, .metric-label, .metric-value, .subtitle {
-    color: #000000 !important;
+
+  .glass-panel,
+  .metric-card,
+  .chart-card {
+    break-inside: avoid;
   }
   
-  /* Force charts to render cleanly on white bg */
+  h1, h2, h3, h4, .panel-title, .metric-label, .metric-value, .subtitle {
+    color: var(--text-main) !important;
+  }
+  
+  /* Preserve chart labels and colors in the printed output */
   .recharts-text {
     fill: #000000 !important;
   }
