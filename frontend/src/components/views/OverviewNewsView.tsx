@@ -31,7 +31,14 @@ export default function OverviewNewsView({ overviewData, chartData, sourceData, 
           let details = null;
           if ((i === 0 || i === 1 || i === 3) && overviewData.source_speed) {
             details = <ul className="metric-details-list">{overviewData.source_speed.map((source: any) => (
-              <li key={source.source}><span>{source.source}</span><strong>{i === 3 ? `${Number(source.avg_latency_min).toFixed(1)} min` : i === 1 ? "Active" : formatCompactNumber(source.article_count)}</strong></li>
+              <li key={source.source}>
+                <span>{source.source}</span>
+                {i === 1 ? (
+                  <strong className="metric-active-status"><span className="metric-active-dot" aria-hidden="true" />Active</strong>
+                ) : (
+                  <strong>{i === 3 ? `${Number(source.avg_latency_min).toFixed(1)} min` : formatCompactNumber(source.article_count)}</strong>
+                )}
+              </li>
             ))}</ul>;
           } else if (i === 2) {
             details = <ul className="metric-details-list">{categoryRows.slice(0, 5).map((category) => (

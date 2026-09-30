@@ -863,6 +863,20 @@ h1 {
   margin-bottom: 0;
   padding-bottom: 0;
 }
+.metric-active-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--accent-green);
+}
+.metric-active-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0.45rem rgba(16, 185, 129, 0.5);
+}
 
 /* Table */
 .data-table {
