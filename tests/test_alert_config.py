@@ -52,6 +52,7 @@ async def test_alert_thresholds_are_shared_in_mongodb(monkeypatch):
 async def test_alert_threshold_update_requires_admin(async_client: AsyncClient):
     response = await async_client.post(
         "/api/v1/alerts/config",
+        headers={"Authorization": ""},
         json={
             "crisis_negative_pct": 30,
             "crisis_min_posts": 10,

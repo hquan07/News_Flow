@@ -5,7 +5,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Query
 
 from api.database import get_mongo_db
-from api.security import get_admin_user
+from api.security import require_permission
 from api.services.analytics import _query, _query_one
 from api.services.clickhouse_resilience import execute_clickhouse
 from api.services.health import dependency_health
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
 @router.post("/mock/social")
 def inject_mock_social_posts(
     count: int = Query(default=10, ge=1, le=1000),
-    user: dict = Depends(get_admin_user),
+    user: dict = Depends(require_permission("mock_data.create")),
 ):
     """Insert synthetic social posts for local/demo alert testing."""
     del user
@@ -70,7 +70,7 @@ def inject_mock_social_posts(
 
 
 @router.get("/metrics/latency")
-def get_crawl_latency(user: dict = Depends(get_admin_user)):
+def get_crawl_latency(user: dict = Depends(require_permission("system.read"))):
     """Lấy độ trễ trung bình khi cào dữ liệu (từ bài báo xuất bản đến lúc cào)."""
     query = """
         SELECT source, avg(crawl_latency_minutes) as avg_latency
@@ -103,7 +103,7 @@ def get_crawl_latency(user: dict = Depends(get_admin_user)):
 
 
 @router.get("/metrics/volume")
-def get_article_volume(user: dict = Depends(get_admin_user)):
+def get_article_volume(user: dict = Depends(require_permission("system.read"))):
     """Lấy tổng số bài viết theo nguồn, bao gồm cả News và Social."""
     query_news = """
         SELECT source, count(*) as total_articles
@@ -145,7 +145,7 @@ def get_article_volume(user: dict = Depends(get_admin_user)):
 
 
 @router.get("/metrics/users")
-async def get_user_metrics(user: dict = Depends(get_admin_user)):
+async def get_user_metrics(user: dict = Depends(require_permission("system.read"))):
     """Lấy tổng số user từ MongoDB."""
     db = get_mongo_db()
     total_users = await db.users.count_documents({})
@@ -160,13 +160,13 @@ async def get_user_metrics(user: dict = Depends(get_admin_user)):
 
 
 @router.get("/metrics/health")
-async def get_system_health(user: dict = Depends(get_admin_user)):
+async def get_system_health(user: dict = Depends(require_permission("system.read"))):
     result = await dependency_health()
     return {**result, "generated_at": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/metrics/operations")
-def get_operations_metrics(user: dict = Depends(get_admin_user)):
+def get_operations_metrics(user: dict = Depends(require_permission("system.read"))):
     """Return ingestion freshness and NLP coverage for the current article set."""
     row = _query_one("""
         SELECT

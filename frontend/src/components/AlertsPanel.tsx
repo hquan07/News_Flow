@@ -46,6 +46,7 @@ interface AlertThresholds {
 }
 
 interface AlertsPanelProps {
+  canManage: boolean;
   liveAlerts?: {
     crisis: SocialCrisisAlert[];
     viral: ViralPostAlertSummary[];
@@ -125,6 +126,7 @@ function AlertCardActions({
 }
 
 const AlertsPanel: React.FC<AlertsPanelProps> = ({
+  canManage,
   liveAlerts,
   onOpenArticles,
 }) => {
@@ -254,6 +256,10 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         : `Updated ${Math.floor(freshnessAgeSeconds / 60)}m ago`;
 
   useEffect(() => {
+    if (!canManage) {
+      setWorkflowStates({});
+      return;
+    }
     if (!alertIdsKey) {
       setWorkflowStates({});
       return;
@@ -282,7 +288,7 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         }
       });
     return () => controller.abort();
-  }, [alertIdsKey]);
+  }, [alertIdsKey, canManage]);
 
   const toggleWorkflowState = useCallback(
     async (
@@ -543,13 +549,13 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
             <Clock size={15} aria-hidden="true" />
             {isStale ? `Stale data · ${freshnessLabel}` : freshnessLabel}
           </span>
-          <button
+          {canManage && <button
             className="btn btn-secondary"
             onClick={() => setShowConfig(!showConfig)}
             aria-expanded={showConfig}
           >
             <Settings size={18} /> Configure
-          </button>
+          </button>}
         </div>
       </div>
       {error && (
@@ -565,7 +571,7 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         )}
       </div>
 
-      {showConfig && (
+      {canManage && showConfig && (
         <div
           className="glass-panel config-panel"
           style={{
@@ -701,12 +707,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
                     </div>
                     <div className="alert-card-hint">Click for crisis details →</div>
                   </button>
-                  <AlertCardActions
+                  {canManage && <AlertCardActions
                     state={state}
                     onToggle={(field, value) =>
                       void toggleWorkflowState(alertId, field, value)
                     }
-                  />
+                  />}
                 </div>
               );
             })}
@@ -803,12 +809,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
                       {isCluster ? "Explore clustered posts →" : "Click for details →"}
                     </div>
                   </button>
-                  <AlertCardActions
+                  {canManage && <AlertCardActions
                     state={state}
                     onToggle={(field, value) =>
                       void toggleWorkflowState(cluster.id, field, value)
                     }
-                  />
+                  />}
                 </div>
               );
             })}
@@ -890,12 +896,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
                     </div>
                     <div className="alert-card-hint">Click for spike details →</div>
                   </button>
-                  <AlertCardActions
+                  {canManage && <AlertCardActions
                     state={state}
                     onToggle={(field, value) =>
                       void toggleWorkflowState(alertId, field, value)
                     }
-                  />
+                  />}
                 </div>
               );
             })

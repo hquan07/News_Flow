@@ -1,9 +1,53 @@
+from collections.abc import Callable
 from typing import Annotated
 
 import jwt
-from fastapi import Header, HTTPException, status
+from bson import ObjectId
+from fastapi import Cookie, Header, HTTPException, status
 
 from api.config import get_settings
+from api.database import get_mongo_db
+
+
+ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
+    "user": frozenset({
+        "dashboard.read",
+        "reports.export",
+    }),
+    "analyst": frozenset({
+        "dashboard.read",
+        "reports.export",
+        "reports.export_full",
+    }),
+    "operator": frozenset({
+        "dashboard.read",
+        "reports.export",
+        "alerts.read",
+        "alerts.manage",
+        "crawler.read",
+        "crawler.run",
+        "system.read",
+    }),
+    "admin": frozenset({
+        "dashboard.read",
+        "reports.export",
+        "reports.export_full",
+        "alerts.read",
+        "alerts.manage",
+        "crawler.read",
+        "crawler.run",
+        "system.read",
+        "users.manage",
+        "audit.read",
+        "mock_data.create",
+    }),
+}
+
+VALID_ROLES = frozenset(ROLE_PERMISSIONS)
+
+
+def permissions_for_role(role: str | None) -> list[str]:
+    return sorted(ROLE_PERMISSIONS.get(role or "", frozenset()))
 
 
 def create_access_token(payload: dict) -> str:
@@ -32,29 +76,73 @@ def decode_access_token(token: str) -> dict:
 
 async def get_current_user(
     authorization: Annotated[str | None, Header()] = None,
+    access_token: Annotated[str | None, Cookie()] = None,
 ) -> dict:
-    if not authorization or not authorization.startswith("Bearer "):
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.removeprefix("Bearer ").strip()
+    elif access_token:
+        token = access_token
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized",
         )
-    return decode_access_token(authorization.removeprefix("Bearer ").strip())
+    authenticated_user = decode_access_token(token)
+    role = authenticated_user.get("role", "user")
+    subject = str(authenticated_user.get("sub", ""))
+    if ObjectId.is_valid(subject):
+        account = await get_mongo_db().users.find_one(
+            {"_id": ObjectId(subject)},
+            {"email": 1, "role": 1, "is_active": 1},
+        )
+        if account is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account no longer exists",
+            )
+        if account.get("is_active", True) is False:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is disabled",
+            )
+        role = account.get("role", "user")
+        authenticated_user["email"] = account.get(
+            "email", authenticated_user.get("email", "")
+        )
+    if role not in VALID_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Unknown account role",
+        )
+    return {
+        **authenticated_user,
+        "role": role,
+        "permissions": permissions_for_role(role),
+    }
+
+
+def require_permission(permission: str) -> Callable:
+    async def permission_dependency(
+        authorization: Annotated[str | None, Header()] = None,
+        access_token: Annotated[str | None, Cookie()] = None,
+    ) -> dict:
+        authenticated_user = await get_current_user(authorization, access_token)
+        if permission not in authenticated_user["permissions"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Forbidden: Missing permission '{permission}'",
+            )
+        return authenticated_user
+
+    return permission_dependency
 
 
 async def get_admin_user(
     authorization: Annotated[str | None, Header()] = None,
+    access_token: Annotated[str | None, Cookie()] = None,
 ) -> dict:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-        )
-    authenticated_user = decode_access_token(
-        authorization.removeprefix("Bearer ").strip()
+    return await require_permission("users.manage")(
+        authorization=authorization,
+        access_token=access_token,
     )
-    if authenticated_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Admin access required",
-        )
-    return authenticated_user

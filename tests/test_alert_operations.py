@@ -78,6 +78,7 @@ async def test_alert_state_service_round_trip(monkeypatch):
 async def test_alert_state_query_requires_admin(async_client: AsyncClient):
     response = await async_client.post(
         "/api/v1/alerts/state/query",
+        headers={"Authorization": ""},
         json={"alert_ids": ["viral:post-1"]},
     )
 

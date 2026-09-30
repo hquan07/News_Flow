@@ -10,7 +10,7 @@ from api.services.analytics import (
     get_volume_spike_detail,
     get_interaction_trend,
 )
-from api.security import get_admin_user
+from api.security import require_permission
 from api.services.alert_state import get_alert_states, update_alert_state
 from api.services.alert_metrics import alert_metrics
 from api.services.alert_config import get_alert_thresholds, update_alert_thresholds
@@ -158,7 +158,7 @@ async def get_config():
 @router.post("/config", response_model=AlertThresholds)
 async def update_config(
     config: AlertThresholds,
-    user: dict = Depends(get_admin_user),
+    user: dict = Depends(require_permission("alerts.manage")),
 ):
     return await update_alert_thresholds(config.model_dump(), user["sub"])
 
@@ -216,7 +216,7 @@ def social_interaction_trend(
 
 
 @router.get("/metrics", response_model=dict)
-async def get_alert_metrics(_user: dict = Depends(get_admin_user)):
+async def get_alert_metrics(_user: dict = Depends(require_permission("system.read"))):
     """Return telemetry aggregated from active API workers."""
     return await alert_metrics.shared_snapshot()
 
@@ -224,7 +224,7 @@ async def get_alert_metrics(_user: dict = Depends(get_admin_user)):
 @router.post("/state/query", response_model=List[AlertState])
 async def query_alert_states(
     query: AlertStateQuery,
-    user: dict = Depends(get_admin_user),
+    user: dict = Depends(require_permission("alerts.manage")),
 ):
     started = monotonic()
     outcome = "success"
@@ -241,7 +241,7 @@ async def query_alert_states(
 async def patch_alert_state(
     alert_id: str,
     patch: AlertStatePatch,
-    user: dict = Depends(get_admin_user),
+    user: dict = Depends(require_permission("alerts.manage")),
 ):
     started = monotonic()
     outcome = "success"

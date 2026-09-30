@@ -13,6 +13,8 @@ import {
   Download,
   Server,
   Users,
+  DatabaseZap,
+  UserCog,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AlertsPanel from "@/components/AlertsPanel";
@@ -28,6 +30,8 @@ import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
 import MockDataGenerator from "@/components/views/MockDataGenerator";
+import CrawlerManagementView from "@/components/views/CrawlerManagementView";
+import UserManagementView from "@/components/views/UserManagementView";
 import SocialInfluencersView, {
   type SocialInfluencer,
 } from "@/components/views/SocialInfluencersView";
@@ -35,7 +39,7 @@ import LiveSocialFeedView, {
   type LiveSocialPost,
 } from "@/components/views/LiveSocialFeedView";
 import { API_BASE, apiFetch } from "@/lib/api";
-import { readCachedUser } from "@/lib/auth-storage";
+import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
 import {
   EMPTY_ARTICLE_FILTERS,
   type ArticleFilters,
@@ -140,13 +144,17 @@ export default function Home() {
   const streamPausedRef = useRef(false);
 
   const [activeCard, setActiveCard] = useState<number | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<CachedUser | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [authModalError, setAuthModalError] = useState<string | null>(null);
   const [forYouArticles, setForYouArticles] = useState<any[]>([]);
+  const canAccessOperations = hasPermission(user, "system.read") || hasPermission(user, "crawler.read") || hasPermission(user, "alerts.read");
+  const canManageAlerts = hasPermission(user, "alerts.manage");
+  const canManageUsers = hasPermission(user, "users.manage");
+  const canExportFull = hasPermission(user, "reports.export_full");
 
   // Auth Functions
   const handleAuth = async (e: any) => {
@@ -182,6 +190,7 @@ export default function Home() {
   };
 
   const handleLogout = () => {
+    void apiFetch(`${API_BASE}/auth/logout`, { method: "POST" }).catch(() => {});
     localStorage.removeItem("token");
     localStorage.removeItem("user_cache");
     setUser(null);
@@ -207,6 +216,10 @@ export default function Home() {
   };
 
   const exportToCSV = (data: any[], filename: string) => {
+    if (!canExportFull) {
+      alert("Full CSV export requires the Analyst or Admin role.");
+      return;
+    }
     if (!data || !data.length) {
       alert("No data available to export");
       return;
@@ -274,9 +287,27 @@ export default function Home() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      setUser(readCachedUser());
+      const cachedUser = readCachedUser();
+      setUser(cachedUser);
+      void apiFetch<CachedUser>(`${API_BASE}/auth/me`)
+        .then((freshUser) => {
+          localStorage.setItem("user_cache", JSON.stringify(freshUser));
+          setUser(freshUser);
+        })
+        .catch(() => {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user_cache");
+          setUser(null);
+        });
     }
   }, []);
+
+  useEffect(() => {
+    if (user && dashboardMode === "admin" && !canAccessOperations) {
+      setDashboardMode("news");
+      setActiveTab("overview");
+    }
+  }, [canAccessOperations, dashboardMode, user]);
 
   // Smart fetch: only load data relevant to the active tab
   const fetchOverview = useCallback(async () => {
@@ -536,6 +567,11 @@ export default function Home() {
 
   // One shared SSE connection for the debug feed and live alert cards.
   useEffect(() => {
+    if (!hasPermission(user, "system.read")) {
+      sseRef.current?.close();
+      setIsConnected(false);
+      return;
+    }
     let disposed = false;
 
     const socialPostToFeedEvent = (post: LiveSocialPost, timestamp?: string): FeedEvent => {
@@ -667,7 +703,7 @@ export default function Home() {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       reconnectTimer.current = null;
     };
-  }, []);
+  }, [user]);
 
   // Auto-hide error toast after 5 seconds
   useEffect(() => {
@@ -747,12 +783,12 @@ export default function Home() {
               >
                 💬 Social Media
               </button>
-              {user?.role === "admin" && (
+              {canAccessOperations && (
                 <button
                   onClick={() => {
                     setDashboardMode("admin");
                     setSelectedSource("");
-                    setActiveTab("admin_dashboard");
+                    setActiveTab(hasPermission(user, "system.read") ? "admin_dashboard" : hasPermission(user, "crawler.read") ? "crawlers" : "alerts");
                   }}
                   style={{
                     padding: "6px 16px",
@@ -766,7 +802,7 @@ export default function Home() {
                     transition: "all 0.3s",
                   }}
                 >
-                  ⚙️ Admin
+                  ⚙️ Operations
                 </button>
               )}
             </div>
@@ -848,6 +884,7 @@ export default function Home() {
               >
                 {user.email[0].toUpperCase()}
               </div>
+              <span className="role-badge">{user.role ?? "user"}</span>
               <button
                 onClick={handleLogout}
                 className="print-hide"
@@ -902,9 +939,10 @@ export default function Home() {
           </div>
 
           {/* Admin sidebar layout */}
-          {dashboardMode === "admin" && (
+          {dashboardMode === "admin" && canAccessOperations && (
             <div className="admin-layout">
               <aside className="admin-sidebar" role="tablist" aria-label="Admin navigation">
+                {hasPermission(user, "system.read") && (
                 <button
                   type="button"
                   role="tab"
@@ -914,7 +952,8 @@ export default function Home() {
                 >
                   <Activity size={18} /> Admin Dashboard
                 </button>
-                <button
+                )}
+                {hasPermission(user, "system.read") && <button
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "articles"}
@@ -926,8 +965,8 @@ export default function Home() {
                   }}
                 >
                   <BookOpen size={18} /> System Articles
-                </button>
-                <button
+                </button>}
+                {hasPermission(user, "system.read") && <button
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "stream"}
@@ -935,8 +974,8 @@ export default function Home() {
                   onClick={() => setActiveTab("stream")}
                 >
                   <Radio size={18} /> Live Stream Debug
-                </button>
-                <button
+                </button>}
+                {hasPermission(user, "alerts.read") && <button
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "alerts"}
@@ -944,8 +983,17 @@ export default function Home() {
                   onClick={() => setActiveTab("alerts")}
                 >
                   <AlertTriangle size={18} /> System Alerts
-                </button>
-                <button
+                </button>}
+                {hasPermission(user, "crawler.read") && <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "crawlers"}
+                  className={`admin-sidebar-btn ${activeTab === "crawlers" ? "active" : ""}`}
+                  onClick={() => setActiveTab("crawlers")}
+                >
+                  <DatabaseZap size={18} /> Crawlers
+                </button>}
+                {hasPermission(user, "system.read") && <button
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "architecture"}
@@ -953,13 +1001,23 @@ export default function Home() {
                   onClick={() => setActiveTab("architecture")}
                 >
                   <Server size={18} /> Architecture
-                </button>
+                </button>}
 
-                <MockDataGenerator />
+                {canManageUsers && <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "users"}
+                  className={`admin-sidebar-btn ${activeTab === "users" ? "active" : ""}`}
+                  onClick={() => setActiveTab("users")}
+                >
+                  <UserCog size={18} /> User Access
+                </button>}
+
+                {hasPermission(user, "mock_data.create") && <MockDataGenerator />}
               </aside>
               <div className="admin-content">
 
-          {activeTab === "admin_dashboard" && dashboardMode === "admin" && (
+          {activeTab === "admin_dashboard" && dashboardMode === "admin" && hasPermission(user, "system.read") && (
             <AdminView
               adminLatency={adminLatency}
               adminClickbait={adminClickbait}
@@ -971,7 +1029,7 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "articles" && dashboardMode === "admin" && (
+          {activeTab === "articles" && dashboardMode === "admin" && hasPermission(user, "system.read") && (
             <ArticlesView
               title="System Articles"
               articles={articles}
@@ -994,10 +1052,11 @@ export default function Home() {
               trackClick={trackClick}
               timeAgo={timeAgo}
               exportToCSV={exportToCSV}
+              canExportCSV={canExportFull}
             />
           )}
 
-          {activeTab === "stream" && dashboardMode === "admin" && (
+          {activeTab === "stream" && dashboardMode === "admin" && hasPermission(user, "system.read") && (
             <StreamView
               feed={feed}
               isConnected={isConnected}
@@ -1016,8 +1075,9 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "alerts" && dashboardMode === "admin" && (
+          {activeTab === "alerts" && dashboardMode === "admin" && hasPermission(user, "alerts.read") && (
             <AlertsPanel
+              canManage={canManageAlerts}
               liveAlerts={liveSocialAlerts}
               onOpenArticles={(filter) => {
                 setArticleAlertFilter(filter);
@@ -1031,7 +1091,15 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "architecture" && dashboardMode === "admin" && (
+          {activeTab === "crawlers" && dashboardMode === "admin" && hasPermission(user, "crawler.read") && (
+            <CrawlerManagementView canRun={hasPermission(user, "crawler.run")} />
+          )}
+
+          {activeTab === "users" && dashboardMode === "admin" && canManageUsers && (
+            <UserManagementView currentUserId={user?.id} />
+          )}
+
+          {activeTab === "architecture" && dashboardMode === "admin" && hasPermission(user, "system.read") && (
             <ArchitectureView />
           )}
 
@@ -1132,6 +1200,7 @@ export default function Home() {
               activeCard={activeCard}
               setActiveCard={setActiveCard}
               exportToCSV={exportToCSV}
+              canExportCSV={canExportFull}
               updatedAt={dataUpdatedAt}
             />
           )}
@@ -1183,6 +1252,7 @@ export default function Home() {
               trackClick={trackClick}
               timeAgo={timeAgo}
               exportToCSV={exportToCSV}
+              canExportCSV={canExportFull}
             />
           )}
 

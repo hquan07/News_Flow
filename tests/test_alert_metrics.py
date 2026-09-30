@@ -92,7 +92,10 @@ async def test_alert_metrics_aggregate_active_workers(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_alert_metrics_endpoint_requires_admin(async_client: AsyncClient):
-    response = await async_client.get("/api/v1/alerts/metrics")
+    response = await async_client.get(
+        "/api/v1/alerts/metrics",
+        headers={"Authorization": ""},
+    )
 
     assert response.status_code == 401
 

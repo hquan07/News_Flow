@@ -61,6 +61,7 @@ type ArticlesViewProps = {
   trackClick: (articleHash: string) => void | Promise<void>;
   timeAgo: (date: string) => string;
   exportToCSV: (data: Record<string, unknown>[], filename: string) => void;
+  canExportCSV: boolean;
 };
 
 export default function ArticlesView({
@@ -79,6 +80,7 @@ export default function ArticlesView({
   trackClick,
   timeAgo,
   exportToCSV,
+  canExportCSV,
 }: ArticlesViewProps) {
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const invalidDateRange = Boolean(
@@ -103,7 +105,7 @@ export default function ArticlesView({
           <div className="panel-title">
             <BookOpen size={20} /> {title}
           </div>
-          <button
+          {canExportCSV && <button
             onClick={() => {
               const dataToExport = articles.map((a) => ({
                 article_id: a.article_id,
@@ -130,7 +132,7 @@ export default function ArticlesView({
             }}
           >
             <FileText size={14} /> CSV
-          </button>
+          </button>}
         </div>
         <div className="article-search-row">
           <div className="article-search-field">

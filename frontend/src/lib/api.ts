@@ -63,6 +63,11 @@ export async function apiFetch<T>(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(input, init);
+  const headers = new Headers(init?.headers);
+  if (typeof window !== "undefined" && !headers.has("Authorization")) {
+    const token = localStorage.getItem("token");
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(input, { ...init, headers });
   return parseJsonResponse<T>(response);
 }

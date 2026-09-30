@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -15,7 +15,8 @@ from api.middleware import (
 from api.logging_config import configure_logging
 from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin
+from api.security import require_permission
 
 settings = get_settings()
 configure_logging()
@@ -81,19 +82,25 @@ async def dependency_unavailable_handler(
     )
 
 prefix = settings.API_V1_PREFIX
-app.include_router(articles.router, prefix=prefix)
-app.include_router(overview.router, prefix=prefix)
-app.include_router(trending.router, prefix=prefix)
-app.include_router(sources.router, prefix=prefix)
-app.include_router(alerts.router, prefix=prefix)
-app.include_router(entities.router, prefix=prefix)
-app.include_router(sentiment.router, prefix=prefix)
+dashboard_access = [Depends(require_permission("dashboard.read"))]
+app.include_router(articles.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(overview.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(trending.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(sources.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(
+    alerts.router,
+    prefix=prefix,
+    dependencies=[Depends(require_permission("alerts.read"))],
+)
+app.include_router(entities.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(sentiment.router, prefix=prefix, dependencies=dashboard_access)
 app.include_router(stream.router, prefix=prefix)
-app.include_router(social.router, prefix=prefix)
+app.include_router(social.router, prefix=prefix, dependencies=dashboard_access)
 app.include_router(auth.router, prefix=prefix)
 app.include_router(recommendations.router, prefix=prefix)
 app.include_router(admin.router, prefix=prefix)
 app.include_router(crawler_admin.router, prefix=prefix)
+app.include_router(user_admin.router, prefix=prefix)
 app.include_router(public.router, prefix=prefix)
 
 

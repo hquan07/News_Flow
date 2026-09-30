@@ -22,6 +22,7 @@ def create_admin():
         "password": hashed_password,
         "full_name": "System Administrator",
         "role": "admin",
+        "is_active": True,
         "created_at": datetime.now(timezone.utc),
     }
     

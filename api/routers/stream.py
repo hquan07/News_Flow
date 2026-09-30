@@ -4,7 +4,7 @@ import logging
 import time
 import itertools
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from api.services.analytics import (
@@ -15,6 +15,7 @@ from api.services.analytics import (
 from api.config import get_settings
 from api.services.alert_metrics import alert_metrics
 from api.services.alert_config import get_alert_thresholds
+from api.security import require_permission
 
 router = APIRouter(prefix="/stream", tags=["Stream"])
 logger = logging.getLogger("newspulse.stream")
@@ -150,7 +151,10 @@ async def guarded_event_generator(request: Request):
 
 @router.get("")
 @router.get("/", include_in_schema=False)
-async def sse_stream(request: Request):
+async def sse_stream(
+    request: Request,
+    _user: dict = Depends(require_permission("system.read")),
+):
     if not await sse_connections.acquire(
         max(get_settings().SSE_MAX_CONNECTIONS_PER_WORKER, 1)
     ):

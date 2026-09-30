@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-secret-key-with-at-least-32-chars")
 
 from api.main import app
+from api.security import create_access_token
 
 
 ARTICLES = [
@@ -45,7 +46,12 @@ ARTICLES = [
 @pytest_asyncio.fixture
 async def async_client():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    token = create_access_token({"sub": "test-admin", "role": "admin"})
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as client:
         yield client
 
 

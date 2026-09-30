@@ -8,7 +8,10 @@ from api.security import create_access_token
 
 @pytest.mark.asyncio
 async def test_admin_metrics_require_auth(async_client: AsyncClient):
-    response = await async_client.get("/api/v1/admin/metrics/latency")
+    response = await async_client.get(
+        "/api/v1/admin/metrics/latency",
+        headers={"Authorization": ""},
+    )
     assert response.status_code == 401
 
 

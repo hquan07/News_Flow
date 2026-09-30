@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
-from api.security import get_admin_user
+from api.security import require_permission
 from api.services.analytics import _query
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ async def _airflow_post(path: str, json_body: dict = None) -> dict:
 
 
 @router.get("/")
-async def list_crawlers(user: dict = Depends(get_admin_user)):
+async def list_crawlers(user: dict = Depends(require_permission("crawler.read"))):
     """
     Trả về danh sách tất cả crawler spiders cùng trạng thái chạy cuối cùng từ Airflow.
     """
@@ -163,7 +163,7 @@ async def list_crawlers(user: dict = Depends(get_admin_user)):
 
 
 @router.post("/trigger/{spider_name}")
-async def trigger_crawler(spider_name: str, user: dict = Depends(get_admin_user)):
+async def trigger_crawler(spider_name: str, user: dict = Depends(require_permission("crawler.run"))):
     """
     Trigger cào dữ liệu cho 1 spider cụ thể bằng cách gọi Airflow REST API.
     Sử dụng conf parameter để chỉ định spider (nếu DAG hỗ trợ),
@@ -194,7 +194,7 @@ async def trigger_crawler(spider_name: str, user: dict = Depends(get_admin_user)
 @router.get("/history")
 async def crawler_history(
     limit: int = Query(10, ge=1, le=50),
-    user: dict = Depends(get_admin_user),
+    user: dict = Depends(require_permission("crawler.read")),
 ):
     """Lấy lịch sử các DAG run gần nhất."""
     data = await _airflow_get(
@@ -216,7 +216,7 @@ async def crawler_history(
 
 
 @router.get("/data-quality")
-async def data_quality_summary(user: dict = Depends(get_admin_user)):
+async def data_quality_summary(user: dict = Depends(require_permission("crawler.read"))):
     """
     Thống kê chất lượng dữ liệu: tỷ lệ bài viết thiếu author, thiếu content, v.v.
     """

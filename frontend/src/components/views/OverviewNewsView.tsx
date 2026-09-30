@@ -10,7 +10,7 @@ import { formatCategoryName, formatCompactNumber, formatPercent, truncateLabel }
 interface TrendPoint { time: string; count: number }
 interface CategoryPoint { name: string; count: number; percentage?: number }
 
-export default function OverviewNewsView({ overviewData, chartData, sourceData, activeCard, setActiveCard, exportToCSV, updatedAt }: any) {
+export default function OverviewNewsView({ overviewData, chartData, sourceData, activeCard, setActiveCard, exportToCSV, canExportCSV, updatedAt }: any) {
   const trendData: TrendPoint[] = chartData ?? [];
   const trendTotal = trendData.reduce((sum, row) => sum + Number(row.count || 0), 0);
   const categoryTotal = (sourceData ?? []).reduce((sum: number, row: CategoryPoint) => sum + Number(row.count || 0), 0);
@@ -55,7 +55,7 @@ export default function OverviewNewsView({ overviewData, chartData, sourceData, 
       </div>
 
       <div className="charts-grid">
-        <ChartCard title={<><BarChart2 size={20} /> Publication Trend</>} description="How many articles were published in each hourly bucket?" timeRange="All available data · hour of day" unit="Articles" total={trendTotal} updatedAt={updatedAt} actions={<button type="button" onClick={() => exportToCSV(trendData, "publication_trend.csv")} className="chart-action-button print-hide"><FileText size={14} /> CSV</button>}>
+        <ChartCard title={<><BarChart2 size={20} /> Publication Trend</>} description="How many articles were published in each hourly bucket?" timeRange="All available data · hour of day" unit="Articles" total={trendTotal} updatedAt={updatedAt} actions={canExportCSV ? <button type="button" onClick={() => exportToCSV(trendData, "publication_trend.csv")} className="chart-action-button print-hide"><FileText size={14} /> CSV</button> : undefined}>
           {trendData.length > 0 ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={trendData} margin={{ top: 12, right: 10, left: 0, bottom: 4 }}>
             <defs><linearGradient id="publicationCount" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.65} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0.03} /></linearGradient></defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
