@@ -703,6 +703,19 @@ h1 {
   gap: 0.3rem;
 }
 
+.entity-bar-tooltip {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 7px;
+  background: #1e293b;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  font-size: 0.88rem;
+}
+
+.entity-bar-tooltip-title { color: #f8fafc; margin-bottom: 0.3rem; }
+.entity-bar-tooltip-detail { display: flex; align-items: center; gap: 0.4rem; }
+.entity-bar-tooltip-swatch { flex: 0 0 0.55rem; width: 0.55rem; height: 0.55rem; border-radius: 2px; }
+
 .chart-actions,
 .chart-toggle,
 .graph-controls,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps } from "recharts";
 import { Hash, MessageSquare, ThumbsUp, Users } from "lucide-react";
 import ChartCard from "../ui/ChartCard";
 import EmptyState from "../ui/EmptyState";
@@ -12,6 +12,23 @@ const TYPE_COLORS: Record<string, string> = { PER: "#f97316", PERSON: "#f97316",
 const SENTIMENT_COLORS = { Positive: "#10b981", Neutral: "#94a3b8", Negative: "#f97316" };
 const TOOLTIP_CONTENT_STYLE = { backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)", color: "#f8fafc" };
 const TOOLTIP_TEXT_STYLE = { color: "#f8fafc" };
+
+function entityColor(type: unknown): string {
+  return TYPE_COLORS[String(type).toUpperCase()] ?? "#3b82f6";
+}
+
+function EntityBarTooltip({ active, payload }: TooltipContentProps) {
+  const row = payload?.[0]?.payload as { entity_name?: string; entity_type?: string; mention_count?: number } | undefined;
+  if (!active || !row) return null;
+  const color = entityColor(row.entity_type);
+  return <div className="entity-bar-tooltip">
+    <div className="entity-bar-tooltip-title">{row.entity_name}</div>
+    <div className="entity-bar-tooltip-detail" style={{ color }}>
+      <span className="entity-bar-tooltip-swatch" style={{ backgroundColor: color }} aria-hidden="true" />
+      {row.entity_name} · {row.entity_type}: {Number(row.mention_count ?? 0).toLocaleString()} mentions
+    </div>
+  </div>;
+}
 
 function value(row: Record<string, unknown>, key: string): number {
   const match = Object.keys(row).find((candidate) => candidate.toLowerCase() === key.toLowerCase());
@@ -38,8 +55,8 @@ export default function EntitiesView({ entitiesData, trendingKeywords, entityTyp
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
         <XAxis type="number" stroke="#94a3b8" fontSize={11} allowDecimals={false} tickFormatter={formatCompactNumber} />
         <YAxis type="category" dataKey="entity_name" width={112} stroke="#94a3b8" fontSize={11} tickFormatter={(label) => truncateLabel(String(label), 18)} />
-        <Tooltip cursor={false} formatter={(count, _name, item) => [`${Number(count).toLocaleString()} mentions`, `${item.payload.entity_name} · ${item.payload.entity_type}`]} contentStyle={TOOLTIP_CONTENT_STYLE} itemStyle={TOOLTIP_TEXT_STYLE} labelStyle={TOOLTIP_TEXT_STYLE} />
-        <Bar dataKey="mention_count" name="Mentions" radius={[0, 4, 4, 0]}>{entities.map((row: any) => <Cell key={row.entity_name} fill={TYPE_COLORS[String(row.entity_type).toUpperCase()] ?? "#3b82f6"} />)}<LabelList dataKey="mention_count" position="right" fill="#cbd5e1" fontSize={10} formatter={(count) => formatCompactNumber(Number(count))} /></Bar>
+        <Tooltip cursor={false} content={EntityBarTooltip} />
+        <Bar dataKey="mention_count" name="Mentions" radius={[0, 4, 4, 0]}>{entities.map((row: any) => <Cell key={row.entity_name} fill={entityColor(row.entity_type)} />)}<LabelList dataKey="mention_count" position="right" fill="#cbd5e1" fontSize={10} formatter={(count) => formatCompactNumber(Number(count))} /></Bar>
       </BarChart></ResponsiveContainer> : !entitiesData ? <ChartSkeleton /> : <EmptyState message="No entity data" />}
     </ChartCard>
 
