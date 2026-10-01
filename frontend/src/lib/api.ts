@@ -28,6 +28,7 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
   let payload: unknown;
 
   if (!rawBody.trim()) {
+    if (response.ok && response.status === 204) return undefined as T;
     throw new ApiError(
       response.ok
         ? "API returned an empty response."

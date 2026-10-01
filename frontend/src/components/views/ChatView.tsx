@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Trash2, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
@@ -54,7 +55,7 @@ const suggestions = [
   "Thực thể nào xuất hiện nhiều trong 7 ngày qua?",
 ];
 
-export default function ChatView() {
+export default function ChatView({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -62,6 +63,8 @@ export default function ChatView() {
   const [timeRange, setTimeRange] = useState("");
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const questionRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<CachedUser | null>(null);
   const [action, setAction] = useState<ActionType>("generate_report");
@@ -74,6 +77,10 @@ export default function ChatView() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => { setCurrentUser(readCachedUser()); }, []);
+
+  useEffect(() => {
+    if (open) questionRef.current?.focus();
+  }, [open]);
 
   const availableActions: { value: ActionType; label: string }[] = [
     ...(hasPermission(currentUser, "reports.export") ? [{ value: "generate_report" as ActionType, label: "Tạo báo cáo" }] : []),
@@ -185,7 +192,7 @@ export default function ChatView() {
 
   async function send(message: string) {
     const text = message.trim();
-    if (!text || loading || historyLoading) return;
+    if (!text || loading || historyLoading || deletingId) return;
     setLoading(true);
     setError(null);
     try {
@@ -222,25 +229,52 @@ export default function ChatView() {
     void send(question);
   }
 
+  async function deleteConversation(conversation: Conversation) {
+    if (loading || historyLoading || deletingId) return;
+    if (!window.confirm(`Xóa hội thoại “${conversation.title}” và toàn bộ tin nhắn? Hành động này không thể hoàn tác.`)) return;
+    setDeletingId(conversation.id);
+    setError(null);
+    try {
+      await apiFetch<void>(`${API_BASE}/chat/conversations/${encodeURIComponent(conversation.id)}`, { method: "DELETE" });
+      setConversations((current) => current.filter((item) => item.id !== conversation.id));
+      if (activeId === conversation.id) {
+        setActiveId(null);
+        setMessages([]);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không xóa được hội thoại.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <section className="chat-view" aria-label="NewsPulse chatbot">
       <div className="chat-sidebar glass-panel">
         <div className="chat-sidebar-heading">
           <h2>Hội thoại</h2>
-          <button type="button" onClick={() => { setActiveId(null); setMessages([]); setError(null); }} disabled={loading}>+ Mới</button>
+          <button type="button" onClick={() => { setActiveId(null); setMessages([]); setError(null); }} disabled={loading || !!deletingId}>+ Mới</button>
         </div>
         <div className="chat-conversation-list">
           {conversations.map((conversation) => (
-            <button
-              key={conversation.id}
-              type="button"
-              className={activeId === conversation.id ? "active" : ""}
-              onClick={() => { setMessages([]); setError(null); setActiveId(conversation.id); }}
-              disabled={loading}
-              title={conversation.title}
-            >
-              {conversation.title}
-            </button>
+            <div className="chat-conversation-row" key={conversation.id}>
+              <button
+                type="button"
+                className={`chat-conversation-open ${activeId === conversation.id ? "active" : ""}`}
+                onClick={() => { setMessages([]); setError(null); setActiveId(conversation.id); }}
+                disabled={loading || !!deletingId}
+                title={conversation.title}
+              >
+                {conversation.title}
+              </button>
+              <button type="button" className="chat-conversation-delete"
+                onClick={() => void deleteConversation(conversation)}
+                disabled={loading || historyLoading || !!deletingId}
+                aria-label={`Xóa hội thoại ${conversation.title}`}
+                title={`Xóa hội thoại ${conversation.title}`}>
+                <Trash2 size={16} aria-hidden="true" />
+              </button>
+            </div>
           ))}
           {conversations.length === 0 && <p>Chưa có hội thoại.</p>}
         </div>
@@ -251,12 +285,17 @@ export default function ChatView() {
             <h2>NewsPulse Assistant</h2>
             <p>Hỏi về bài viết, từ khóa, cảm xúc, thực thể và nguồn tin.</p>
           </div>
-          <select aria-label="Khoảng thời gian" value={timeRange} onChange={(event) => setTimeRange(event.target.value)} disabled={loading}>
-            <option value="">Theo câu hỏi</option>
-            <option value="today">24 giờ qua</option>
-            <option value="7d">7 ngày qua</option>
-            <option value="30d">30 ngày qua</option>
-          </select>
+          <div className="chat-header-controls">
+            <select aria-label="Khoảng thời gian" value={timeRange} onChange={(event) => setTimeRange(event.target.value)} disabled={loading}>
+              <option value="">Theo câu hỏi</option>
+              <option value="today">24 giờ qua</option>
+              <option value="7d">7 ngày qua</option>
+              <option value="30d">30 ngày qua</option>
+            </select>
+            <button type="button" className="chat-close-button" onClick={onClose} aria-label="Đóng Chat Assistant" title="Đóng Chat Assistant">
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div className="chat-messages" aria-live="polite">
           {messages.length === 0 && (
@@ -368,9 +407,9 @@ export default function ChatView() {
         )}
         <form className="chat-form" onSubmit={submit}>
           <label htmlFor="chat-question" className="chat-visually-hidden">Câu hỏi</label>
-          <input id="chat-question" value={question} onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ví dụ: So sánh nguồn VnExpress và Tuổi Trẻ" maxLength={2000} disabled={loading || historyLoading} />
-          <button type="submit" disabled={loading || historyLoading || !question.trim()}>Gửi</button>
+          <input id="chat-question" ref={questionRef} value={question} onChange={(event) => setQuestion(event.target.value)}
+            placeholder="Ví dụ: So sánh nguồn VnExpress và Tuổi Trẻ" maxLength={2000} disabled={loading || historyLoading || !!deletingId} />
+          <button type="submit" disabled={loading || historyLoading || !!deletingId || !question.trim()}>Gửi</button>
         </form>
       </div>
     </section>

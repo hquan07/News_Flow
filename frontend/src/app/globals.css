@@ -2715,6 +2715,59 @@ h1 {
   .feed-avatar { width: 36px; height: 36px; flex: 0 0 36px; }
 }
 /* Chat assistant */
+.chat-launcher {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 901;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 1px solid #60a5fa;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+
+.chat-launcher:hover,
+.chat-launcher:focus-visible {
+  background: #1d4ed8;
+  outline: 2px solid #bfdbfe;
+  outline-offset: 3px;
+}
+
+.chat-drawer {
+  position: fixed;
+  right: 24px;
+  bottom: 94px;
+  z-index: 900;
+  width: min(880px, calc(100vw - 48px));
+  height: min(720px, calc(100dvh - 120px));
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  background: #172338;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.55);
+}
+
+.chat-drawer[hidden] { display: none; }
+
+.chat-drawer .chat-view {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+
+.chat-drawer .chat-sidebar,
+.chat-drawer .chat-main { min-height: 0; }
+.chat-drawer .chat-sidebar { overflow-y: auto; }
+.chat-drawer .chat-main { overflow-y: auto; }
+.chat-drawer .chat-messages { min-height: 0; max-height: none; }
+
 .chat-view {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -2785,6 +2838,32 @@ h1 {
   margin-top: 1rem;
 }
 
+.chat-conversation-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.chat-conversation-row .chat-conversation-open {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-conversation-row .chat-conversation-delete {
+  display: grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  padding: 0;
+  color: #fca5a5;
+}
+
+.chat-conversation-row .chat-conversation-delete:hover {
+  border-color: #f87171;
+  background: rgba(239, 68, 68, 0.16);
+}
+
 .chat-conversation-list button {
   width: 100%;
   overflow: hidden;
@@ -2799,6 +2878,18 @@ h1 {
 }
 
 .chat-header select {
+  padding: 0.55rem;
+}
+
+.chat-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-header-controls .chat-close-button {
+  display: grid;
+  place-items: center;
   padding: 0.55rem;
 }
 
@@ -2966,4 +3057,21 @@ h1 {
   .chat-message {
     max-width: 100%;
   }
+}
+
+@media (max-width: 760px) {
+  .chat-launcher { right: 12px; bottom: 12px; width: 52px; height: 52px; }
+  .chat-drawer {
+    right: 10px;
+    bottom: 74px;
+    width: calc(100vw - 20px);
+    height: calc(100dvh - 88px);
+    padding: 8px;
+  }
+  .chat-drawer .chat-view {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .chat-drawer .chat-sidebar { max-height: 140px; }
+  .chat-drawer .chat-header { align-items: flex-start; }
 }

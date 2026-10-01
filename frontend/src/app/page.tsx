@@ -90,6 +90,8 @@ const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [chatOpen, setChatOpen] = useState(false);
+  const chatLauncherRef = useRef<HTMLButtonElement>(null);
   const [dashboardMode, setDashboardMode] = useState<
     "news" | "social" | "admin"
   >("news");
@@ -195,6 +197,7 @@ export default function Home() {
     localStorage.removeItem("token");
     localStorage.removeItem("user_cache");
     setUser(null);
+    setChatOpen(false);
     setActiveTab("overview");
   };
 
@@ -272,7 +275,7 @@ export default function Home() {
     const savedMode = localStorage.getItem("newsFlowMode");
     const savedTab = localStorage.getItem("newsFlowTab");
     if (savedMode) setDashboardMode(savedMode as any);
-    if (savedTab) setActiveTab(savedTab);
+    if (savedTab) setActiveTab(savedTab === "chat" ? "overview" : savedTab);
     setIsInitialized(true);
   }, []);
 
@@ -1218,17 +1221,6 @@ export default function Home() {
                     ✨ For You
                   </button>
                 )}
-                {hasPermission(user, "chat.use") && (
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === "chat"}
-                    className={activeTab === "chat" ? "admin-sidebar-btn active" : "admin-sidebar-btn"}
-                    onClick={() => setActiveTab("chat")}
-                  >
-                    <MessageSquare size={18} /> Chat Assistant
-                  </button>
-                )}
               </aside>
               <div className="admin-content">
 
@@ -1302,10 +1294,6 @@ export default function Home() {
               trackClick={trackClick}
               timeAgo={timeAgo}
             />
-          )}
-
-          {activeTab === "chat" && dashboardMode === "news" && hasPermission(user, "chat.use") && (
-            <ChatView />
           )}
 
           {apiError && (
@@ -1428,6 +1416,38 @@ export default function Home() {
 
               </div>
             </div>
+          )}
+          {hasPermission(user, "chat.use") && (
+            <>
+              <button
+                ref={chatLauncherRef}
+                type="button"
+                className="chat-launcher"
+                aria-label={chatOpen ? "Đóng Chat Assistant" : "Mở Chat Assistant"}
+                aria-controls="chat-assistant-panel"
+                aria-expanded={chatOpen}
+                title={chatOpen ? "Đóng Chat Assistant" : "Mở Chat Assistant"}
+                onClick={() => setChatOpen((current) => !current)}
+              >
+                <MessageSquare size={24} aria-hidden="true" />
+              </button>
+              <div
+                id="chat-assistant-panel"
+                className="chat-drawer"
+                role="dialog"
+                aria-label="Chat Assistant"
+                aria-modal="false"
+                hidden={!chatOpen}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setChatOpen(false);
+                    chatLauncherRef.current?.focus();
+                  }
+                }}
+              >
+                <ChatView open={chatOpen} onClose={() => { setChatOpen(false); chatLauncherRef.current?.focus(); }} />
+              </div>
+            </>
           )}
         </>
       )}
