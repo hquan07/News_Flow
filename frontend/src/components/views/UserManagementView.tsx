@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { RefreshCw, ShieldCheck, UserCog } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
 
@@ -8,6 +9,7 @@ type ManagedUser = {
   id: string;
   email: string;
   full_name: string;
+  avatar_data_url?: string | null;
   role: "user" | "analyst" | "operator" | "admin";
   is_active: boolean;
   created_at?: string;
@@ -93,7 +95,19 @@ export default function UserManagementView({ currentUserId }: { currentUserId?: 
               const isSelf = managedUser.id === currentUserId;
               return (
                 <tr key={managedUser.id}>
-                  <td><strong>{managedUser.full_name || managedUser.email}</strong><span>{managedUser.email}{isSelf ? " · You" : ""}</span></td>
+                  <td>
+                    <div className="access-user">
+                      <div className="access-user-avatar" aria-hidden="true">
+                        {managedUser.avatar_data_url?.startsWith("data:image/jpeg;base64,")
+                          ? <Image src={managedUser.avatar_data_url} alt="" width={36} height={36} unoptimized />
+                          : managedUser.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="access-user-details">
+                        <strong>{managedUser.full_name || managedUser.email}</strong>
+                        <span>{managedUser.email}{isSelf ? " · You" : ""}</span>
+                      </div>
+                    </div>
+                  </td>
                   <td>
                     <label className="sr-only" htmlFor={`role-${managedUser.id}`}>Role for {managedUser.email}</label>
                     <select id={`role-${managedUser.id}`} value={managedUser.role} disabled={isSelf || savingId === managedUser.id} onChange={(event) => void updateAccess(managedUser, { role: event.target.value as ManagedUser["role"] })}>

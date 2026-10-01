@@ -6,6 +6,7 @@ from bson import ObjectId
 
 from api.main import app
 from api.routers import auth
+from api.routers.user_admin import _serialize_user
 
 
 @pytest.mark.asyncio
@@ -76,3 +77,9 @@ async def test_avatar_rejects_non_image_and_oversized_payload(async_client, avat
     )
     assert oversized.status_code in (400, 422)
     assert "avatar_data_url" not in avatar_account
+
+
+def test_admin_user_list_includes_avatar_and_keeps_fallback():
+    account = {"_id": ObjectId(), "email": "avatar@example.com", "avatar_data_url": "data:image/jpeg;base64,abc"}
+    assert _serialize_user(account)["avatar_data_url"] == account["avatar_data_url"]
+    assert _serialize_user({"_id": ObjectId(), "email": "other@example.com"})["avatar_data_url"] is None

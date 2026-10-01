@@ -34,6 +34,7 @@ def _serialize_user(document: dict) -> dict:
         "id": str(document["_id"]),
         "email": document.get("email", ""),
         "full_name": document.get("full_name", ""),
+        "avatar_data_url": document.get("avatar_data_url"),
         "role": document.get("role", "user"),
         "is_active": document.get("is_active", True),
         "created_at": document.get("created_at"),
