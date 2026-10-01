@@ -233,17 +233,54 @@ def _trending(request: ChatRequest, time_range: str) -> ToolResult:
         f"WHERE {where} GROUP BY k.keyword ORDER BY count DESC LIMIT 10",
         params,
     )
+    title_fallback = not rows
+    if title_fallback:
+        # NLP enrichment is optional. Use a bounded, explicitly labeled title
+        # frequency when there are no indexed keywords for the requested period.
+        title_where, title_params = _where(request, time_range)
+        title_params.update({
+            "title_pattern": r"[\p{L}]{2,}",
+            "excluded_phrases": [
+                "báo dân", "dân trí", "báo lao", "lao động", "tuổi trẻ",
+                "thanh niên", "tin tức", "hôm nay", "tuyển việt",
+            ],
+        })
+        phrase_filter = "keyword NOT IN {excluded_phrases:Array(String)}"
+        if keyword_query:
+            phrase_filter += " AND keyword ILIKE {keyword_query:String}"
+            title_params["keyword_query"] = f"%{keyword_query}%"
+        rows = _query(
+            "SELECT keyword, countDistinct(article_id) AS count FROM ("
+            "SELECT a.url_hash AS article_id, "
+            "arrayJoin(arrayMap(pair -> concat(pair.1, char(32), pair.2), "
+            "arrayZip(arrayPopBack(extractAll(lowerUTF8(a.title), {title_pattern:String})), "
+            "arrayPopFront(extractAll(lowerUTF8(a.title), {title_pattern:String}))))) AS keyword "
+            "FROM (SELECT a.url_hash, a.title FROM newspulse.raw_articles AS a FINAL "
+            f"WHERE {title_where} ORDER BY a.publish_time DESC LIMIT 3000) AS a) "
+            f"WHERE {phrase_filter} GROUP BY keyword ORDER BY count DESC LIMIT 10",
+            title_params,
+        )
     if rows:
-        answer = f"Từ khóa xuất hiện nhiều trong bài viết trong {_TIME_LABELS[time_range]}:\n" + "\n".join(
+        heading = (
+            f"Các cụm từ xuất hiện nhiều trong tiêu đề của tối đa 3.000 bài mới nhất trong {_TIME_LABELS[time_range]} "
+            "(chưa có dữ liệu từ khóa NLP):"
+            if title_fallback else
+            f"Từ khóa xuất hiện nhiều trong bài viết trong {_TIME_LABELS[time_range]}:"
+        )
+        answer = heading + "\n" + "\n".join(
             f"{index}. {row['keyword']}: {row['count']} bài"
             for index, row in enumerate(rows, 1)
         )
-        answer += "\nĐây là tần suất trong khoảng chọn, chưa phải tốc độ tăng so với kỳ trước."
+        answer += (
+            "\nĐây là tần suất cụm từ trong tiêu đề, không phải tốc độ tăng so với kỳ trước."
+            if title_fallback else
+            "\nĐây là tần suất trong khoảng chọn, chưa phải tốc độ tăng so với kỳ trước."
+        )
     else:
-        answer = "Chưa có dữ liệu từ khóa trong khoảng thời gian này."
+        answer = "Chưa có dữ liệu từ khóa hoặc cụm từ tiêu đề phù hợp trong khoảng thời gian này."
     return ToolResult(
         answer=answer, tool="get_trending_keywords", time_range=time_range,
-        chart=_chart("Tần suất từ khóa", "bài viết", rows, "keyword", "count"),
+        chart=_chart("Tần suất cụm từ tiêu đề" if title_fallback else "Tần suất từ khóa", "bài viết", rows, "keyword", "count"),
     )
 
 

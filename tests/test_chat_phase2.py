@@ -138,6 +138,39 @@ async def test_trending_query_is_bounded_and_parameterized(
 
 
 @pytest.mark.asyncio
+async def test_trending_falls_back_to_labeled_title_phrases_when_nlp_is_empty(
+    async_client: AsyncClient, chat_db, monkeypatch
+):
+    calls = []
+
+    def fake_query(sql, params):
+        calls.append((sql, params))
+        return [] if len(calls) == 1 else [{"keyword": "lãi suất", "count": 8}]
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    response = await async_client.post(
+        "/api/v1/chat",
+        json={"message": "Từ khóa nào thịnh hành hôm nay?", "source": "vnexpress"},
+        headers=_headers("alice"),
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tool"] == "get_trending_keywords"
+    assert data["time_range"] == "today"
+    assert "cụm từ xuất hiện nhiều trong tiêu đề" in data["answer"]
+    assert "chưa có dữ liệu từ khóa NLP" in data["answer"]
+    assert "lãi suất: 8 bài" in data["answer"]
+    assert "không phải tốc độ tăng" in data["answer"]
+    assert data["chart"]["title"] == "Tần suất cụm từ tiêu đề"
+    assert len(calls) == 2
+    assert "a.source = {source:String}" in calls[1][0]
+    assert "24 HOUR" in calls[1][0]
+    assert "LIMIT 3000" in calls[1][0]
+    assert "LIMIT 10" in calls[1][0]
+    assert calls[1][1]["source"] == "vnexpress"
+
+
+@pytest.mark.asyncio
 async def test_sentiment_uses_filtered_article_rows(
     async_client: AsyncClient, chat_db, monkeypatch
 ):
