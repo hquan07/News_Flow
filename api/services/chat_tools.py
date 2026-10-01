@@ -316,7 +316,8 @@ def _alerts(request: ChatRequest, time_range: str) -> ToolResult:
     rows = get_alerts(threshold=2.0, limit=5)
     if rows:
         answer = "Cảnh báo tăng đột biến số bài theo giờ trong 7 ngày qua:\n" + "\n".join(
-            f"- {row['hour_slot']}: {row['article_count']} bài, z-score {row['z_score']}"
+            f"- {row['hour_slot']} (ID: {row.get('alert_id', 'n/a')}): "
+            f"{row['article_count']} bài, z-score {row['z_score']}"
             for row in rows
         )
     else:

@@ -2915,6 +2915,31 @@ h1 {
   font-weight: 700;
 }
 
+.chat-action-panel {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 0.75rem 0;
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.chat-action-panel h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+.chat-action-panel p, .chat-action-panel small { color: var(--text-muted); font-size: 0.82rem; }
+.chat-action-controls { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: end; margin-top: 0.75rem; }
+.chat-action-controls label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; }
+.chat-action-controls input, .chat-action-controls select {
+  min-width: 150px;
+  padding: 0.5rem;
+  font: inherit;
+  color: var(--text-main);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.chat-action-preview, .chat-action-result { margin-top: 0.75rem; padding: 0.75rem; border: 1px solid var(--accent-blue); border-radius: 8px; }
+.chat-action-preview div { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.chat-action-result button { margin-left: 0.75rem; }
+
 .chat-visually-hidden {
   position: absolute;
   width: 1px;
