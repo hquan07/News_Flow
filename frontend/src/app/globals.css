@@ -2726,18 +2726,20 @@ h1 {
   height: 58px;
   border: 1px solid #60a5fa;
   border-radius: 50%;
-  background: #2563eb;
-  color: #fff;
+  background: #f8fafc;
+  color: #0f172a;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.45);
   cursor: pointer;
 }
 
 .chat-launcher:hover,
 .chat-launcher:focus-visible {
-  background: #1d4ed8;
+  background: #dbeafe;
   outline: 2px solid #bfdbfe;
   outline-offset: 3px;
 }
+
+.chat-launcher img { display: block; width: 40px; height: 40px; }
 
 .chat-drawer {
   position: fixed;

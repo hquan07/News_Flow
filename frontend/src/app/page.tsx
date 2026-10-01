@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Image from "next/image";
 import {
   Activity,
   BookOpen,
@@ -1429,7 +1430,7 @@ export default function Home() {
                 title={chatOpen ? "Đóng Chat Assistant" : "Mở Chat Assistant"}
                 onClick={() => setChatOpen((current) => !current)}
               >
-                <MessageSquare size={24} aria-hidden="true" />
+                <Image src="/chatbot-robot.png" alt="" width={40} height={40} aria-hidden="true" />
               </button>
               <div
                 id="chat-assistant-panel"
