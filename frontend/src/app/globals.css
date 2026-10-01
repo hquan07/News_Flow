@@ -2850,18 +2850,44 @@ h1 {
   min-width: 0;
 }
 
-.chat-conversation-row .chat-conversation-delete {
-  display: grid;
+.chat-conversation-row .chat-conversation-options {
+  display: none;
   flex: 0 0 36px;
   place-items: center;
   width: 36px;
   padding: 0;
-  color: #fca5a5;
 }
 
-.chat-conversation-row .chat-conversation-delete:hover {
-  border-color: #f87171;
+.chat-context-menu {
+  position: fixed;
+  z-index: 950;
+  min-width: 180px;
+  padding: 0.3rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: #111c30;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.chat-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #fca5a5;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-context-menu button:hover,
+.chat-context-menu button:focus-visible {
   background: rgba(239, 68, 68, 0.16);
+  outline: 2px solid #f87171;
 }
 
 .chat-conversation-list button {
@@ -3074,4 +3100,8 @@ h1 {
   }
   .chat-drawer .chat-sidebar { max-height: 140px; }
   .chat-drawer .chat-header { align-items: flex-start; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .chat-conversation-row .chat-conversation-options { display: grid; }
 }

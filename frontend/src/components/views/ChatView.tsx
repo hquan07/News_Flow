@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Trash2, X } from "lucide-react";
+import { MoreHorizontal, Trash2, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
@@ -64,6 +65,13 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    conversationId: string;
+    x: number;
+    y: number;
+    trigger: HTMLButtonElement;
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
   const questionRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<CachedUser | null>(null);
@@ -80,7 +88,29 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
 
   useEffect(() => {
     if (open) questionRef.current?.focus();
+    else setContextMenu(null);
   }, [open]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    contextMenuRef.current?.querySelector("button")?.focus();
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!contextMenuRef.current?.contains(event.target as Node)) setContextMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setContextMenu(null);
+        contextMenu.trigger.focus();
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenu]);
 
   const availableActions: { value: ActionType; label: string }[] = [
     ...(hasPermission(currentUser, "reports.export") ? [{ value: "generate_report" as ActionType, label: "Tạo báo cáo" }] : []),
@@ -229,8 +259,19 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
     void send(question);
   }
 
+  function showContextMenu(conversationId: string, x: number, y: number, trigger: HTMLButtonElement) {
+    if (loading || historyLoading || deletingId) return;
+    setContextMenu({
+      conversationId,
+      x: Math.max(8, Math.min(x, window.innerWidth - 188)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 56)),
+      trigger,
+    });
+  }
+
   async function deleteConversation(conversation: Conversation) {
     if (loading || historyLoading || deletingId) return;
+    setContextMenu(null);
     if (!window.confirm(`Xóa hội thoại “${conversation.title}” và toàn bộ tin nhắn? Hành động này không thể hoàn tác.`)) return;
     setDeletingId(conversation.id);
     setError(null);
@@ -261,18 +302,36 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
               <button
                 type="button"
                 className={`chat-conversation-open ${activeId === conversation.id ? "active" : ""}`}
-                onClick={() => { setMessages([]); setError(null); setActiveId(conversation.id); }}
+                onClick={() => { setContextMenu(null); setMessages([]); setError(null); setActiveId(conversation.id); }}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  showContextMenu(conversation.id, event.clientX, event.clientY, event.currentTarget);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                    event.preventDefault();
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    showContextMenu(conversation.id, rect.left + 12, rect.bottom, event.currentTarget);
+                  }
+                }}
                 disabled={loading || !!deletingId}
-                title={conversation.title}
+                aria-haspopup="menu"
+                aria-expanded={contextMenu?.conversationId === conversation.id}
+                title={`${conversation.title} — nhấp chuột phải để mở tùy chọn`}
               >
                 {conversation.title}
               </button>
-              <button type="button" className="chat-conversation-delete"
-                onClick={() => void deleteConversation(conversation)}
+              <button type="button" className="chat-conversation-options"
+                onClick={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  showContextMenu(conversation.id, rect.right, rect.bottom, event.currentTarget);
+                }}
                 disabled={loading || historyLoading || !!deletingId}
-                aria-label={`Xóa hội thoại ${conversation.title}`}
-                title={`Xóa hội thoại ${conversation.title}`}>
-                <Trash2 size={16} aria-hidden="true" />
+                aria-label={`Tùy chọn hội thoại ${conversation.title}`}
+                aria-haspopup="menu"
+                aria-expanded={contextMenu?.conversationId === conversation.id}
+                title={`Tùy chọn hội thoại ${conversation.title}`}>
+                <MoreHorizontal size={18} aria-hidden="true" />
               </button>
             </div>
           ))}
@@ -412,6 +471,25 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
           <button type="submit" disabled={loading || historyLoading || !!deletingId || !question.trim()}>Gửi</button>
         </form>
       </div>
+      {open && contextMenu && createPortal(
+        <div ref={contextMenuRef} className="chat-context-menu" role="menu"
+          aria-label="Tùy chọn hội thoại" style={{ left: contextMenu.x, top: contextMenu.y }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              setContextMenu(null);
+              contextMenu.trigger.focus();
+            }
+          }}>
+          <button type="button" role="menuitem"
+            onClick={() => {
+              const conversation = conversations.find((item) => item.id === contextMenu.conversationId);
+              if (conversation) void deleteConversation(conversation);
+            }}>
+            <Trash2 size={16} aria-hidden="true" /> Xóa hội thoại
+          </button>
+        </div>, document.body
+      )}
     </section>
   );
 }
