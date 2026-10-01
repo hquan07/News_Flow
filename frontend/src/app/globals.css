@@ -2761,7 +2761,7 @@ h1 {
 .chat-drawer .chat-view {
   height: 100%;
   min-height: 0;
-  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
 }
 
 .chat-drawer .chat-sidebar,
@@ -2863,18 +2863,24 @@ h1 {
 .chat-project-heading h3 { font-size: 0.95rem; }
 .chat-project-heading button { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
 .chat-project-row { display: grid; grid-template-columns: minmax(0, 1fr) 30px; gap: 0.2rem; }
+.chat-project-children { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.1rem; padding-left: 22px; }
+.chat-project-children p { color: var(--text-muted); font-size: 0.75rem; padding: 0.35rem; }
 .chat-project-row.drop-ready > .chat-project-filter { border-style: dashed; }
 .chat-project-row.drop-target > .chat-project-filter {
   border-color: var(--accent-blue);
   background: rgba(59, 130, 246, 0.3);
 }
 .chat-project-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
   width: 100%;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.chat-project-filter span { overflow: hidden; text-overflow: ellipsis; }
 .chat-project-filter.active {
   border-color: var(--accent-blue);
   background: rgba(59, 130, 246, 0.18);
@@ -2911,6 +2917,52 @@ h1 {
   width: 36px;
   padding: 0;
 }
+
+.chat-sidebar-tree {
+  background: #171717;
+  border: 1px solid #303030;
+}
+.chat-sidebar-tree .chat-new-chat {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: transparent;
+  border-color: transparent;
+  text-align: left;
+}
+.chat-sidebar-tree .chat-search { margin: 0.55rem 0 0.9rem; background: #222; }
+.chat-sidebar-tree .chat-projects {
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  gap: 0.15rem;
+}
+.chat-sidebar-tree .chat-project-heading h3,
+.chat-sidebar-tree .chat-sidebar-heading h2 { color: #888; font-size: 0.8rem; font-weight: 500; }
+.chat-sidebar-tree .chat-project-heading { padding: 0.25rem 0.35rem; }
+.chat-sidebar-tree .chat-project-heading button { background: transparent; border-color: transparent; }
+.chat-sidebar-tree .chat-project-row { gap: 0; grid-template-columns: minmax(0, 1fr) 28px; }
+.chat-sidebar-tree .chat-project-filter,
+.chat-sidebar-tree .chat-conversation-open { border-color: transparent; background: transparent; padding: 0.42rem 0.45rem; font-size: 0.82rem; }
+.chat-sidebar-tree .chat-project-filter.active,
+.chat-sidebar-tree .chat-conversation-open.active,
+.chat-sidebar-tree .chat-project-filter:hover,
+.chat-sidebar-tree .chat-conversation-open:hover { background: #2a2a2a; border-color: transparent; }
+.chat-sidebar-tree .chat-project-options,
+.chat-sidebar-tree .chat-conversation-options { background: transparent; border-color: transparent; opacity: 0; }
+.chat-sidebar-tree .chat-project-row:hover > .chat-project-options,
+.chat-sidebar-tree .chat-project-options:focus-visible,
+.chat-sidebar-tree .chat-conversation-row:hover > .chat-conversation-options,
+.chat-sidebar-tree .chat-conversation-options:focus-visible { opacity: 1; }
+.chat-sidebar-tree .chat-conversation-row:hover > .chat-conversation-options,
+.chat-sidebar-tree .chat-conversation-row:focus-within > .chat-conversation-options { display: grid; }
+.chat-sidebar-tree .chat-conversation-list { gap: 0.1rem; margin-top: 0.3rem; }
+.chat-sidebar-tree .chat-conversation-open { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-sidebar-tree .chat-project-children .chat-conversation-open { padding-left: 0.45rem; }
+.chat-sidebar-tree .chat-drag-hint { margin: 0.35rem 0; }
 
 .chat-context-menu {
   position: fixed;
@@ -3164,10 +3216,12 @@ h1 {
     grid-template-rows: auto minmax(0, 1fr);
   }
   .chat-drawer .chat-sidebar { max-height: 220px; }
-  .chat-drawer .chat-projects { max-height: 110px; }
+  .chat-drawer .chat-projects { max-height: none; }
   .chat-drawer .chat-header { align-items: flex-start; }
 }
 
 @media (hover: none), (pointer: coarse) {
   .chat-conversation-row .chat-conversation-options { display: grid; }
+  .chat-sidebar-tree .chat-project-options,
+  .chat-sidebar-tree .chat-conversation-options { opacity: 1; }
 }

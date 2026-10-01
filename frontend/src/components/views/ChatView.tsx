@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { MoreHorizontal, Pencil, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Pencil, SquarePen, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { API_BASE, apiFetch } from "@/lib/api";
@@ -59,6 +59,9 @@ const suggestions = [
 
 export default function ChatView({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [projectConversations, setProjectConversations] = useState<Record<string, Conversation[]>>({});
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
+  const [listRevision, setListRevision] = useState(0);
   const [projects, setProjects] = useState<Project[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [selectedProject, setSelectedProject] = useState("all");
@@ -77,7 +80,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   const [historyLoading, setHistoryLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
-    conversationId: string;
+    conversation: Conversation;
     x: number;
     y: number;
     trigger: HTMLButtonElement;
@@ -95,17 +98,10 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const visibleConversations = conversations.filter((conversation) => {
-    const inProject = selectedProject === "all" || (
-      selectedProject === "unassigned"
-        ? !conversation.project_id
-        : conversation.project_id === selectedProject
-    );
-    return inProject && conversation.title.toLocaleLowerCase("vi").includes(chatSearch.trim().toLocaleLowerCase("vi"));
-  });
-  const contextConversation = contextMenu
-    ? conversations.find((item) => item.id === contextMenu.conversationId)
-    : null;
+  const visibleConversations = conversations.filter((conversation) =>
+    conversation.title.toLocaleLowerCase("vi").includes(chatSearch.trim().toLocaleLowerCase("vi"))
+  );
+  const contextConversation = contextMenu?.conversation ?? null;
 
   useEffect(() => { setCurrentUser(readCachedUser()); }, []);
 
@@ -224,7 +220,12 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   useEffect(() => {
     let live = true;
     void apiFetch<Project[]>(`${API_BASE}/chat/projects`)
-      .then((items) => { if (live) setProjects(items); })
+      .then((items) => {
+        if (live) {
+          setProjects(items);
+          setExpandedProjectIds(new Set(items.slice(0, 3).map((item) => item.id)));
+        }
+      })
       .catch((cause: Error) => { if (live) setError(cause.message); });
     return () => { live = false; };
   }, []);
@@ -233,16 +234,23 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
     let live = true;
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams({ limit: "100" });
-      if (selectedProject !== "all") params.set("project_id", selectedProject);
       if (chatSearch.trim()) params.set("q", chatSearch.trim());
       setListLoading(true);
+      setProjectConversations({});
       void apiFetch<Conversation[]>(`${API_BASE}/chat/conversations?${params}`)
         .then((items) => { if (live) setConversations(items); })
         .catch((cause: Error) => { if (live) setError(cause.message); })
         .finally(() => { if (live) setListLoading(false); });
+      for (const projectId of expandedProjectIds) {
+        const projectParams = new URLSearchParams(params);
+        projectParams.set("project_id", projectId);
+        void apiFetch<Conversation[]>(`${API_BASE}/chat/conversations?${projectParams}`)
+          .then((items) => { if (live) setProjectConversations((current) => ({ ...current, [projectId]: items })); })
+          .catch((cause: Error) => { if (live) setError(cause.message); });
+      }
     }, chatSearch ? 200 : 0);
     return () => { live = false; window.clearTimeout(timer); };
-  }, [selectedProject, chatSearch]);
+  }, [expandedProjectIds, chatSearch, listRevision]);
 
   useEffect(() => {
     if (!activeId) {
@@ -288,6 +296,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
           { id: response.conversation_id, title: text.slice(0, 120),
             project_id: selectedProject !== "all" && selectedProject !== "unassigned" ? selectedProject : null }, ...current,
         ]);
+        setListRevision((current) => current + 1);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không gửi được câu hỏi.");
@@ -309,6 +318,18 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
     setError(null);
     setContextMenu(null);
     setProjectMenuId(null);
+  }
+
+  function toggleProject(projectId: string) {
+    if (loading || historyLoading || projectBusy || movingId) return;
+    const wasExpanded = expandedProjectIds.has(projectId);
+    setExpandedProjectIds((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+    chooseProject(wasExpanded ? "all" : projectId);
   }
 
   async function saveProject(event: FormEvent<HTMLFormElement>) {
@@ -334,6 +355,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
         : [...current, project]);
       if (!projectEditor.id) {
         setSelectedProject(project.id);
+        setExpandedProjectIds((current) => new Set(current).add(project.id));
         setActiveId(null);
         setMessages([]);
         setChatSearch("");
@@ -358,8 +380,14 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
       setProjects((current) => current.filter((item) => item.id !== project.id));
       setConversations((current) => current.map((item) => item.project_id === project.id
         ? { ...item, project_id: null } : item));
-      if (selectedProject === project.id) setSelectedProject("unassigned");
+      setExpandedProjectIds((current) => {
+        const next = new Set(current);
+        next.delete(project.id);
+        return next;
+      });
+      if (selectedProject === project.id) setSelectedProject("all");
       if (projectEditor?.id === project.id) setProjectEditor(null);
+      setListRevision((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không xóa được Project.");
     } finally {
@@ -379,11 +407,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
           body: JSON.stringify({ project_id: projectId }) },
       );
       setConversations((current) => current.map((item) => item.id === updated.id ? updated : item));
-      if (activeId === conversation.id && selectedProject !== "all" &&
-          (selectedProject === "unassigned" ? !!updated.project_id : selectedProject !== updated.project_id)) {
-        setActiveId(null);
-        setMessages([]);
-      }
+      setListRevision((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không chuyển được hội thoại.");
     } finally {
@@ -396,11 +420,11 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
     setDropProjectId(null);
   }
 
-  function showContextMenu(conversationId: string, x: number, y: number, trigger: HTMLButtonElement) {
+  function showContextMenu(conversation: Conversation, x: number, y: number, trigger: HTMLButtonElement) {
     if (loading || historyLoading || deletingId || movingId || projectBusy) return;
     const menuHeight = Math.min(420, 170 + projects.length * 44);
     setContextMenu({
-      conversationId,
+      conversation,
       x: Math.max(8, Math.min(x, window.innerWidth - 228)),
       y: Math.max(8, Math.min(y, window.innerHeight - menuHeight - 8)),
       trigger,
@@ -416,6 +440,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
     try {
       await apiFetch<void>(`${API_BASE}/chat/conversations/${encodeURIComponent(conversation.id)}`, { method: "DELETE" });
       setConversations((current) => current.filter((item) => item.id !== conversation.id));
+      setListRevision((current) => current + 1);
       if (activeId === conversation.id) {
         setActiveId(null);
         setMessages([]);
@@ -427,19 +452,72 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
     }
   }
 
+  function renderConversation(conversation: Conversation) {
+    return (
+      <div className={`chat-conversation-row ${draggedConversationId === conversation.id ? "dragging" : ""}`}
+        key={conversation.id}
+        draggable={!conversation.project_id && !loading && !historyLoading && !deletingId && !movingId && !projectBusy}
+        onDragStart={(event) => {
+          if (conversation.project_id) { event.preventDefault(); return; }
+          setContextMenu(null);
+          setDraggedConversationId(conversation.id);
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", conversation.id);
+        }}
+        onDragEnd={endConversationDrag}>
+        <button type="button" className={`chat-conversation-open ${activeId === conversation.id ? "active" : ""}`}
+          onClick={() => { setContextMenu(null); setMessages([]); setError(null); setActiveId(conversation.id); }}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            showContextMenu(conversation, event.clientX, event.clientY, event.currentTarget);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+              event.preventDefault();
+              const rect = event.currentTarget.getBoundingClientRect();
+              showContextMenu(conversation, rect.left + 12, rect.bottom, event.currentTarget);
+            }
+          }}
+          disabled={loading || !!deletingId || !!movingId || projectBusy}
+          aria-haspopup="menu"
+          aria-expanded={contextMenu?.conversation.id === conversation.id}
+          title={`${conversation.title} — ${conversation.project_id ? "nhấp chuột phải để mở tùy chọn" : "kéo vào Project hoặc nhấp chuột phải để mở tùy chọn"}`}>
+          {conversation.title}
+        </button>
+        <button type="button" className="chat-conversation-options"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            showContextMenu(conversation, rect.right, rect.bottom, event.currentTarget);
+          }}
+          disabled={loading || historyLoading || !!deletingId || !!movingId || projectBusy}
+          aria-label={`Tùy chọn hội thoại ${conversation.title}`}
+          aria-haspopup="menu" aria-expanded={contextMenu?.conversation.id === conversation.id}
+          title={`Tùy chọn hội thoại ${conversation.title}`}>
+          <MoreHorizontal size={18} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <section className="chat-view" aria-label="NewsPulse chatbot">
-      <div className="chat-sidebar glass-panel">
+      <div className="chat-sidebar chat-sidebar-tree glass-panel">
+        <button type="button" className="chat-new-chat" onClick={() => {
+          chooseProject("all");
+          setChatSearch("");
+          questionRef.current?.focus();
+        }} disabled={loading || historyLoading || !!deletingId || !!movingId || projectBusy}>
+          <SquarePen size={17} aria-hidden="true" /> New chat
+        </button>
+        <label htmlFor="chat-search" className="chat-visually-hidden">Tìm hội thoại</label>
+        <input id="chat-search" className="chat-search" value={chatSearch} maxLength={120}
+          onChange={(event) => setChatSearch(event.target.value)} placeholder="Tìm hội thoại..." />
         <div className="chat-projects">
           <div className="chat-project-heading">
             <h3>Projects</h3>
             <button type="button" onClick={() => { setProjectEditor({ id: null, title: "" }); setProjectMenuId(null); }}
               disabled={projectBusy || projects.length >= 100} aria-label="Tạo Project">+ Mới</button>
           </div>
-          <button type="button" className={selectedProject === "all" ? "chat-project-filter active" : "chat-project-filter"}
-            onClick={() => chooseProject("all")}>Tất cả hội thoại</button>
-          <button type="button" className={selectedProject === "unassigned" ? "chat-project-filter active" : "chat-project-filter"}
-            onClick={() => chooseProject("unassigned")}>Chưa phân loại</button>
           {projects.map((project) => (
             <div className={`chat-project-row ${draggedConversationId ? "drop-ready" : ""} ${dropProjectId === project.id ? "drop-target" : ""}`}
               key={project.id}
@@ -457,7 +535,11 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
                 if (conversation) void moveConversation(conversation, project.id);
               }}>
               <button type="button" className={selectedProject === project.id ? "chat-project-filter active" : "chat-project-filter"}
-                onClick={() => chooseProject(project.id)} title={draggedConversationId ? `Thả hội thoại vào ${project.title}` : project.title}>▣ {project.title}</button>
+                onClick={() => toggleProject(project.id)} title={draggedConversationId ? `Thả hội thoại vào ${project.title}` : project.title}
+                aria-expanded={expandedProjectIds.has(project.id)}>
+                {expandedProjectIds.has(project.id) ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+                <Folder size={16} aria-hidden="true" /> <span>{project.title}</span>
+              </button>
               <button type="button" className="chat-project-options" aria-label={`Tùy chọn Project ${project.title}`}
                 aria-expanded={projectMenuId === project.id}
                 onClick={() => setProjectMenuId((current) => current === project.id ? null : project.id)}>
@@ -465,12 +547,24 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
               </button>
               {projectMenuId === project.id && (
                 <div className="chat-project-actions">
+                  <button type="button" disabled={loading || historyLoading || !!movingId || projectBusy}
+                    onClick={() => { chooseProject(project.id); setExpandedProjectIds((current) => new Set(current).add(project.id)); questionRef.current?.focus(); }}>
+                    <SquarePen size={14} aria-hidden="true" /> Chat mới
+                  </button>
                   <button type="button" onClick={() => { setProjectEditor({ id: project.id, title: project.title }); setProjectMenuId(null); }}>
                     <Pencil size={14} aria-hidden="true" /> Đổi tên
                   </button>
                   <button type="button" onClick={() => void deleteProject(project)}>
                     <Trash2 size={14} aria-hidden="true" /> Xóa Project
                   </button>
+                </div>
+              )}
+              {expandedProjectIds.has(project.id) && (
+                <div className="chat-project-children">
+                  {projectConversations[project.id]?.map(renderConversation)}
+                  {!projectConversations[project.id] && <p>Đang tải…</p>}
+                  {projectConversations[project.id]?.length === 0 && <p>Chưa có hội thoại.</p>}
+                  {(projectConversations[project.id]?.length ?? 0) >= 100 && <p>Hiển thị 100 chat gần nhất.</p>}
                 </div>
               )}
             </div>
@@ -488,66 +582,12 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
             </form>
           )}
         </div>
-        <div className="chat-sidebar-heading">
-          <h2>Hội thoại</h2>
-          <button type="button" onClick={() => { setActiveId(null); setMessages([]); setChatSearch(""); setError(null); }}
-            disabled={loading || !!deletingId || !!movingId || projectBusy}>+ Mới</button>
-        </div>
-        <label htmlFor="chat-search" className="chat-visually-hidden">Tìm hội thoại</label>
-        <input id="chat-search" className="chat-search" value={chatSearch} maxLength={120}
-          onChange={(event) => setChatSearch(event.target.value)} placeholder="Tìm hội thoại..." />
+        <div className="chat-sidebar-heading"><h2>Recents</h2></div>
         {visibleConversations.some((conversation) => !conversation.project_id) && projects.length > 0 && (
           <p className="chat-drag-hint">Kéo chat chưa phân loại vào một Project.</p>
         )}
         <div className="chat-conversation-list">
-          {visibleConversations.map((conversation) => (
-            <div className={`chat-conversation-row ${draggedConversationId === conversation.id ? "dragging" : ""}`}
-              key={conversation.id}
-              draggable={!conversation.project_id && !loading && !historyLoading && !deletingId && !movingId && !projectBusy}
-              onDragStart={(event) => {
-                if (conversation.project_id) { event.preventDefault(); return; }
-                setContextMenu(null);
-                setDraggedConversationId(conversation.id);
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", conversation.id);
-              }}
-              onDragEnd={endConversationDrag}>
-              <button
-                type="button"
-                className={`chat-conversation-open ${activeId === conversation.id ? "active" : ""}`}
-                onClick={() => { setContextMenu(null); setMessages([]); setError(null); setActiveId(conversation.id); }}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  showContextMenu(conversation.id, event.clientX, event.clientY, event.currentTarget);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
-                    event.preventDefault();
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    showContextMenu(conversation.id, rect.left + 12, rect.bottom, event.currentTarget);
-                  }
-                }}
-                disabled={loading || !!deletingId || !!movingId || projectBusy}
-                aria-haspopup="menu"
-                aria-expanded={contextMenu?.conversationId === conversation.id}
-                title={`${conversation.title} — ${conversation.project_id ? "nhấp chuột phải để mở tùy chọn" : "kéo vào Project hoặc nhấp chuột phải để mở tùy chọn"}`}
-              >
-                {conversation.title}
-              </button>
-              <button type="button" className="chat-conversation-options"
-                onClick={(event) => {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  showContextMenu(conversation.id, rect.right, rect.bottom, event.currentTarget);
-                }}
-                disabled={loading || historyLoading || !!deletingId || !!movingId || projectBusy}
-                aria-label={`Tùy chọn hội thoại ${conversation.title}`}
-                aria-haspopup="menu"
-                aria-expanded={contextMenu?.conversationId === conversation.id}
-                title={`Tùy chọn hội thoại ${conversation.title}`}>
-                <MoreHorizontal size={18} aria-hidden="true" />
-              </button>
-            </div>
-          ))}
+          {visibleConversations.map(renderConversation)}
           {listLoading && <p>Đang tìm hội thoại…</p>}
           {!listLoading && visibleConversations.length === 0 && <p>Chưa có hội thoại phù hợp.</p>}
           {conversations.length >= 100 && <p>Đang hiển thị 100 hội thoại gần nhất trong bộ lọc.</p>}
@@ -557,7 +597,9 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
         <div className="chat-header">
           <div>
             <h2>NewsPulse Assistant</h2>
-            <p>Hỏi về bài viết, từ khóa, cảm xúc, thực thể và nguồn tin.</p>
+            <p>{!activeId && selectedProject !== "all"
+              ? `Chat mới trong Project ${projects.find((project) => project.id === selectedProject)?.title ?? ""}.`
+              : "Hỏi về bài viết, từ khóa, cảm xúc, thực thể và nguồn tin."}</p>
           </div>
           <div className="chat-header-controls">
             <select aria-label="Khoảng thời gian" value={timeRange} onChange={(event) => setTimeRange(event.target.value)} disabled={loading}>
