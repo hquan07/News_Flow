@@ -1,4 +1,4 @@
-"""Read-only, bounded data tools available to the Phase 2 chatbot."""
+"""Read-only, bounded data tools available to the chatbot."""
 
 import re
 import unicodedata
@@ -26,6 +26,8 @@ class ToolResult:
     sources: list[dict] = field(default_factory=list)
     queried_at: datetime | None = None
     time_range: str | None = None
+    chart: dict | None = None
+    context: dict | None = None
 
 
 def _normalized(value: str) -> str:
@@ -37,12 +39,16 @@ def _intent(message: str) -> str | None:
     normalized = _normalized(message)
     if any(word in normalized for word in ("canh bao", "alert", "khung hoang", "bat thuong")):
         return "alerts"
+    if any(word in normalized for word in ("so sanh nguon", "so sanh bao", "nguon nao", "bao nao", "compare sources")):
+        return "sources"
     if any(word in normalized for word in ("sentiment", "cam xuc", "tich cuc", "tieu cuc")):
         return "sentiment"
     if any(word in normalized for word in ("trending", "xu huong", "thinh hanh", "tu khoa", "chu de nao")):
         return "trending"
     if any(word in normalized for word in ("bai viet", "bai bao", "tin moi", "tim tin", "tim bai", "tom tat", "articles")):
         return "articles"
+    if any(word in normalized for word in ("entity", "thuc the", "nhan vat", "to chuc nao", "dia danh", "lien quan den")):
+        return "entities"
     return None
 
 
@@ -55,6 +61,55 @@ def _time_range(request: ChatRequest) -> str:
     if "30 ngay" in normalized or "30d" in normalized or "thang qua" in normalized:
         return "30d"
     return "7d"
+
+
+def _has_time_hint(message: str) -> bool:
+    normalized = _normalized(message)
+    return any(value in normalized for value in (
+        "hom nay", "today", "24 gio", "7 ngay", "7d", "30 ngay", "30d", "thang qua"
+    ))
+
+
+def _is_followup(message: str) -> bool:
+    normalized = _normalized(message).strip()
+    return normalized.startswith(("con ", "the ", "vay ", "neu ", "so voi "))
+
+
+_SOURCE_NAMES = {
+    "vnexpress": "vnexpress",
+    "tuoi tre": "tuoitre",
+    "tuoitre": "tuoitre",
+    "thanh nien": "thanhnien",
+    "thanhnien": "thanhnien",
+    "dan tri": "dantri",
+    "dantri": "dantri",
+    "lao dong": "laodong",
+    "laodong": "laodong",
+    "tien phong": "tienphong",
+    "tienphong": "tienphong",
+}
+
+
+def _mentioned_sources(message: str) -> list[str]:
+    normalized = _normalized(message)
+    return list(dict.fromkeys(
+        canonical for alias, canonical in _SOURCE_NAMES.items()
+        if re.search(rf"\b{re.escape(alias)}\b", normalized)
+    ))
+
+
+def _chart(title: str, unit: str, rows: list[dict], label_key: str, value_key: str) -> dict | None:
+    if not rows:
+        return None
+    return {
+        "type": "bar",
+        "title": title,
+        "unit": unit,
+        "points": [
+            {"label": str(row[label_key]), "value": float(row[value_key])}
+            for row in rows[:10]
+        ],
+    }
 
 
 def _search_term(request: ChatRequest) -> str | None:
@@ -142,7 +197,10 @@ def _trending(request: ChatRequest, time_range: str) -> ToolResult:
         answer += "\nĐây là tần suất trong khoảng chọn, chưa phải tốc độ tăng so với kỳ trước."
     else:
         answer = "Chưa có dữ liệu từ khóa trong khoảng thời gian này."
-    return ToolResult(answer=answer, tool="get_trending_keywords", time_range=time_range)
+    return ToolResult(
+        answer=answer, tool="get_trending_keywords", time_range=time_range,
+        chart=_chart("Tần suất từ khóa", "bài viết", rows, "keyword", "count"),
+    )
 
 
 def _sentiment(request: ChatRequest, time_range: str) -> ToolResult:
@@ -164,7 +222,89 @@ def _sentiment(request: ChatRequest, time_range: str) -> ToolResult:
         )
     else:
         answer = "Chưa có bài viết đã phân tích cảm xúc phù hợp với bộ lọc này."
-    return ToolResult(answer=answer, tool="get_sentiment_distribution", time_range=time_range)
+    return ToolResult(
+        answer=answer, tool="get_sentiment_distribution", time_range=time_range,
+        chart=_chart("Phân bố cảm xúc", "bài viết", rows, "sentiment_label", "count"),
+    )
+
+
+def _sources(request: ChatRequest, time_range: str) -> ToolResult:
+    if request.source:
+        raise HTTPException(status_code=422, detail="Clear the single-source filter to compare sources")
+    selected = request.compare_sources or _mentioned_sources(request.message)
+    if request.query:
+        title_query = request.query
+    else:
+        title_query = _search_term(request)
+    where, params = _where(request, time_range, title_query=title_query)
+    if selected:
+        where += " AND has({source_names:Array(String)}, a.source)"
+        params["source_names"] = selected
+    rows = _query(
+        "SELECT a.source, countDistinct(a.url_hash) AS article_count, "
+        "round(avg(a.word_count), 1) AS avg_word_count "
+        "FROM newspulse.raw_articles FINAL AS a "
+        f"WHERE {where} GROUP BY a.source ORDER BY article_count DESC LIMIT 6",
+        params,
+    )
+    if rows:
+        answer = f"Số bài theo nguồn trong {_TIME_LABELS[time_range]}:\n" + "\n".join(
+            f"- {row['source']}: {row['article_count']} bài, trung bình {row['avg_word_count']} từ/bài"
+            for row in rows
+        )
+        answer += "\nĐây là số bài trong kỳ, chưa đo tốc độ đưa tin hay mức độ trùng lặp."
+    else:
+        answer = "Chưa có bài viết phù hợp để so sánh các nguồn."
+    return ToolResult(
+        answer=answer, tool="compare_sources", time_range=time_range,
+        chart=_chart("Số bài theo nguồn", "bài viết", rows, "source", "article_count"),
+    )
+
+
+def _entities(request: ChatRequest, time_range: str) -> ToolResult:
+    subject = _search_term(request)
+    if not subject:
+        match = re.search(r"(?:liên quan đến|lien quan den)\s+(.+)", request.message, re.IGNORECASE)
+        subject = match.group(1).strip(" ?.!")[:120] if match else None
+    where, params = _where(request, time_range)
+    if subject:
+        where += " AND target.entity ILIKE {entity_query:String} AND e.entity != target.entity"
+        params["entity_query"] = f"%{subject}%"
+        rows = _query(
+            "SELECT e.entity AS entity_name, e.entity_type, "
+            "countDistinct(a.url_hash) AS article_count "
+            "FROM newspulse.raw_article_entities AS e "
+            "INNER JOIN newspulse.raw_article_entities AS target ON e.url_hash = target.url_hash "
+            "INNER JOIN newspulse.raw_articles FINAL AS a ON e.url_hash = a.url_hash "
+            f"WHERE {where} GROUP BY e.entity, e.entity_type "
+            "ORDER BY article_count DESC LIMIT 10",
+            params,
+        )
+        heading = f"Thực thể cùng xuất hiện với {subject} trong {_TIME_LABELS[time_range]}"
+    else:
+        rows = _query(
+            "SELECT e.entity AS entity_name, e.entity_type, "
+            "countDistinct(a.url_hash) AS article_count "
+            "FROM newspulse.raw_article_entities AS e "
+            "INNER JOIN newspulse.raw_articles FINAL AS a ON e.url_hash = a.url_hash "
+            f"WHERE {where} GROUP BY e.entity, e.entity_type "
+            "ORDER BY article_count DESC LIMIT 10",
+            params,
+        )
+        heading = f"Thực thể xuất hiện nhiều trong {_TIME_LABELS[time_range]}"
+    if rows:
+        answer = heading + ":\n" + "\n".join(
+            f"- {row['entity_name']} ({row['entity_type']}): {row['article_count']} bài"
+            for row in rows
+        )
+        if subject:
+            answer += "\nCùng xuất hiện trong bài không chứng minh quan hệ trực tiếp."
+    else:
+        answer = "Chưa có dữ liệu thực thể phù hợp trong khoảng thời gian này."
+    return ToolResult(
+        answer=answer, tool="get_entities", time_range=time_range,
+        chart=_chart("Số bài nhắc tới thực thể", "bài viết", rows, "entity_name", "article_count"),
+    )
 
 
 def _alerts(request: ChatRequest, time_range: str) -> ToolResult:
@@ -181,15 +321,34 @@ def _alerts(request: ChatRequest, time_range: str) -> ToolResult:
     return ToolResult(answer=answer, tool="get_volume_alerts", time_range="7d")
 
 
-def answer_question(request: ChatRequest, actor: dict) -> ToolResult:
+def answer_question(
+    request: ChatRequest, actor: dict, previous_context: dict | None = None
+) -> ToolResult:
     intent = _intent(request.message)
+    followup = _is_followup(request.message) and previous_context is not None
+    if followup and intent is None:
+        intent = previous_context.get("intent")
+    if followup and intent != "alerts":
+        previous_time = previous_context.get("time_range", "7d")
+        mentioned = _mentioned_sources(request.message)
+        request = request.model_copy(update={
+            "time_range": request.time_range or (
+                _time_range(request) if _has_time_hint(request.message) else previous_time
+            ),
+            "source": request.source or (
+                None if intent == "sources" else
+                (mentioned[0] if mentioned else previous_context.get("source"))
+            ),
+            "category": request.category or previous_context.get("category"),
+            "query": request.query or _search_term(request) or previous_context.get("query"),
+        })
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'alerts.read'")
-    if intent in ("articles", "trending", "sentiment") and "dashboard.read" not in actor["permissions"]:
+    if intent in ("articles", "trending", "sentiment", "sources", "entities") and "dashboard.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'dashboard.read'")
     if intent is None:
         return ToolResult(answer=(
-            "Mình hỗ trợ tìm bài viết, xem từ khóa thịnh hành, phân bố cảm xúc "
+            "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn "
             "và cảnh báo tăng đột biến. Hãy hỏi rõ một trong các nội dung này."
         ))
     time_range = _time_range(request)
@@ -197,7 +356,16 @@ def answer_question(request: ChatRequest, actor: dict) -> ToolResult:
         "articles": _articles,
         "trending": _trending,
         "sentiment": _sentiment,
+        "sources": _sources,
+        "entities": _entities,
         "alerts": _alerts,
     }[intent](request, time_range)
     result.queried_at = datetime.now(timezone.utc)
+    result.context = {
+        "intent": intent,
+        "time_range": time_range,
+        "source": request.source,
+        "category": request.category,
+        "query": _search_term(request),
+    }
     return result

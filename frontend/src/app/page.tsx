@@ -21,6 +21,7 @@ import AlertsPanel from "@/components/AlertsPanel";
 import AdminView from "@/components/views/AdminView";
 import DebatesView from "@/components/views/DebatesView";
 import ForYouView from "@/components/views/ForYouView";
+import ChatView from "@/components/views/ChatView";
 import StreamView from "@/components/views/StreamView";
 import ArticlesView from "@/components/views/ArticlesView";
 import NetworkView from "@/components/views/NetworkView";
@@ -1217,6 +1218,17 @@ export default function Home() {
                     ✨ For You
                   </button>
                 )}
+                {hasPermission(user, "chat.use") && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "chat"}
+                    className={activeTab === "chat" ? "admin-sidebar-btn active" : "admin-sidebar-btn"}
+                    onClick={() => setActiveTab("chat")}
+                  >
+                    <MessageSquare size={18} /> Chat Assistant
+                  </button>
+                )}
               </aside>
               <div className="admin-content">
 
@@ -1290,6 +1302,10 @@ export default function Home() {
               trackClick={trackClick}
               timeAgo={timeAgo}
             />
+          )}
+
+          {activeTab === "chat" && dashboardMode === "news" && hasPermission(user, "chat.use") && (
+            <ChatView />
           )}
 
           {apiError && (

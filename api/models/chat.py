@@ -26,6 +26,8 @@ class ChatMessage(BaseModel):
     sources: list["ChatSource"] = Field(default_factory=list)
     tool: str | None = None
     queried_at: datetime | None = None
+    chart: "ChatChart | None" = None
+    context: "ChatContext | None" = None
 
 
 class ChatSource(BaseModel):
@@ -36,6 +38,26 @@ class ChatSource(BaseModel):
     published_at: datetime | None = None
 
 
+class ChatChartPoint(BaseModel):
+    label: str
+    value: float
+
+
+class ChatChart(BaseModel):
+    type: Literal["bar"] = "bar"
+    title: str
+    unit: str
+    points: list[ChatChartPoint] = Field(default_factory=list)
+
+
+class ChatContext(BaseModel):
+    intent: str
+    time_range: Literal["today", "7d", "30d"]
+    source: str | None = None
+    category: str | None = None
+    query: str | None = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     conversation_id: str | None = None
@@ -43,6 +65,7 @@ class ChatRequest(BaseModel):
     source: str | None = Field(default=None, max_length=80)
     category: str | None = Field(default=None, max_length=80)
     query: str | None = Field(default=None, max_length=120)
+    compare_sources: list[str] | None = Field(default=None, min_length=2, max_length=6)
 
     @field_validator("message")
     @classmethod
@@ -60,6 +83,7 @@ class ChatResponse(BaseModel):
     sources: list[ChatSource] = Field(default_factory=list)
     queried_at: datetime | None = None
     time_range: str | None = None
+    chart: ChatChart | None = None
 
 
 class ConversationDetail(Conversation):

@@ -20,17 +20,28 @@ from api.services import chat_store, chat_tools
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
-async def _run_tool(payload: ChatRequest, actor: dict) -> chat_tools.ToolResult:
-    return await asyncio.to_thread(chat_tools.answer_question, payload, actor)
+async def _run_tool(
+    payload: ChatRequest, actor: dict, previous_context: dict | None
+) -> chat_tools.ToolResult:
+    return await asyncio.to_thread(
+        chat_tools.answer_question, payload, actor, previous_context
+    )
 
 
 async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
     owner_id = actor["sub"]
+    previous_context = None
     if payload.conversation_id:
         # Check ownership before executing a query or writing any messages.
-        await chat_store.get_conversation(owner_id, payload.conversation_id)
+        conversation = await chat_store.get_conversation(owner_id, payload.conversation_id)
+        last_answer = next(
+            (message for message in reversed(conversation["messages"])
+             if message["role"] == "assistant"),
+            None,
+        )
+        previous_context = last_answer.get("context") if last_answer else None
 
-    result = await _run_tool(payload, actor)
+    result = await _run_tool(payload, actor, previous_context)
     if payload.conversation_id:
         conversation_id = payload.conversation_id
     else:
@@ -48,6 +59,8 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
         sources=result.sources,
         tool=result.tool,
         queried_at=result.queried_at,
+        chart=result.chart,
+        context=result.context,
     )
     return ChatResponse(
         conversation_id=conversation_id,
@@ -56,6 +69,7 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
         sources=result.sources,
         queried_at=result.queried_at,
         time_range=result.time_range,
+        chart=result.chart,
     )
 
 

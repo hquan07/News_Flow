@@ -23,8 +23,8 @@ def chat_db(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def inline_chat_tools(monkeypatch):
-    async def run_tool(payload, actor):
-        return chat_tools.answer_question(payload, actor)
+    async def run_tool(payload, actor, previous_context):
+        return chat_tools.answer_question(payload, actor, previous_context)
 
     monkeypatch.setattr(chat, "_run_tool", run_tool)
 
