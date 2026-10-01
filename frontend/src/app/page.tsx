@@ -32,7 +32,6 @@ import SentimentView from "@/components/views/SentimentView";
 import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
-import MockDataGenerator from "@/components/views/MockDataGenerator";
 import CrawlerManagementView from "@/components/views/CrawlerManagementView";
 import UserManagementView from "@/components/views/UserManagementView";
 import SocialInfluencersView, {
@@ -1034,7 +1033,6 @@ export default function Home() {
                   <UserCog size={18} /> User Access
                 </button>}
 
-                {hasPermission(user, "mock_data.create") && <MockDataGenerator />}
               </aside>
               <div className="admin-content">
 
@@ -1113,7 +1111,7 @@ export default function Home() {
           )}
 
           {activeTab === "crawlers" && dashboardMode === "admin" && hasPermission(user, "crawler.read") && (
-            <CrawlerManagementView canRun={hasPermission(user, "crawler.run")} />
+            <CrawlerManagementView canRun={hasPermission(user, "crawler.run")} canCreateMock={hasPermission(user, "mock_data.create")} />
           )}
 
           {activeTab === "users" && dashboardMode === "admin" && canManageUsers && (

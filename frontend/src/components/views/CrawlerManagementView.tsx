@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { DatabaseZap, Loader2, Play, RefreshCw } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
+import MockDataGenerator from "@/components/views/MockDataGenerator";
 
 type Crawler = {
   spider_name: string;
@@ -15,7 +16,7 @@ type Crawler = {
   total_items: number;
 };
 
-export default function CrawlerManagementView({ canRun }: { canRun: boolean }) {
+export default function CrawlerManagementView({ canRun, canCreateMock }: { canRun: boolean; canCreateMock: boolean }) {
   const [crawlers, setCrawlers] = useState<Crawler[]>([]);
   const [dagState, setDagState] = useState("unknown");
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,7 @@ export default function CrawlerManagementView({ canRun }: { canRun: boolean }) {
     }
   };
 
-  return (
+  return <div className="crawler-management">
     <section className="glass-panel access-panel">
       <div className="access-panel-header">
         <div>
@@ -100,5 +101,10 @@ export default function CrawlerManagementView({ canRun }: { canRun: boolean }) {
         ))}
       </div>
     </section>
-  );
+    {canCreateMock && <section className="glass-panel crawler-test-panel" aria-labelledby="crawler-test-title">
+      <h2 id="crawler-test-title">Test Data</h2>
+      <p>Generate sample social posts for testing. These are not collected by crawlers.</p>
+      <MockDataGenerator />
+    </section>}
+  </div>;
 }
