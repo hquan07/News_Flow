@@ -152,7 +152,7 @@ def _articles(request: ChatRequest, time_range: str) -> ToolResult:
     rows = _query(
         "SELECT a.url_hash AS article_id, a.title, a.url, a.source, "
         "a.publish_time AS published_at "
-        "FROM newspulse.raw_articles FINAL AS a "
+        "FROM newspulse.raw_articles AS a FINAL "
         f"WHERE {where} ORDER BY a.publish_time DESC LIMIT 5",
         params,
     )
@@ -188,7 +188,7 @@ def _trending(request: ChatRequest, time_range: str) -> ToolResult:
     rows = _query(
         "SELECT k.keyword, countDistinct(a.url_hash) AS count "
         "FROM newspulse.raw_article_keywords AS k "
-        "INNER JOIN newspulse.raw_articles FINAL AS a ON k.url_hash = a.url_hash "
+        "INNER JOIN newspulse.raw_articles AS a FINAL ON k.url_hash = a.url_hash "
         f"WHERE {where} GROUP BY k.keyword ORDER BY count DESC LIMIT 10",
         params,
     )
@@ -211,8 +211,8 @@ def _sentiment(request: ChatRequest, time_range: str) -> ToolResult:
     rows = _query(
         "SELECT lowerUTF8(s.sentiment_label) AS sentiment_label, "
         "countDistinct(a.url_hash) AS count "
-        "FROM newspulse.raw_articles FINAL AS a "
-        "INNER JOIN newspulse.raw_article_sentiment FINAL AS s "
+        "FROM newspulse.raw_articles AS a FINAL "
+        "INNER JOIN newspulse.raw_article_sentiment AS s FINAL "
         "ON a.url_hash = s.url_hash "
         f"WHERE {where} GROUP BY sentiment_label ORDER BY count DESC",
         params,
@@ -246,7 +246,7 @@ def _sources(request: ChatRequest, time_range: str) -> ToolResult:
     rows = _query(
         "SELECT a.source, countDistinct(a.url_hash) AS article_count, "
         "round(avg(a.word_count), 1) AS avg_word_count "
-        "FROM newspulse.raw_articles FINAL AS a "
+        "FROM newspulse.raw_articles AS a FINAL "
         f"WHERE {where} GROUP BY a.source ORDER BY article_count DESC LIMIT 6",
         params,
     )
@@ -278,7 +278,7 @@ def _entities(request: ChatRequest, time_range: str) -> ToolResult:
             "countDistinct(a.url_hash) AS article_count "
             "FROM newspulse.raw_article_entities AS e "
             "INNER JOIN newspulse.raw_article_entities AS target ON e.url_hash = target.url_hash "
-            "INNER JOIN newspulse.raw_articles FINAL AS a ON e.url_hash = a.url_hash "
+            "INNER JOIN newspulse.raw_articles AS a FINAL ON e.url_hash = a.url_hash "
             f"WHERE {where} GROUP BY e.entity, e.entity_type "
             "ORDER BY article_count DESC LIMIT 10",
             params,
@@ -289,7 +289,7 @@ def _entities(request: ChatRequest, time_range: str) -> ToolResult:
             "SELECT e.entity AS entity_name, e.entity_type, "
             "countDistinct(a.url_hash) AS article_count "
             "FROM newspulse.raw_article_entities AS e "
-            "INNER JOIN newspulse.raw_articles FINAL AS a ON e.url_hash = a.url_hash "
+            "INNER JOIN newspulse.raw_articles AS a FINAL ON e.url_hash = a.url_hash "
             f"WHERE {where} GROUP BY e.entity, e.entity_type "
             "ORDER BY article_count DESC LIMIT 10",
             params,

@@ -7,6 +7,7 @@ from time import monotonic
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from api.models.chat import (
     ChatRequest,
@@ -33,9 +34,13 @@ async def _record_metric(tool: str, outcome: str, started: float, source_count: 
 async def _run_tool(
     payload: ChatRequest, actor: dict, previous_context: dict | None
 ) -> chat_tools.ToolResult:
-    return await asyncio.to_thread(
-        chat_tools.answer_question, payload, actor, previous_context
-    )
+    try:
+        return await asyncio.to_thread(
+            chat_tools.answer_question, payload, actor, previous_context
+        )
+    except DatabaseError as exc:
+        logger.exception("Chat data query failed")
+        raise HTTPException(status_code=500, detail="Chat data query failed") from exc
 
 
 async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:

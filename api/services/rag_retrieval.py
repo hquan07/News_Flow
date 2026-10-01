@@ -36,7 +36,7 @@ def _keyword_candidates(query: str, since: datetime, source: str | None, categor
         matches.append(f"(a.title ILIKE {{term{index}:String}} OR a.content ILIKE {{term{index}:String}})")
     where.append("(" + " OR ".join(matches) + ")")
     rows = _query(
-        "SELECT a.url_hash AS article_id FROM newspulse.raw_articles FINAL AS a "
+        "SELECT a.url_hash AS article_id FROM newspulse.raw_articles AS a FINAL "
         "WHERE " + " AND ".join(where) + " ORDER BY a.publish_time DESC LIMIT 12",
         params,
     )
@@ -57,7 +57,7 @@ def _current_articles(ids: list[str], since: datetime, source: str | None, categ
     rows = _query(
         "SELECT a.url_hash AS article_id, a.title, a.content, a.url, a.source, "
         "a.category, a.publish_time AS published_at "
-        "FROM newspulse.raw_articles FINAL AS a WHERE " + " AND ".join(where) +
+        "FROM newspulse.raw_articles AS a FINAL WHERE " + " AND ".join(where) +
         " LIMIT 32",
         params,
     )

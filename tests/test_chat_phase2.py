@@ -157,7 +157,7 @@ async def test_sentiment_uses_filtered_article_rows(
     assert response.json()["tool"] == "get_sentiment_distribution"
     assert "positive: 3 bài" in response.json()["answer"]
     assert captured["params"] == {"title_query": "%AI%"}
-    assert "raw_article_sentiment FINAL" in captured["sql"]
+    assert "raw_article_sentiment AS s FINAL" in captured["sql"]
     assert "30 DAY" in captured["sql"]
 
 
