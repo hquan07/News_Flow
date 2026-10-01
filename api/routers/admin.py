@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from random import choice, randint, uniform
+from random import randint, uniform
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query
@@ -12,38 +13,104 @@ from api.services.health import dependency_health
 
 router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
 
+MockScenario = Literal["balanced", "high_engagement", "negative_sentiment"]
+MOCK_SCENARIOS = {
+    "balanced": {
+        "label": "Chart coverage",
+        "description": "Balanced sources and sentiments with low engagement.",
+        "sources": ("reddit_vn", "facebook", "voz_forum", "youtube_comments"),
+        "sentiments": ("positive", "neutral", "negative"),
+        "like_range": (2, 30),
+        "reply_range": (0, 10),
+        "topics": (
+            "AI và tương lai việc làm",
+            "Thị trường công nghệ hôm nay",
+            "Cộng đồng bàn luận về sản phẩm mới",
+            "Xu hướng nổi bật trên mạng xã hội",
+        ),
+    },
+    "high_engagement": {
+        "label": "High engagement",
+        "description": "Posts with many likes and replies for engagement and viral-alert testing.",
+        "sources": ("reddit_vn", "facebook", "voz_forum", "youtube_comments"),
+        "sentiments": ("positive", "neutral", "negative"),
+        "like_range": (1500, 6000),
+        "reply_range": (200, 900),
+        "topics": (
+            "Chủ đề công nghệ đang được quan tâm",
+            "Bài thảo luận thu hút nhiều tương tác",
+            "Sự kiện nổi bật trong cộng đồng",
+        ),
+    },
+    "negative_sentiment": {
+        "label": "Negative sentiment",
+        "description": "Negative posts concentrated on one source for sentiment and crisis-alert testing.",
+        "sources": ("reddit_vn",),
+        "sentiments": ("negative",),
+        "like_range": (2, 30),
+        "reply_range": (0, 10),
+        "topics": (
+            "Người dùng phản ánh lỗi dịch vụ",
+            "Tranh cãi về chất lượng sản phẩm",
+            "Cộng đồng bày tỏ sự thất vọng",
+        ),
+    },
+}
+
+
+@router.get("/mock/social/scenarios")
+def list_mock_social_scenarios(
+    _user: dict = Depends(require_permission("mock_data.create")),
+):
+    return {
+        "scenarios": [
+            {
+                "id": key,
+                "label": config["label"],
+                "description": config["description"],
+                "sources": config["sources"],
+                "sentiments": config["sentiments"],
+                "like_range": config["like_range"],
+                "reply_range": config["reply_range"],
+            }
+            for key, config in MOCK_SCENARIOS.items()
+        ],
+        "destination": "newspulse.social_sentiment_metrics",
+    }
+
 
 @router.post("/mock/social")
 def inject_mock_social_posts(
     count: int = Query(default=10, ge=1, le=1000),
+    scenario: MockScenario = Query(default="balanced"),
     user: dict = Depends(require_permission("mock_data.create")),
 ):
     """Insert synthetic social posts for local/demo alert testing."""
     del user
-    sources = ("reddit_vn", "facebook", "voz_forum", "youtube_comments")
-    topics = (
-        "AI và tương lai việc làm",
-        "Thị trường công nghệ hôm nay",
-        "Cộng đồng bàn luận về sản phẩm mới",
-        "Xu hướng nổi bật trên mạng xã hội",
-    )
-    sentiments = ("positive", "neutral", "negative")
+    config = MOCK_SCENARIOS[scenario]
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     rows = []
-    for _ in range(count):
+    for index in range(count):
         post_id = f"live_post_{uuid4().hex}"
-        source = choice(sources)
-        title = choice(topics)
+        source = config["sources"][index % len(config["sources"])]
+        title = config["topics"][index % len(config["topics"])]
+        sentiment = config["sentiments"][index % len(config["sentiments"])]
+        if sentiment == "positive":
+            sentiment_score = round(uniform(0.25, 0.9), 4)
+        elif sentiment == "negative":
+            sentiment_score = round(uniform(-0.95, -0.5), 4)
+        else:
+            sentiment_score = round(uniform(-0.15, 0.15), 4)
         rows.append([
             post_id,
             source,
-            title,
-            f"Synthetic demo post about {title.lower()}.",
-            randint(20, 500),
+            f"[MOCK] {title}",
+            f"[MOCK:{scenario}] Synthetic demo post about {title.lower()}.",
+            randint(*config["like_range"]),
             round(uniform(0.75, 1.0), 4),
-            randint(5, 180),
-            round(uniform(-1.0, 1.0), 4),
-            choice(sentiments),
+            randint(*config["reply_range"]),
+            sentiment_score,
+            sentiment,
             now,
             now,
             now,
@@ -64,8 +131,9 @@ def inject_mock_social_posts(
     return {
         "status": "success",
         "count": count,
+        "scenario": scenario,
         "synthetic": True,
-        "message": f"Injected {count} synthetic social posts",
+        "message": f"Injected {count} synthetic social posts for {config['label']}",
     }
 
 
