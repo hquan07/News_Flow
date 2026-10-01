@@ -40,6 +40,9 @@ def _serialize_message(document: dict) -> dict:
         "role": document["role"],
         "content": document["content"],
         "created_at": document["created_at"],
+        "sources": document.get("sources", []),
+        "tool": document.get("tool"),
+        "queried_at": document.get("queried_at"),
     }
 
 
@@ -108,6 +111,10 @@ async def append_message(
     conversation_id: str,
     role: Literal["user", "assistant"],
     content: str,
+    *,
+    sources: list[dict] | None = None,
+    tool: str | None = None,
+    queried_at: datetime | None = None,
 ) -> dict:
     if role not in ("user", "assistant") or not content.strip() or len(content) > 16000:
         raise ValueError("Invalid chat message")
@@ -126,6 +133,9 @@ async def append_message(
         "role": role,
         "content": content,
         "created_at": now,
+        "sources": sources or [],
+        "tool": tool,
+        "queried_at": queried_at,
     }
     result = await db.chat_messages.insert_one(document)
     document["_id"] = result.inserted_id

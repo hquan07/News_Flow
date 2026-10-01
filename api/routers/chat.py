@@ -1,13 +1,90 @@
-"""Conversation management endpoints; model responses arrive in a later phase."""
+"""Authenticated conversation and read-only news question endpoints."""
+
+import asyncio
+import json
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.responses import StreamingResponse
 
-from api.models.chat import Conversation, ConversationCreate, ConversationDetail
+from api.models.chat import (
+    ChatRequest,
+    ChatResponse,
+    Conversation,
+    ConversationCreate,
+    ConversationDetail,
+)
 from api.security import require_permission
-from api.services import chat_store
+from api.services import chat_store, chat_tools
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+
+
+async def _run_tool(payload: ChatRequest, actor: dict) -> chat_tools.ToolResult:
+    return await asyncio.to_thread(chat_tools.answer_question, payload, actor)
+
+
+async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
+    owner_id = actor["sub"]
+    if payload.conversation_id:
+        # Check ownership before executing a query or writing any messages.
+        await chat_store.get_conversation(owner_id, payload.conversation_id)
+
+    result = await _run_tool(payload, actor)
+    if payload.conversation_id:
+        conversation_id = payload.conversation_id
+    else:
+        conversation = await chat_store.create_conversation(
+            owner_id, payload.message.strip()[:120]
+        )
+        conversation_id = conversation["id"]
+
+    await chat_store.append_message(owner_id, conversation_id, "user", payload.message)
+    await chat_store.append_message(
+        owner_id,
+        conversation_id,
+        "assistant",
+        result.answer,
+        sources=result.sources,
+        tool=result.tool,
+        queried_at=result.queried_at,
+    )
+    return ChatResponse(
+        conversation_id=conversation_id,
+        answer=result.answer,
+        tool=result.tool,
+        sources=result.sources,
+        queried_at=result.queried_at,
+        time_range=result.time_range,
+    )
+
+
+@router.post("", response_model=ChatResponse)
+async def ask_chat(
+    payload: ChatRequest,
+    actor: dict = Depends(require_permission("chat.use")),
+):
+    return await _answer(payload, actor)
+
+
+@router.post("/stream")
+async def stream_chat(
+    payload: ChatRequest,
+    actor: dict = Depends(require_permission("chat.use")),
+):
+    result = await _answer(payload, actor)
+
+    async def events():
+        for offset in range(0, len(result.answer), 200):
+            chunk = result.answer[offset:offset + 200]
+            yield f"event: delta\ndata: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
+        metadata = result.model_dump(mode="json", exclude={"answer"})
+        yield f"event: done\ndata: {json.dumps(metadata, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+    })
 
 
 @router.post("/conversations", response_model=Conversation, status_code=status.HTTP_201_CREATED)

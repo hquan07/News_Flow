@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ConversationCreate(BaseModel):
@@ -23,6 +23,43 @@ class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str
     created_at: datetime
+    sources: list["ChatSource"] = Field(default_factory=list)
+    tool: str | None = None
+    queried_at: datetime | None = None
+
+
+class ChatSource(BaseModel):
+    article_id: str
+    title: str
+    url: str
+    source: str
+    published_at: datetime | None = None
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    conversation_id: str | None = None
+    time_range: Literal["today", "7d", "30d"] | None = None
+    source: str | None = Field(default=None, max_length=80)
+    category: str | None = Field(default=None, max_length=80)
+    query: str | None = Field(default=None, max_length=120)
+
+    @field_validator("message")
+    @classmethod
+    def nonempty_message(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Message cannot be blank")
+        return value
+
+
+class ChatResponse(BaseModel):
+    conversation_id: str
+    answer: str
+    tool: str | None = None
+    sources: list[ChatSource] = Field(default_factory=list)
+    queried_at: datetime | None = None
+    time_range: str | None = None
 
 
 class ConversationDetail(Conversation):
