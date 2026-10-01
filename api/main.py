@@ -7,6 +7,8 @@ import asyncio
 from api.config import close_ch_client, get_settings
 from api.database import lifespan_db
 from api.services.chat_store import ensure_chat_indexes
+from api.services.chat_guard import ensure_indexes as ensure_chat_guard_indexes
+from api.services.chat_metrics import ensure_indexes as ensure_chat_metrics_indexes
 from api.exceptions import DependencyUnavailableError
 from api.middleware import (
     RequestContextMiddleware,
@@ -30,6 +32,8 @@ async def lifespan(app: FastAPI):
     try:
         async with lifespan_db():
             await ensure_chat_indexes()
+            await ensure_chat_guard_indexes()
+            await ensure_chat_metrics_indexes()
             yield
     finally:
         metrics_stop.set()

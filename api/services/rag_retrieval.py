@@ -4,8 +4,9 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from api.config import get_settings
+from api.exceptions import DependencyUnavailableError
 from api.services.analytics import _query
-from api.services import rag_client
+from api.services import chat_embed_cache, rag_client
 
 
 _DAYS = {"today": 1, "7d": 7, "30d": 30}
@@ -82,8 +83,14 @@ def retrieve(query: str, *, time_range: str, source: str | None, category: str |
     if not get_settings().RAG_ENABLED:
         return "Tìm kiếm ngữ nghĩa chưa được bật. Quản trị viên cần khởi động dịch vụ RAG và lập chỉ mục bài viết.", []
     since = datetime.now(timezone.utc) - timedelta(days=_DAYS[time_range])
-    vector = rag_client.embed([query[:2000]])[0]
-    vector_hits = rag_client.query_chunks(vector, source=source, category=category, since=since)
+    degraded = False
+    try:
+        vector = chat_embed_cache.query_vector(query[:2000])
+        vector_hits = rag_client.query_chunks(vector, source=source, category=category, since=since)
+    except DependencyUnavailableError:
+        # Keyword search remains useful when optional embedding/vector services fail.
+        degraded = True
+        vector_hits = []
     keyword_ids = _keyword_candidates(query, since, source, category)
     scores: dict[str, float] = {}
     snippets: dict[str, str] = {}
@@ -117,5 +124,9 @@ def retrieve(query: str, *, time_range: str, source: str | None, category: str |
         })
         lines.append(f"[{len(sources)}] {row['title']} ({row['source']}): {excerpt}")
     if not sources:
-        return "Chưa tìm thấy nội dung bài viết phù hợp trong phạm vi và thời gian đã chọn.", []
-    return "Các đoạn liên quan từ bài viết đã đối chiếu với dữ liệu gốc:\n" + "\n".join(lines) + "\nĐây là trích đoạn, chưa phải bản tóm tắt do AI suy luận.", sources
+        message = "Chưa tìm thấy nội dung bài viết phù hợp trong phạm vi và thời gian đã chọn."
+        if degraded:
+            message += " Tìm kiếm ngữ nghĩa tạm thời không khả dụng; đã thử tìm theo từ khóa."
+        return message, []
+    prefix = "Tìm kiếm ngữ nghĩa tạm thời không khả dụng; chỉ tìm theo từ khóa.\n" if degraded else ""
+    return prefix + "Các đoạn liên quan từ bài viết đã đối chiếu với dữ liệu gốc:\n" + "\n".join(lines) + "\nĐây là trích đoạn, chưa phải bản tóm tắt do AI suy luận.", sources

@@ -1,0 +1,14 @@
+[
+  {"message": "Tìm bài viết về AI", "expected_tool": "search_articles", "role": "user"},
+  {"message": "Tin mới hôm nay", "expected_tool": "search_articles", "role": "user", "time_range": "today"},
+  {"message": "Từ khóa nào thịnh hành?", "expected_tool": "get_trending_keywords", "role": "user"},
+  {"message": "Xu hướng tuần này", "expected_tool": "get_trending_keywords", "role": "analyst"},
+  {"message": "Phân bố sentiment 7 ngày qua", "expected_tool": "get_sentiment_distribution", "role": "user"},
+  {"message": "So sánh nguồn VnExpress và Tuổi Trẻ", "expected_tool": "compare_sources", "role": "analyst"},
+  {"message": "Thực thể nào liên quan đến VinFast?", "expected_tool": "get_entities", "role": "user"},
+  {"message": "Có cảnh báo nào không?", "expected_tool": "get_volume_alerts", "role": "operator"},
+  {"message": "Có cảnh báo nào không?", "expected_status": 403, "role": "user"},
+  {"message": "Tóm tắt nội dung về lãi suất", "expected_tool": "search_article_content", "role": "user"},
+  {"message": "Tìm bài tương tự về chính sách thuế", "expected_tool": "search_article_content", "role": "analyst"},
+  {"message": "Hãy trigger crawler ngay", "expected_tool": null, "role": "user"}
+]

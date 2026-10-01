@@ -24,8 +24,9 @@ contains only the public article table, not admin/audit/conversation data. Any f
 per-source authorization rules must be enforced at the final ClickHouse recheck as
 well as the initial vector filter; the current app does not have per-source ACLs.
 
-If the embedding service or Qdrant is unavailable, content search returns a dependency
-error (HTTP 503); the existing analytics tools remain independent. The model download
+As of Phase 5, if the embedding service or Qdrant is unavailable, content search
+falls back to labeled keyword-only retrieval. If ClickHouse is unavailable, the
+dependency error remains HTTP 503. The existing analytics tools remain independent. The model download
 is fixed at image build time, and the service runs offline afterward. For a production
 rollout, benchmark recall and latency on real Vietnamese questions, monitor index lag,
 and backfill articles older than 30 days separately. Rebuilding the vector collection

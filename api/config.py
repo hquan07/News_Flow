@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "newspulse_article_chunks_v1"
     EMBEDDING_URL: str = "http://localhost:8088"
     RAG_TIMEOUT_SECONDS: float = 8.0
+    CHAT_RATE_LIMIT_PER_MINUTE: int = 20
+    CHAT_EMBED_CACHE_TTL_SECONDS: int = 120
+    CHAT_EMBED_CACHE_MAX_ITEMS: int = 256
 
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100

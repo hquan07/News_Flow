@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import logging
+from time import monotonic
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 
 from api.models.chat import (
@@ -14,10 +16,18 @@ from api.models.chat import (
     ConversationDetail,
 )
 from api.security import require_permission
-from api.services import chat_store, chat_tools
+from api.services import chat_guard, chat_metrics, chat_store, chat_tools
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+logger = logging.getLogger("newspulse.chat")
+
+
+async def _record_metric(tool: str, outcome: str, started: float, source_count: int = 0) -> None:
+    try:
+        await chat_metrics.record(tool, outcome, monotonic() - started, source_count)
+    except Exception:
+        logger.exception("Unable to record chatbot metric")
 
 
 async def _run_tool(
@@ -29,48 +39,62 @@ async def _run_tool(
 
 
 async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
+    started = monotonic()
     owner_id = actor["sub"]
     previous_context = None
-    if payload.conversation_id:
-        # Check ownership before executing a query or writing any messages.
-        conversation = await chat_store.get_conversation(owner_id, payload.conversation_id)
-        last_answer = next(
-            (message for message in reversed(conversation["messages"])
-             if message["role"] == "assistant"),
-            None,
-        )
-        previous_context = last_answer.get("context") if last_answer else None
+    tool = "unknown"
+    try:
+        if payload.conversation_id:
+            # Check ownership before executing a query or writing any messages.
+            conversation = await chat_store.get_conversation(owner_id, payload.conversation_id)
+            last_answer = next(
+                (message for message in reversed(conversation["messages"])
+                 if message["role"] == "assistant"),
+                None,
+            )
+            previous_context = last_answer.get("context") if last_answer else None
 
-    result = await _run_tool(payload, actor, previous_context)
-    if payload.conversation_id:
-        conversation_id = payload.conversation_id
-    else:
-        conversation = await chat_store.create_conversation(
-            owner_id, payload.message.strip()[:120]
-        )
-        conversation_id = conversation["id"]
+        await chat_guard.check_rate_limit(owner_id)
+        result = await _run_tool(payload, actor, previous_context)
+        tool = result.tool or "none"
+        if payload.conversation_id:
+            conversation_id = payload.conversation_id
+        else:
+            conversation = await chat_store.create_conversation(
+                owner_id, payload.message.strip()[:120]
+            )
+            conversation_id = conversation["id"]
 
-    await chat_store.append_message(owner_id, conversation_id, "user", payload.message)
-    await chat_store.append_message(
-        owner_id,
-        conversation_id,
-        "assistant",
-        result.answer,
-        sources=result.sources,
-        tool=result.tool,
-        queried_at=result.queried_at,
-        chart=result.chart,
-        context=result.context,
-    )
-    return ChatResponse(
-        conversation_id=conversation_id,
-        answer=result.answer,
-        tool=result.tool,
-        sources=result.sources,
-        queried_at=result.queried_at,
-        time_range=result.time_range,
-        chart=result.chart,
-    )
+        await chat_store.append_message(owner_id, conversation_id, "user", payload.message)
+        await chat_store.append_message(
+            owner_id,
+            conversation_id,
+            "assistant",
+            result.answer,
+            sources=result.sources,
+            tool=result.tool,
+            queried_at=result.queried_at,
+            chart=result.chart,
+            context=result.context,
+        )
+        response = ChatResponse(
+            conversation_id=conversation_id,
+            answer=result.answer,
+            tool=result.tool,
+            sources=result.sources,
+            queried_at=result.queried_at,
+            time_range=result.time_range,
+            chart=result.chart,
+        )
+    except HTTPException as exc:
+        outcome = "rate_limited" if exc.status_code == 429 else "denied" if exc.status_code in (401, 403, 404) else "errors"
+        await _record_metric(tool, outcome, started)
+        raise
+    except Exception:
+        await _record_metric(tool, "errors", started)
+        raise
+    await _record_metric(tool, "success", started, len(result.sources))
+    return response
 
 
 @router.post("", response_model=ChatResponse)
@@ -107,6 +131,14 @@ async def create_conversation(
     actor: dict = Depends(require_permission("chat.use")),
 ):
     return await chat_store.create_conversation(actor["sub"], payload.title)
+
+
+@router.get("/metrics")
+async def get_chat_metrics(
+    hours: int = Query(default=24, ge=1, le=168),
+    _actor: dict = Depends(require_permission("system.read")),
+):
+    return await chat_metrics.snapshot(hours)
 
 
 @router.get("/conversations", response_model=list[Conversation])

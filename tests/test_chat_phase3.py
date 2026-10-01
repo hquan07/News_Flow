@@ -5,7 +5,7 @@ from httpx import AsyncClient
 
 from api.routers import chat
 from api.security import create_access_token
-from api.services import chat_store, chat_tools
+from api.services import chat_guard, chat_metrics, chat_store, chat_tools
 from tests.test_chat_foundation import _Collection
 
 
@@ -26,6 +26,12 @@ def inline_chat_tools(monkeypatch):
         return chat_tools.answer_question(payload, actor, previous_context)
 
     monkeypatch.setattr(chat, "_run_tool", run_tool)
+    async def no_limit(_owner_id):
+        return None
+    async def no_metric(*_args, **_kwargs):
+        return None
+    monkeypatch.setattr(chat_guard, "check_rate_limit", no_limit)
+    monkeypatch.setattr(chat_metrics, "record", no_metric)
 
 
 def _headers(subject: str, role: str = "user"):
