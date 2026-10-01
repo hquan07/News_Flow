@@ -25,6 +25,7 @@ type AuditLog = {
 };
 
 const ROLES: ManagedUser["role"][] = ["user", "analyst", "operator", "admin"];
+const PREVIEW_LOG_COUNT = 5;
 
 export default function UserManagementView({ currentUserId }: { currentUserId?: string }) {
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -32,13 +33,28 @@ export default function UserManagementView({ currentUserId }: { currentUserId?: 
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [hideAudit, setHideAudit] = useState(false);
+  const [showAllAudit, setShowAllAudit] = useState(false);
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditDays, setAuditDays] = useState("all");
+  const [auditCutoff, setAuditCutoff] = useState(0);
+
+  const search = auditSearch.trim().toLocaleLowerCase();
+  const filteredAuditLogs = auditLogs.filter((log) => {
+    const timestamp = Date.parse(log.created_at || "");
+    if (auditCutoff && (!Number.isFinite(timestamp) || timestamp < auditCutoff)) return false;
+    if (!search) return true;
+    return [log.actor_email || "Admin", log.target_email || "user", log.action, JSON.stringify(log.changes)]
+      .some((value) => value.toLocaleLowerCase().includes(search));
+  });
+  const visibleAuditLogs = showAllAudit ? filteredAuditLogs : filteredAuditLogs.slice(0, PREVIEW_LOG_COUNT);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [userData, auditData] = await Promise.all([
         apiFetch<{ users: ManagedUser[] }>(`${API_BASE}/admin/users`),
-        apiFetch<{ logs: AuditLog[] }>(`${API_BASE}/admin/audit-logs?limit=20`),
+        apiFetch<{ logs: AuditLog[] }>(`${API_BASE}/admin/audit-logs?limit=100`),
       ]);
       setUsers(userData.users ?? []);
       setAuditLogs(auditData.logs ?? []);
@@ -64,7 +80,7 @@ export default function UserManagementView({ currentUserId }: { currentUserId?: 
         body: JSON.stringify(changes),
       });
       setUsers((current) => current.map((item) => item.id === updated.id ? updated : item));
-      const auditData = await apiFetch<{ logs: AuditLog[] }>(`${API_BASE}/admin/audit-logs?limit=20`);
+      const auditData = await apiFetch<{ logs: AuditLog[] }>(`${API_BASE}/admin/audit-logs?limit=100`);
       setAuditLogs(auditData.logs ?? []);
       setMessage(`Updated access for ${updated.email}. The user must sign in again to refresh permissions.`);
     } catch (error) {
@@ -128,10 +144,26 @@ export default function UserManagementView({ currentUserId }: { currentUserId?: 
       </div>
 
       <div className="audit-section">
-        <h3>Recent access changes</h3>
-        {auditLogs.length === 0 ? <p>No access changes recorded yet.</p> : (
+        <div className="audit-section-heading">
+          <h3>Recent access changes <span>({auditLogs.length})</span></h3>
+          <button type="button" className="audit-control-button" aria-expanded={!hideAudit} aria-controls="access-audit-content" onClick={() => setHideAudit((current) => !current)}>
+            {hideAudit ? "Show" : "Hide"}
+          </button>
+        </div>
+        {!hideAudit && <div id="access-audit-content">
+          <div className="audit-filters">
+            <label className="sr-only" htmlFor="audit-search">Filter access changes</label>
+            <input id="audit-search" type="search" value={auditSearch} onChange={(event) => { setAuditSearch(event.target.value); setShowAllAudit(false); }} placeholder="Filter by account or change" />
+            <label className="sr-only" htmlFor="audit-days">Access change period</label>
+            <select id="audit-days" value={auditDays} onChange={(event) => { const days = event.target.value; setAuditDays(days); setAuditCutoff(days === "all" ? 0 : Date.now() - Number(days) * 24 * 60 * 60 * 1000); setShowAllAudit(false); }}>
+              <option value="all">All dates</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+            </select>
+          </div>
+          {auditLogs.length === 0 ? <p>No access changes recorded yet.</p> : filteredAuditLogs.length === 0 ? <p>No matching access changes.</p> : <>
           <div className="audit-list">
-            {auditLogs.map((log) => (
+            {visibleAuditLogs.map((log) => (
               <article key={log.id}>
                 <div><strong>{log.actor_email || "Admin"}</strong> updated <strong>{log.target_email || "user"}</strong></div>
                 <span>{Object.entries(log.changes).map(([key, value]) => `${key}: ${String(value)}`).join(" · ")}</span>
@@ -139,7 +171,11 @@ export default function UserManagementView({ currentUserId }: { currentUserId?: 
               </article>
             ))}
           </div>
-        )}
+          {filteredAuditLogs.length > PREVIEW_LOG_COUNT && <button type="button" className="audit-control-button audit-more-button" onClick={() => setShowAllAudit((current) => !current)}>
+            {showAllAudit ? "Show latest 5" : `Show all ${filteredAuditLogs.length} matching changes`}
+          </button>}
+          </>}
+        </div>}
       </div>
     </section>
   );

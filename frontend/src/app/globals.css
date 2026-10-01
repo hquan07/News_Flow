@@ -2703,7 +2703,35 @@ h1 {
 }
 
 .audit-section h3 { margin: 0 0 0.75rem; font-size: 0.95rem; }
+.audit-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; }
+.audit-section-heading h3 { margin: 0; }
+.audit-section-heading h3 span { color: var(--text-muted); font-weight: 400; }
+.audit-control-button {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.5);
+  color: #bfdbfe;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.audit-control-button:hover, .audit-control-button:focus-visible { background: rgba(59, 130, 246, 0.18); }
+.audit-more-button { margin-top: 0.7rem; }
+.audit-filters { display: flex; gap: 0.6rem; margin: 0 0 0.75rem; }
+.audit-filters input, .audit-filters select {
+  min-height: 35px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: #0f172a;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.78rem;
+}
+.audit-filters input { flex: 1; min-width: 0; }
 .audit-section > p { color: var(--text-muted); font-size: 0.8rem; }
+.audit-section #access-audit-content > p { color: var(--text-muted); font-size: 0.8rem; }
 .audit-list { display: grid; gap: 0.55rem; }
 .audit-list article {
   display: grid;
@@ -2738,6 +2766,7 @@ h1 {
 @media (max-width: 760px) {
   .access-panel-header,
   .access-panel-actions { align-items: flex-start; flex-direction: column; }
+  .audit-filters { flex-direction: column; }
   .audit-list article { grid-template-columns: 1fr; }
   .audit-list time { text-align: left; }
   .influencers-panel, .live-social-panel { padding: 1rem; }
