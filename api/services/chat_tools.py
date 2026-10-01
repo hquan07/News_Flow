@@ -9,6 +9,7 @@ from fastapi import HTTPException
 
 from api.models.chat import ChatRequest
 from api.services.analytics import _query, get_alerts
+from api.services.rag_retrieval import retrieve
 
 
 _TIME_WINDOWS = {
@@ -45,6 +46,8 @@ def _intent(message: str) -> str | None:
         return "sentiment"
     if any(word in normalized for word in ("trending", "xu huong", "thinh hanh", "tu khoa", "chu de nao")):
         return "trending"
+    if any(word in normalized for word in ("tom tat", "noi dung", "noi gi ve", "giai thich ve", "semantic", "tuong tu", "summarize")):
+        return "rag"
     if any(word in normalized for word in ("bai viet", "bai bao", "tin moi", "tim tin", "tim bai", "tom tat", "articles")):
         return "articles"
     if any(word in normalized for word in ("entity", "thuc the", "nhan vat", "to chuc nao", "dia danh", "lien quan den")):
@@ -321,6 +324,14 @@ def _alerts(request: ChatRequest, time_range: str) -> ToolResult:
     return ToolResult(answer=answer, tool="get_volume_alerts", time_range="7d")
 
 
+def _rag(request: ChatRequest, time_range: str) -> ToolResult:
+    query = request.query or request.message
+    answer, sources = retrieve(
+        query, time_range=time_range, source=request.source, category=request.category
+    )
+    return ToolResult(answer=answer, tool="search_article_content", sources=sources, time_range=time_range)
+
+
 def answer_question(
     request: ChatRequest, actor: dict, previous_context: dict | None = None
 ) -> ToolResult:
@@ -344,12 +355,12 @@ def answer_question(
         })
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'alerts.read'")
-    if intent in ("articles", "trending", "sentiment", "sources", "entities") and "dashboard.read" not in actor["permissions"]:
+    if intent in ("articles", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'dashboard.read'")
     if intent is None:
         return ToolResult(answer=(
-            "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn "
-            "và cảnh báo tăng đột biến. Hãy hỏi rõ một trong các nội dung này."
+            "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn, "
+            "nội dung bài viết và cảnh báo tăng đột biến. Hãy hỏi rõ một trong các nội dung này."
         ))
     time_range = _time_range(request)
     result = {
@@ -359,6 +370,7 @@ def answer_question(
         "sources": _sources,
         "entities": _entities,
         "alerts": _alerts,
+        "rag": _rag,
     }[intent](request, time_range)
     result.queried_at = datetime.now(timezone.utc)
     result.context = {

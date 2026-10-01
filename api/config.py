@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     API_RATE_LIMIT_PER_MINUTE: int = 120
     API_MAX_BODY_BYTES: int = 1_048_576
 
+    RAG_ENABLED: bool = False
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_COLLECTION: str = "newspulse_article_chunks_v1"
+    EMBEDDING_URL: str = "http://localhost:8088"
+    RAG_TIMEOUT_SECONDS: float = 8.0
+
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 

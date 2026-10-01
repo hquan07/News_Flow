@@ -354,6 +354,9 @@ services:
       AIRFLOW_API_USERNAME: ${AIRFLOW_API_USERNAME:-admin}
       AIRFLOW_API_PASSWORD: ${AIRFLOW_API_PASSWORD:-admin}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+      RAG_ENABLED: ${RAG_ENABLED:-false}
+      QDRANT_URL: http://qdrant:6333
+      EMBEDDING_URL: http://embeddings:8088
     depends_on:
       postgres:
         condition: service_healthy
@@ -505,6 +508,55 @@ services:
     depends_on:
       - api
 
+  qdrant:
+    image: qdrant/qdrant:v1.13.6
+    profiles: [rag]
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  embeddings:
+    build:
+      context: ../..
+      dockerfile: rag/Dockerfile
+    profiles: [rag]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8088/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  rag-indexer:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    profiles: [rag]
+    restart: unless-stopped
+    env_file: ../../.env
+    environment:
+      MONGO_HOST: mongo
+      MONGO_PORT: "27017"
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-admin123}
+      QDRANT_URL: http://qdrant:6333
+      EMBEDDING_URL: http://embeddings:8088
+    command: ["python", "-m", "api.services.rag_indexer", "--loop", "300"]
+    healthcheck:
+      disable: true
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      embeddings:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
   nginx:
     image: nginx:alpine
     container_name: newspulse-nginx
@@ -529,3 +581,4 @@ volumes:
   spark-checkpoints:
   minio-data:
   clickhouse-data:
+  qdrant-data:
