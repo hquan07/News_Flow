@@ -1,5 +1,6 @@
 [
   {"message": "Tìm bài viết về AI", "expected_tool": "search_articles", "role": "user"},
+  {"message": "Tổng số bài báo thu thập được từ VnExpress", "expected_tool": "count_articles", "role": "user"},
   {"message": "Tin mới hôm nay", "expected_tool": "search_articles", "role": "user", "time_range": "today"},
   {"message": "Từ khóa nào thịnh hành?", "expected_tool": "get_trending_keywords", "role": "user"},
   {"message": "Xu hướng tuần này", "expected_tool": "get_trending_keywords", "role": "analyst"},

@@ -20,6 +20,7 @@ from api.services.chat_tools import _intent  # noqa: E402
 
 TOOL_FOR_INTENT = {
     "articles": "search_articles",
+    "article_count": "count_articles",
     "trending": "get_trending_keywords",
     "sentiment": "get_sentiment_distribution",
     "sources": "compare_sources",

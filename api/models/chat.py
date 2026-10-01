@@ -52,7 +52,7 @@ class ChatChart(BaseModel):
 
 class ChatContext(BaseModel):
     intent: str
-    time_range: Literal["today", "7d", "30d"]
+    time_range: Literal["today", "7d", "30d", "all"]
     source: str | None = None
     category: str | None = None
     query: str | None = None

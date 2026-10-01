@@ -46,6 +46,10 @@ def _intent(message: str) -> str | None:
         return "sentiment"
     if any(word in normalized for word in ("trending", "xu huong", "thinh hanh", "tu khoa", "chu de nao")):
         return "trending"
+    if any(phrase in normalized for phrase in ("tong so", "bao nhieu", "so luong", "dem ", "count ")) and any(
+        subject in normalized for subject in ("bai", "tin", "article", "news")
+    ):
+        return "article_count"
     if any(word in normalized for word in ("tom tat", "noi dung", "noi gi ve", "giai thich ve", "semantic", "tuong tu", "summarize")):
         return "rag"
     if any(word in normalized for word in ("bai viet", "bai bao", "tin moi", "tim tin", "tim bai", "tom tat", "articles")):
@@ -177,6 +181,43 @@ def _articles(request: ChatRequest, time_range: str) -> ToolResult:
         if "tom tat" in _normalized(request.message):
             answer += "\nHiện mình mới liệt kê bài phù hợp; chưa tóm tắt nội dung toàn văn."
     return ToolResult(answer=answer, tool="search_articles", sources=sources, time_range=time_range)
+
+
+def _article_count(request: ChatRequest, time_range: str) -> ToolResult:
+    conditions = []
+    params = {}
+    if time_range != "all":
+        conditions.append(f"a.publish_time >= now() - INTERVAL {_TIME_WINDOWS[time_range]}")
+    if request.source:
+        conditions.append("a.source = {source:String}")
+        params["source"] = request.source.strip()
+    if request.category:
+        conditions.append("a.category = {category:String}")
+        params["category"] = request.category.strip()
+    term = _search_term(request)
+    if term and request.source:
+        term = re.sub(
+            r"\s+(?:từ|của|from)\s+.+$",
+            "", term, flags=re.IGNORECASE,
+        ).strip()
+    if term:
+        conditions.append("a.title ILIKE {title_query:String}")
+        params["title_query"] = f"%{term}%"
+    where = " AND ".join(conditions) if conditions else "1 = 1"
+    rows = _query(
+        "SELECT count() AS article_count FROM newspulse.raw_articles AS a FINAL "
+        f"WHERE {where}",
+        params,
+    )
+    count = int(rows[0]["article_count"]) if rows else 0
+    scope = f" từ {request.source}" if request.source else " từ tất cả nguồn"
+    period = "từ trước đến nay" if time_range == "all" else f"trong {_TIME_LABELS[time_range]}"
+    topic = f" có tiêu đề chứa '{term}'" if term else ""
+    formatted_count = f"{count:,}".replace(",", ".")
+    answer = f"Đã thu thập {formatted_count} bài báo{scope}{topic} {period}."
+    if request.category:
+        answer += f" Danh mục: {request.category}."
+    return ToolResult(answer=answer, tool="count_articles", time_range=time_range)
 
 
 def _trending(request: ChatRequest, time_range: str) -> ToolResult:
@@ -345,7 +386,8 @@ def answer_question(
         mentioned = _mentioned_sources(request.message)
         request = request.model_copy(update={
             "time_range": request.time_range or (
-                _time_range(request) if _has_time_hint(request.message) else previous_time
+                _time_range(request) if _has_time_hint(request.message) else
+                (previous_time if intent == "article_count" or previous_time != "all" else "7d")
             ),
             "source": request.source or (
                 None if intent == "sources" else
@@ -354,18 +396,28 @@ def answer_question(
             "category": request.category or previous_context.get("category"),
             "query": request.query or _search_term(request) or previous_context.get("query"),
         })
+    if intent not in ("sources", "alerts") and not request.source:
+        mentioned = _mentioned_sources(request.message)
+        if len(mentioned) == 1:
+            request = request.model_copy(update={"source": mentioned[0]})
+        elif len(mentioned) > 1 and intent == "article_count":
+            raise HTTPException(status_code=422, detail="Specify one source to count, or ask to compare sources")
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'alerts.read'")
-    if intent in ("articles", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
+    if intent in ("articles", "article_count", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'dashboard.read'")
     if intent is None:
         return ToolResult(answer=(
             "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn, "
             "nội dung bài viết và cảnh báo tăng đột biến. Hãy hỏi rõ một trong các nội dung này."
         ))
-    time_range = _time_range(request)
+    time_range = (
+        "all" if intent == "article_count" and not request.time_range
+        and not _has_time_hint(request.message) else _time_range(request)
+    )
     result = {
         "articles": _articles,
+        "article_count": _article_count,
         "trending": _trending,
         "sentiment": _sentiment,
         "sources": _sources,
@@ -379,6 +431,6 @@ def answer_question(
         "time_range": time_range,
         "source": request.source,
         "category": request.category,
-        "query": _search_term(request),
+        "query": _search_term(request) if intent != "article_count" else request.query,
     }
     return result
