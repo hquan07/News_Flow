@@ -18,6 +18,7 @@ import {
   UserCog,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
+import AccountAvatar from "@/components/AccountAvatar";
 import AlertsPanel from "@/components/AlertsPanel";
 import AdminView from "@/components/views/AdminView";
 import DebatesView from "@/components/views/DebatesView";
@@ -903,20 +904,7 @@ export default function Home() {
                 borderLeft: "1px solid rgba(255,255,255,0.2)",
               }}
             >
-              <div
-                style={{
-                  background: "#3b82f6",
-                  borderRadius: "50%",
-                  width: "32px",
-                  height: "32px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: "bold",
-                }}
-              >
-                {user.email[0].toUpperCase()}
-              </div>
+              <AccountAvatar user={user} onChange={setUser} />
               <span className="role-badge">{user.role ?? "user"}</span>
               <button
                 onClick={handleLogout}

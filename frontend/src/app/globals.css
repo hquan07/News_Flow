@@ -3241,3 +3241,51 @@ h1 {
   .chat-sidebar-tree .chat-project-options,
   .chat-sidebar-tree .chat-conversation-options { opacity: 1; }
 }
+
+.account-avatar-wrapper { position: relative; flex: 0 0 auto; }
+.account-avatar-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+.account-avatar-button img { width: 100%; height: 100%; object-fit: cover; }
+.account-avatar-button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
+.account-avatar-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #172235;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  color: #f8fafc;
+}
+.account-avatar-email { padding: 8px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1; font-size: 0.8rem; }
+.account-avatar-menu button {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.account-avatar-menu button:hover:not(:disabled), .account-avatar-menu button:focus-visible { background: #283b58; }
+.account-avatar-menu button:disabled { opacity: 0.6; cursor: wait; }
+.account-avatar-status, .account-avatar-error { padding: 6px 10px; font-size: 0.8rem; }
+.account-avatar-error { color: #fca5a5; }
+.account-avatar-input { display: none; }

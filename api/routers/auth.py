@@ -1,6 +1,9 @@
+import base64
+import binascii
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from bson import ObjectId
 from pydantic import BaseModel, EmailStr, Field
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -19,6 +22,29 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+
+
+class AvatarUpdate(BaseModel):
+    data_url: str = Field(max_length=700000)
+
+
+def _account_id(user: dict) -> ObjectId:
+    if not ObjectId.is_valid(user["sub"]):
+        raise HTTPException(status_code=401, detail="Invalid account")
+    return ObjectId(user["sub"])
+
+
+def _validated_avatar(data_url: str) -> str:
+    prefix = "data:image/jpeg;base64,"
+    if not data_url.startswith(prefix):
+        raise HTTPException(status_code=400, detail="Avatar must be a JPEG image")
+    try:
+        image = base64.b64decode(data_url[len(prefix):], validate=True)
+    except binascii.Error as exc:
+        raise HTTPException(status_code=400, detail="Invalid avatar image") from exc
+    if not image.startswith(b"\xff\xd8\xff") or not image.endswith(b"\xff\xd9") or len(image) > 512 * 1024:
+        raise HTTPException(status_code=400, detail="Invalid avatar image or image is too large")
+    return data_url
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -82,6 +108,7 @@ async def login(user: UserLogin, response: Response):
             "id": str(db_user["_id"]),
             "role": role,
             "permissions": permissions_for_role(role),
+            "avatar_data_url": db_user.get("avatar_data_url"),
         }
     }
 
@@ -96,12 +123,41 @@ async def me(
         access_token = authorization.removeprefix("Bearer ").strip()
         if access_token:
             _set_access_cookie(response, access_token)
+    account = None
+    if ObjectId.is_valid(user["sub"]):
+        account = await get_mongo_db().users.find_one(
+            {"_id": ObjectId(user["sub"])},
+            {"full_name": 1, "avatar_data_url": 1},
+        )
     return {
         "id": user["sub"],
         "email": user.get("email", ""),
         "role": user["role"],
         "permissions": user["permissions"],
+        "full_name": (account or {}).get("full_name", ""),
+        "avatar_data_url": (account or {}).get("avatar_data_url"),
     }
+
+
+@router.put("/avatar")
+async def update_avatar(payload: AvatarUpdate, user: dict = Depends(get_current_user)):
+    avatar = _validated_avatar(payload.data_url)
+    result = await get_mongo_db().users.update_one(
+        {"_id": _account_id(user)}, {"$set": {"avatar_data_url": avatar}}
+    )
+    if not result.matched_count:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return {"avatar_data_url": avatar}
+
+
+@router.delete("/avatar")
+async def delete_avatar(user: dict = Depends(get_current_user)):
+    result = await get_mongo_db().users.update_one(
+        {"_id": _account_id(user)}, {"$unset": {"avatar_data_url": ""}}
+    )
+    if not result.matched_count:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return {"avatar_data_url": None}
 
 
 @router.post("/logout")
