@@ -12,15 +12,18 @@ from api.database import get_mongo_db
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "user": frozenset({
         "dashboard.read",
+        "chat.use",
         "reports.export",
     }),
     "analyst": frozenset({
         "dashboard.read",
+        "chat.use",
         "reports.export",
         "reports.export_full",
     }),
     "operator": frozenset({
         "dashboard.read",
+        "chat.use",
         "reports.export",
         "alerts.read",
         "alerts.manage",
@@ -30,6 +33,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     }),
     "admin": frozenset({
         "dashboard.read",
+        "chat.use",
         "reports.export",
         "reports.export_full",
         "alerts.read",

@@ -6,6 +6,7 @@ import asyncio
 
 from api.config import close_ch_client, get_settings
 from api.database import lifespan_db
+from api.services.chat_store import ensure_chat_indexes
 from api.exceptions import DependencyUnavailableError
 from api.middleware import (
     RequestContextMiddleware,
@@ -15,7 +16,7 @@ from api.middleware import (
 from api.logging_config import configure_logging
 from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat
 from api.security import require_permission
 
 settings = get_settings()
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
     metrics_task = asyncio.create_task(alert_metrics_flush_loop(metrics_stop))
     try:
         async with lifespan_db():
+            await ensure_chat_indexes()
             yield
     finally:
         metrics_stop.set()
@@ -102,6 +104,7 @@ app.include_router(admin.router, prefix=prefix)
 app.include_router(crawler_admin.router, prefix=prefix)
 app.include_router(user_admin.router, prefix=prefix)
 app.include_router(public.router, prefix=prefix)
+app.include_router(chat.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])
