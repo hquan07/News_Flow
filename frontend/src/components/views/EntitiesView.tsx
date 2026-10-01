@@ -84,7 +84,7 @@ export default function EntitiesView({ entitiesData, trendingKeywords, entityTyp
     <ChartCard title={<><ThumbsUp size={20} /> Sentiment by Entity</>} description="How does sentiment composition compare for the most-mentioned entities?" timeRange="Last 7 days" unit="Share of mentions" total={sentimentRows.reduce((sum: number, row: any) => sum + row.total, 0)} updatedAt={updatedAt} large>
       {sentimentRows.length > 0 ? <ResponsiveContainer width="100%" height="100%"><BarChart data={sentimentRows} layout="vertical" margin={{ left: 0, right: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
-        <XAxis type="number" domain={[0, 100]} tickFormatter={(tick) => `${tick}%`} stroke="#94a3b8" fontSize={11} />
+        <XAxis type="number" domain={[0, 100]} tickFormatter={(tick) => `${Math.round(Number(tick))}%`} stroke="#94a3b8" fontSize={11} />
         <YAxis type="category" dataKey="entity" width={100} tickFormatter={(label) => truncateLabel(String(label), 18)} stroke="#94a3b8" fontSize={11} />
         <Tooltip cursor={false} formatter={(_pct, name, item) => { const key = String(name).replace("Pct", "") as keyof typeof SENTIMENT_COLORS; return [<ColoredTooltipValue key="value" color={SENTIMENT_COLORS[key] ?? "#f8fafc"}>{Number(item.payload[key] ?? 0).toLocaleString()} · {formatPercent(item.payload[`${key}Pct`])}</ColoredTooltipValue>, key]; }} contentStyle={DARK_TOOLTIP_CONTENT_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE} labelStyle={DARK_TOOLTIP_ITEM_STYLE} />
         <Legend formatter={(name) => String(name).replace("Pct", "")} />

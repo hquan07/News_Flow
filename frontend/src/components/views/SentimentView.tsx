@@ -53,7 +53,7 @@ export default function SentimentView({ sentimentDist, sentimentTimeline, sentim
       {distribution.length > 0 ? <div style={{ position: "relative", width: "100%", height: "100%" }}>
         <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={distribution} dataKey="count" nameKey="name" cx="50%" cy="46%" innerRadius="48%" outerRadius="72%" paddingAngle={2} labelLine={false}>{distribution.map((entry: any) => <Cell key={entry.key} fill={entry.color} />)}</Pie>
           <Tooltip formatter={(value, _name, item) => [<ColoredTooltipValue key="value" color={String(item.payload.color)}>{Number(value).toLocaleString()} ({formatPercent(totalSentiment ? Number(value) * 100 / totalSentiment : 0)})</ColoredTooltipValue>, item.payload.name]} contentStyle={DARK_TOOLTIP_CONTENT_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE} labelStyle={DARK_TOOLTIP_ITEM_STYLE} />
-          <Legend verticalAlign="bottom" formatter={(value) => <span style={{ color: "#cbd5e1" }}>{value}</span>} />
+          <Legend verticalAlign="bottom" formatter={(value) => <span style={{ color: distribution.find((row: { name: string; color: string }) => row.name === value)?.color ?? "#cbd5e1" }}>{value}</span>} />
         </PieChart></ResponsiveContainer>
         <div style={{ position: "absolute", inset: "40% 0 auto", textAlign: "center", pointerEvents: "none" }}><strong style={{ fontSize: "1.35rem" }}>{formatCompactNumber(totalSentiment)}</strong><div style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>analyzed</div></div>
       </div> : !sentimentDist ? <ChartSkeleton /> : <EmptyState message="No sentiment data" />}
