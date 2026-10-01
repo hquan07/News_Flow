@@ -2861,6 +2861,11 @@ h1 {
 .chat-project-heading h3 { font-size: 0.95rem; }
 .chat-project-heading button { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
 .chat-project-row { display: grid; grid-template-columns: minmax(0, 1fr) 30px; gap: 0.2rem; }
+.chat-project-row.drop-ready > .chat-project-filter { border-style: dashed; }
+.chat-project-row.drop-target > .chat-project-filter {
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.3);
+}
 .chat-project-filter {
   width: 100%;
   overflow: hidden;
@@ -2881,6 +2886,7 @@ h1 {
 .chat-project-editor div { display: flex; gap: 0.35rem; }
 .chat-project-editor button { padding: 0.4rem 0.55rem; }
 .chat-search { width: 100%; padding: 0.55rem; margin-top: 0.55rem; }
+.chat-drag-hint { margin: 0.35rem 0 0; color: var(--text-muted); font-size: 0.75rem; }
 
 .chat-conversation-row {
   display: flex;
@@ -2888,6 +2894,8 @@ h1 {
   gap: 0.3rem;
   min-width: 0;
 }
+.chat-conversation-row[draggable="true"] { cursor: grab; }
+.chat-conversation-row.dragging { opacity: 0.5; }
 
 .chat-conversation-row .chat-conversation-open {
   flex: 1;

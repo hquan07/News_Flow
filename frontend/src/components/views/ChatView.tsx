@@ -67,6 +67,8 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   const [projectMenuId, setProjectMenuId] = useState<string | null>(null);
   const [projectBusy, setProjectBusy] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [draggedConversationId, setDraggedConversationId] = useState<string | null>(null);
+  const [dropProjectId, setDropProjectId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState("");
@@ -389,6 +391,11 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
     }
   }
 
+  function endConversationDrag() {
+    setDraggedConversationId(null);
+    setDropProjectId(null);
+  }
+
   function showContextMenu(conversationId: string, x: number, y: number, trigger: HTMLButtonElement) {
     if (loading || historyLoading || deletingId || movingId || projectBusy) return;
     const menuHeight = Math.min(420, 170 + projects.length * 44);
@@ -434,9 +441,23 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
           <button type="button" className={selectedProject === "unassigned" ? "chat-project-filter active" : "chat-project-filter"}
             onClick={() => chooseProject("unassigned")}>Chưa phân loại</button>
           {projects.map((project) => (
-            <div className="chat-project-row" key={project.id}>
+            <div className={`chat-project-row ${draggedConversationId ? "drop-ready" : ""} ${dropProjectId === project.id ? "drop-target" : ""}`}
+              key={project.id}
+              onDragOver={(event) => {
+                if (!draggedConversationId || movingId || projectBusy) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDropProjectId(project.id);
+              }}
+              onDragLeave={() => { if (dropProjectId === project.id) setDropProjectId(null); }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const conversation = conversations.find((item) => item.id === draggedConversationId && !item.project_id);
+                endConversationDrag();
+                if (conversation) void moveConversation(conversation, project.id);
+              }}>
               <button type="button" className={selectedProject === project.id ? "chat-project-filter active" : "chat-project-filter"}
-                onClick={() => chooseProject(project.id)} title={project.title}>▣ {project.title}</button>
+                onClick={() => chooseProject(project.id)} title={draggedConversationId ? `Thả hội thoại vào ${project.title}` : project.title}>▣ {project.title}</button>
               <button type="button" className="chat-project-options" aria-label={`Tùy chọn Project ${project.title}`}
                 aria-expanded={projectMenuId === project.id}
                 onClick={() => setProjectMenuId((current) => current === project.id ? null : project.id)}>
@@ -475,9 +496,22 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
         <label htmlFor="chat-search" className="chat-visually-hidden">Tìm hội thoại</label>
         <input id="chat-search" className="chat-search" value={chatSearch} maxLength={120}
           onChange={(event) => setChatSearch(event.target.value)} placeholder="Tìm hội thoại..." />
+        {visibleConversations.some((conversation) => !conversation.project_id) && projects.length > 0 && (
+          <p className="chat-drag-hint">Kéo chat chưa phân loại vào một Project.</p>
+        )}
         <div className="chat-conversation-list">
           {visibleConversations.map((conversation) => (
-            <div className="chat-conversation-row" key={conversation.id}>
+            <div className={`chat-conversation-row ${draggedConversationId === conversation.id ? "dragging" : ""}`}
+              key={conversation.id}
+              draggable={!conversation.project_id && !loading && !historyLoading && !deletingId && !movingId && !projectBusy}
+              onDragStart={(event) => {
+                if (conversation.project_id) { event.preventDefault(); return; }
+                setContextMenu(null);
+                setDraggedConversationId(conversation.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", conversation.id);
+              }}
+              onDragEnd={endConversationDrag}>
               <button
                 type="button"
                 className={`chat-conversation-open ${activeId === conversation.id ? "active" : ""}`}
@@ -496,7 +530,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
                 disabled={loading || !!deletingId || !!movingId || projectBusy}
                 aria-haspopup="menu"
                 aria-expanded={contextMenu?.conversationId === conversation.id}
-                title={`${conversation.title} — nhấp chuột phải để mở tùy chọn`}
+                title={`${conversation.title} — ${conversation.project_id ? "nhấp chuột phải để mở tùy chọn" : "kéo vào Project hoặc nhấp chuột phải để mở tùy chọn"}`}
               >
                 {conversation.title}
               </button>
