@@ -87,9 +87,61 @@ def test_retrieval_revalidates_and_never_quotes_stale_payload(monkeypatch):
 
 def test_rag_disabled_is_explicit(monkeypatch):
     monkeypatch.setattr(rag_retrieval, "get_settings", lambda: SimpleNamespace(RAG_ENABLED=False))
-    answer, sources = rag_retrieval.retrieve("anything", time_range="7d", source=None, category=None)
+    monkeypatch.setattr(rag_retrieval.chat_embed_cache, "query_vector", lambda *args: pytest.fail("embeddings called"))
+    monkeypatch.setattr(rag_retrieval, "_query", lambda *args: [])
+    answer, sources = rag_retrieval.retrieve("lãi suất", time_range="7d", source=None, category=None)
     assert "chưa được bật" in answer
+    assert "đã thử tìm theo từ khóa" in answer
     assert sources == []
+
+
+def test_rag_disabled_returns_cited_keyword_results(monkeypatch):
+    monkeypatch.setattr(rag_retrieval, "get_settings", lambda: SimpleNamespace(RAG_ENABLED=False))
+    monkeypatch.setattr(rag_retrieval.chat_embed_cache, "query_vector", lambda *args: pytest.fail("embeddings called"))
+    queries = []
+
+    def fake_query(sql, params):
+        queries.append((sql, params))
+        if "SELECT a.url_hash AS article_id FROM" in sql:
+            return [{"article_id": "rate-1"}]
+        return [{
+            "article_id": "rate-1", "title": "Lãi suất tiết kiệm tăng",
+            "content": "Một số ngân hàng điều chỉnh lãi suất tiết kiệm trong tuần này.",
+            "url": "https://example.org/rate-1", "source": "vnexpress",
+            "published_at": datetime.now(timezone.utc),
+        }]
+
+    monkeypatch.setattr(rag_retrieval, "_query", fake_query)
+    answer, sources = rag_retrieval.retrieve(
+        "Tóm tắt nội dung về lãi suất", time_range="7d", source="vnexpress", category=None
+    )
+    assert "chưa được bật; chỉ tìm theo từ khóa" in answer
+    assert "lãi suất tiết kiệm" in answer
+    assert "chưa phải bản tóm tắt" in answer
+    assert len(sources) == 1
+    assert sources[0]["source"] == "vnexpress"
+    assert rag_retrieval._keywords("Tóm tắt nội dung về lãi suất") == ["lãi", "suất"]
+    assert all(params["source"] == "vnexpress" for _, params in queries)
+    assert "a.content != ''" in queries[0][0]
+    assert queries[0][1]["phrase"] == "%lãi suất%"
+    assert "ORDER BY (a.title ILIKE {phrase:String}) DESC" in queries[0][0]
+
+
+def test_keyword_candidates_require_all_terms_when_phrase_has_no_hits(monkeypatch):
+    queries = []
+
+    def fake_query(sql, params):
+        queries.append((sql, params))
+        return [] if "phrase" in params else [{"article_id": "separate-terms"}]
+
+    monkeypatch.setattr(rag_retrieval, "_query", fake_query)
+    ids = rag_retrieval._keyword_candidates(
+        "Tóm tắt nội dung về lãi suất", datetime.now(timezone.utc), None, None
+    )
+    assert ids == ["separate-terms"]
+    assert len(queries) == 2
+    assert "(a.title ILIKE {term0:String} OR a.content ILIKE {term0:String}) AND " in queries[1][0]
+    assert "(a.title ILIKE {term1:String} OR a.content ILIKE {term1:String})" in queries[1][0]
 
 
 def test_keyword_only_result_keeps_clickhouse_filters(monkeypatch):

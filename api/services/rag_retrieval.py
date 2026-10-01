@@ -14,7 +14,7 @@ _DAYS = {"today": 1, "7d": 7, "30d": 30}
 
 def _keywords(query: str) -> list[str]:
     words = re.findall(r"[\wÀ-ỹ]+", query.casefold())
-    ignored = {"cho", "toi", "tôi", "các", "bài", "viết", "tin", "tức", "về", "trong", "những", "hãy", "tóm", "tắt", "theo", "của", "là", "what", "about", "summarize"}
+    ignored = {"cho", "toi", "tôi", "các", "bài", "viết", "tin", "tức", "về", "trong", "những", "hãy", "tóm", "tắt", "nội", "dung", "theo", "của", "là", "what", "about", "summarize"}
     return [word for word in words if len(word) >= 3 and word not in ignored][:6]
 
 
@@ -22,7 +22,7 @@ def _keyword_candidates(query: str, since: datetime, source: str | None, categor
     terms = _keywords(query)
     if not terms:
         return []
-    where = ["a.publish_time >= {since:DateTime}"]
+    where = ["a.publish_time >= {since:DateTime}", "a.content != ''"]
     params = {"since": since}
     if source:
         where.append("a.source = {source:String}")
@@ -34,10 +34,20 @@ def _keyword_candidates(query: str, since: datetime, source: str | None, categor
     for index, term in enumerate(terms):
         params[f"term{index}"] = f"%{term}%"
         matches.append(f"(a.title ILIKE {{term{index}:String}} OR a.content ILIKE {{term{index}:String}})")
-    where.append("(" + " OR ".join(matches) + ")")
+    base_sql = "SELECT a.url_hash AS article_id FROM newspulse.raw_articles AS a FINAL WHERE "
+    if len(terms) > 1:
+        phrase_params = {**params, "phrase": f"%{' '.join(terms)}%"}
+        phrase_match = "(a.title ILIKE {phrase:String} OR a.content ILIKE {phrase:String})"
+        rows = _query(
+            base_sql + " AND ".join([*where, phrase_match]) +
+            " ORDER BY (a.title ILIKE {phrase:String}) DESC, a.publish_time DESC LIMIT 12",
+            phrase_params,
+        )
+        if rows:
+            return [str(row["article_id"]) for row in rows]
     rows = _query(
-        "SELECT a.url_hash AS article_id FROM newspulse.raw_articles AS a FINAL "
-        "WHERE " + " AND ".join(where) + " ORDER BY a.publish_time DESC LIMIT 12",
+        base_sql + " AND ".join([*where, *matches]) +
+        " ORDER BY a.publish_time DESC LIMIT 12",
         params,
     )
     return [str(row["article_id"]) for row in rows]
@@ -80,17 +90,21 @@ def _excerpt(content: str, query: str) -> str:
 
 
 def retrieve(query: str, *, time_range: str, source: str | None, category: str | None) -> tuple[str, list[dict]]:
-    if not get_settings().RAG_ENABLED:
-        return "Tìm kiếm ngữ nghĩa chưa được bật. Quản trị viên cần khởi động dịch vụ RAG và lập chỉ mục bài viết.", []
     since = datetime.now(timezone.utc) - timedelta(days=_DAYS[time_range])
-    degraded = False
-    try:
-        vector = chat_embed_cache.query_vector(query[:2000])
-        vector_hits = rag_client.query_chunks(vector, source=source, category=category, since=since)
-    except DependencyUnavailableError:
-        # Keyword search remains useful when optional embedding/vector services fail.
-        degraded = True
-        vector_hits = []
+    semantic_enabled = get_settings().RAG_ENABLED
+    degraded = not semantic_enabled
+    vector_hits = []
+    if semantic_enabled:
+        try:
+            vector = chat_embed_cache.query_vector(query[:2000])
+            vector_hits = rag_client.query_chunks(vector, source=source, category=category, since=since)
+        except DependencyUnavailableError:
+            # Keyword search remains useful when optional embedding/vector services fail.
+            degraded = True
+    fallback_reason = (
+        "Tìm kiếm ngữ nghĩa chưa được bật" if not semantic_enabled else
+        "Tìm kiếm ngữ nghĩa tạm thời không khả dụng" if degraded else None
+    )
     keyword_ids = _keyword_candidates(query, since, source, category)
     scores: dict[str, float] = {}
     snippets: dict[str, str] = {}
@@ -125,8 +139,8 @@ def retrieve(query: str, *, time_range: str, source: str | None, category: str |
         lines.append(f"[{len(sources)}] {row['title']} ({row['source']}): {excerpt}")
     if not sources:
         message = "Chưa tìm thấy nội dung bài viết phù hợp trong phạm vi và thời gian đã chọn."
-        if degraded:
-            message += " Tìm kiếm ngữ nghĩa tạm thời không khả dụng; đã thử tìm theo từ khóa."
+        if fallback_reason:
+            message += f" {fallback_reason}; đã thử tìm theo từ khóa."
         return message, []
-    prefix = "Tìm kiếm ngữ nghĩa tạm thời không khả dụng; chỉ tìm theo từ khóa.\n" if degraded else ""
+    prefix = f"{fallback_reason}; chỉ tìm theo từ khóa.\n" if fallback_reason else ""
     return prefix + "Các đoạn liên quan từ bài viết đã đối chiếu với dữ liệu gốc:\n" + "\n".join(lines) + "\nĐây là trích đoạn, chưa phải bản tóm tắt do AI suy luận.", sources
