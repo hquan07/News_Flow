@@ -6,6 +6,7 @@ import { Activity, BarChart2, ThumbsUp } from "lucide-react";
 import ChartCard from "../ui/ChartCard";
 import EmptyState from "../ui/EmptyState";
 import ChartSkeleton from "../ui/ChartSkeleton";
+import ColoredTooltipValue, { DARK_TOOLTIP_CONTENT_STYLE, DARK_TOOLTIP_ITEM_STYLE } from "../ui/ColoredTooltipValue";
 import { formatCompactNumber, formatPercent, formatSourceName } from "@/lib/formatters";
 
 const SENTIMENTS = {
@@ -51,7 +52,7 @@ export default function SentimentView({ sentimentDist, sentimentTimeline, sentim
     <ChartCard title={<><ThumbsUp size={20} /> Overall Sentiment</>} description="What share of analyzed articles is positive, neutral or negative?" timeRange="Last 7 days" unit="Articles and share" total={totalSentiment} updatedAt={updatedAt}>
       {distribution.length > 0 ? <div style={{ position: "relative", width: "100%", height: "100%" }}>
         <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={distribution} dataKey="count" nameKey="name" cx="50%" cy="46%" innerRadius="48%" outerRadius="72%" paddingAngle={2} labelLine={false}>{distribution.map((entry: any) => <Cell key={entry.key} fill={entry.color} />)}</Pie>
-          <Tooltip formatter={(value, _name, item) => [`${Number(value).toLocaleString()} (${formatPercent(totalSentiment ? Number(value) * 100 / totalSentiment : 0)})`, item.payload.name]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
+          <Tooltip formatter={(value, _name, item) => [<ColoredTooltipValue key="value" color={String(item.payload.color)}>{Number(value).toLocaleString()} ({formatPercent(totalSentiment ? Number(value) * 100 / totalSentiment : 0)})</ColoredTooltipValue>, item.payload.name]} contentStyle={DARK_TOOLTIP_CONTENT_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE} labelStyle={DARK_TOOLTIP_ITEM_STYLE} />
           <Legend verticalAlign="bottom" formatter={(value) => <span style={{ color: "#cbd5e1" }}>{value}</span>} />
         </PieChart></ResponsiveContainer>
         <div style={{ position: "absolute", inset: "40% 0 auto", textAlign: "center", pointerEvents: "none" }}><strong style={{ fontSize: "1.35rem" }}>{formatCompactNumber(totalSentiment)}</strong><div style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>analyzed</div></div>
@@ -63,7 +64,7 @@ export default function SentimentView({ sentimentDist, sentimentTimeline, sentim
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
         <XAxis dataKey="source" stroke="#94a3b8" fontSize={11} interval="preserveStartEnd" />
         <YAxis stroke="#94a3b8" fontSize={11} domain={sourceMode === "percentage" ? [0, 100] : undefined} tickFormatter={sourceMode === "percentage" ? (value) => `${value}%` : formatCompactNumber} allowDecimals={false} />
-        <Tooltip cursor={false} formatter={(value, name, item) => { const key = String(name).replace("Pct", "").toLowerCase(); const count = item.payload[key] ?? 0; const pct = item.payload[`${key}Pct`] ?? 0; return [`${Number(count).toLocaleString()} · ${formatPercent(Number(pct))}`, SENTIMENTS[key as keyof typeof SENTIMENTS]?.label ?? name]; }} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
+        <Tooltip cursor={false} formatter={(value, name, item) => { const key = String(name).replace("Pct", "").toLowerCase() as keyof typeof SENTIMENTS; const count = item.payload[key] ?? 0; const pct = item.payload[`${key}Pct`] ?? 0; return [<ColoredTooltipValue key="value" color={SENTIMENTS[key]?.color ?? "#f8fafc"}>{Number(count).toLocaleString()} · {formatPercent(Number(pct))}</ColoredTooltipValue>, SENTIMENTS[key]?.label ?? name]; }} contentStyle={DARK_TOOLTIP_CONTENT_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE} labelStyle={DARK_TOOLTIP_ITEM_STYLE} />
         <Legend formatter={(value) => SENTIMENTS[String(value).replace("Pct", "") as keyof typeof SENTIMENTS]?.label ?? value} />
         {(["positive", "neutral", "negative"] as const).map((key) => <Bar key={key} dataKey={sourceMode === "percentage" ? `${key}Pct` : key} name={sourceMode === "percentage" ? `${key}Pct` : key} stackId="sentiment" fill={SENTIMENTS[key].color} />)}
       </BarChart></ResponsiveContainer> : !sentimentSources ? <ChartSkeleton /> : <EmptyState message={sentimentCoverage?.unlinked ? `${sentimentCoverage.unlinked.toLocaleString()} sentiment records are not linked to current articles. Run the NLP backfill to restore source attribution.` : "No source sentiment data"} />}
@@ -74,7 +75,7 @@ export default function SentimentView({ sentimentDist, sentimentTimeline, sentim
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
         <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} interval="preserveStartEnd" minTickGap={40} tickFormatter={(value) => new Date(value).toLocaleDateString([], { month: "short", day: "numeric" })} />
         <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} tickFormatter={formatCompactNumber} />
-        <Tooltip labelFormatter={(value) => new Date(String(value)).toLocaleString()} formatter={(value, name) => [Number(value).toLocaleString(), SENTIMENTS[name as keyof typeof SENTIMENTS]?.label ?? name]} contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.15)" }} />
+        <Tooltip labelFormatter={(value) => new Date(String(value)).toLocaleString()} formatter={(value, name) => [<ColoredTooltipValue key="value" color={SENTIMENTS[name as keyof typeof SENTIMENTS]?.color ?? "#f8fafc"}>{Number(value).toLocaleString()}</ColoredTooltipValue>, SENTIMENTS[name as keyof typeof SENTIMENTS]?.label ?? name]} contentStyle={DARK_TOOLTIP_CONTENT_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE} labelStyle={DARK_TOOLTIP_ITEM_STYLE} />
         <Legend formatter={(value) => SENTIMENTS[value as keyof typeof SENTIMENTS]?.label ?? value} />
         {(["positive", "neutral", "negative"] as const).map((key) => <Line key={key} type="linear" dataKey={key} stroke={SENTIMENTS[key].color} strokeWidth={2} dot={false} connectNulls={false} />)}
       </LineChart></ResponsiveContainer> : !sentimentTimeline ? <ChartSkeleton /> : <EmptyState message={sentimentCoverage?.unlinked ? `Timeline unavailable because sentiment coverage is ${sentimentCoverage.coverage_pct}%. Run the NLP backfill to link publication dates.` : "No timeline data"} />}

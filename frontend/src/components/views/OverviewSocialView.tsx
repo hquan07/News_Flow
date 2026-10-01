@@ -15,7 +15,10 @@ import { Activity } from "lucide-react";
 import ChartCard from "../ui/ChartCard";
 import ChartSkeleton from "../ui/ChartSkeleton";
 import EmptyState from "../ui/EmptyState";
+import ColoredTooltipValue, { DARK_TOOLTIP_CONTENT_STYLE, DARK_TOOLTIP_ITEM_STYLE } from "../ui/ColoredTooltipValue";
 import { formatCompactNumber } from "@/lib/formatters";
+
+const ENGAGEMENT_COLORS = { Likes: "#3b82f6", Replies: "#ec4899" } as const;
 
 export default function OverviewSocialView({
   overviewData,
@@ -159,23 +162,23 @@ export default function OverviewSocialView({
                       labelFormatter={(t) =>
                         new Date(t as string).toLocaleString()
                       }
-                      contentStyle={{
-                        backgroundColor: "rgba(30, 41, 59, 0.9)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
+                      formatter={(value, name) => [<ColoredTooltipValue key="value" color={ENGAGEMENT_COLORS[name as keyof typeof ENGAGEMENT_COLORS] ?? "#f8fafc"}>{Number(value).toLocaleString()}</ColoredTooltipValue>, name]}
+                      contentStyle={DARK_TOOLTIP_CONTENT_STYLE}
+                      itemStyle={DARK_TOOLTIP_ITEM_STYLE}
+                      labelStyle={DARK_TOOLTIP_ITEM_STYLE}
                     />
                     <Legend />
                     <Line
                       type="linear"
                       dataKey="Likes"
-                      stroke="#3b82f6"
+                      stroke={ENGAGEMENT_COLORS.Likes}
                       strokeWidth={2}
                       dot={false}
                     />
                     <Line
                       type="linear"
                       dataKey="Replies"
-                      stroke="#ec4899"
+                      stroke={ENGAGEMENT_COLORS.Replies}
                       strokeWidth={2}
                       dot={false}
                     />

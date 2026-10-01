@@ -716,6 +716,9 @@ h1 {
 .entity-bar-tooltip-detail { display: flex; align-items: center; gap: 0.4rem; }
 .entity-bar-tooltip-swatch { flex: 0 0 0.55rem; width: 0.55rem; height: 0.55rem; border-radius: 2px; }
 
+.chart-colored-value { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600; }
+.chart-colored-value-swatch { flex: 0 0 0.5rem; width: 0.5rem; height: 0.5rem; border-radius: 2px; }
+
 .chart-actions,
 .chart-toggle,
 .graph-controls,
