@@ -8,11 +8,40 @@ from pydantic import BaseModel, Field, field_validator
 
 class ConversationCreate(BaseModel):
     title: str = Field(default="New conversation", min_length=1, max_length=120)
+    project_id: str | None = None
+
+
+class ProjectCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, value: str) -> str:
+        title = " ".join(value.split())
+        if not title:
+            raise ValueError("Project title cannot be blank")
+        return title
+
+
+class ProjectUpdate(ProjectCreate):
+    pass
+
+
+class Project(BaseModel):
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationProjectUpdate(BaseModel):
+    project_id: str | None
 
 
 class Conversation(BaseModel):
     id: str
     title: str
+    project_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -61,6 +90,7 @@ class ChatContext(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     conversation_id: str | None = None
+    project_id: str | None = None
     time_range: Literal["today", "7d", "30d"] | None = None
     source: str | None = Field(default=None, max_length=80)
     category: str | None = Field(default=None, max_length=80)

@@ -1,4 +1,5 @@
 from copy import deepcopy
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -27,8 +28,8 @@ class _Collection:
         self.documents = []
         self.indexes = []
 
-    async def create_index(self, fields):
-        self.indexes.append(fields)
+    async def create_index(self, fields, **kwargs):
+        self.indexes.append((fields, kwargs))
 
     async def insert_one(self, document):
         stored = deepcopy(document)
@@ -49,6 +50,14 @@ class _Collection:
             found.update(deepcopy(update["$set"]))
         return SimpleNamespace(matched_count=int(found is not None))
 
+    async def update_many(self, query, update):
+        matched = 0
+        for document in self.documents:
+            if self._matches(document, query):
+                document.update(deepcopy(update["$set"]))
+                matched += 1
+        return SimpleNamespace(matched_count=matched)
+
     async def delete_one(self, query):
         found = next((doc for doc in self.documents if self._matches(doc, query)), None)
         if found:
@@ -60,13 +69,19 @@ class _Collection:
 
     @staticmethod
     def _matches(document, query):
-        return all(document.get(key) == value for key, value in query.items())
+        return all(
+            bool(re.search(value["$regex"], str(document.get(key, "")), re.IGNORECASE))
+            if isinstance(value, dict) and "$regex" in value
+            else document.get(key) == value
+            for key, value in query.items()
+        )
 
 
 @pytest.fixture
 def chat_db(monkeypatch):
     database = SimpleNamespace(
         chat_conversations=_Collection(),
+        chat_projects=_Collection(),
         chat_messages=_Collection(),
         audit_logs=_Collection(),
     )
@@ -168,7 +183,8 @@ async def test_chat_rejects_unauthenticated_and_invalid_requests(
 @pytest.mark.asyncio
 async def test_chat_indexes_and_role_permission(chat_db):
     await chat_store.ensure_chat_indexes()
-    assert len(chat_db.chat_conversations.indexes) == 1
+    assert len(chat_db.chat_conversations.indexes) == 2
+    assert len(chat_db.chat_projects.indexes) == 1
     assert len(chat_db.chat_messages.indexes) == 1
     assert len(chat_db.audit_logs.indexes) == 1
     for role in ("user", "analyst", "operator", "admin"):

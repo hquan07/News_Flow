@@ -15,6 +15,10 @@ from api.models.chat import (
     Conversation,
     ConversationCreate,
     ConversationDetail,
+    ConversationProjectUpdate,
+    Project,
+    ProjectCreate,
+    ProjectUpdate,
 )
 from api.security import require_permission
 from api.services import chat_guard, chat_metrics, chat_store, chat_tools
@@ -52,6 +56,8 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
         if payload.conversation_id:
             # Check ownership before executing a query or writing any messages.
             conversation = await chat_store.get_conversation(owner_id, payload.conversation_id)
+            if payload.project_id is not None and payload.project_id != conversation["project_id"]:
+                raise HTTPException(status_code=422, detail="Move conversation via the project endpoint")
             last_answer = next(
                 (message for message in reversed(conversation["messages"])
                  if message["role"] == "assistant"),
@@ -66,7 +72,7 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
             conversation_id = payload.conversation_id
         else:
             conversation = await chat_store.create_conversation(
-                owner_id, payload.message.strip()[:120]
+                owner_id, payload.message.strip()[:120], project_id=payload.project_id
             )
             conversation_id = conversation["id"]
 
@@ -135,7 +141,38 @@ async def create_conversation(
     payload: ConversationCreate,
     actor: dict = Depends(require_permission("chat.use")),
 ):
-    return await chat_store.create_conversation(actor["sub"], payload.title)
+    return await chat_store.create_conversation(actor["sub"], payload.title, payload.project_id)
+
+
+@router.post("/projects", response_model=Project, status_code=status.HTTP_201_CREATED)
+async def create_project(
+    payload: ProjectCreate,
+    actor: dict = Depends(require_permission("chat.use")),
+):
+    return await chat_store.create_project(actor["sub"], payload.title)
+
+
+@router.get("/projects", response_model=list[Project])
+async def list_projects(actor: dict = Depends(require_permission("chat.use"))):
+    return await chat_store.list_projects(actor["sub"])
+
+
+@router.patch("/projects/{project_id}", response_model=Project)
+async def rename_project(
+    project_id: str,
+    payload: ProjectUpdate,
+    actor: dict = Depends(require_permission("chat.use")),
+):
+    return await chat_store.rename_project(actor["sub"], project_id, payload.title)
+
+
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project(
+    project_id: str,
+    actor: dict = Depends(require_permission("chat.use")),
+):
+    await chat_store.delete_project(actor["sub"], project_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/metrics")
@@ -149,9 +186,11 @@ async def get_chat_metrics(
 @router.get("/conversations", response_model=list[Conversation])
 async def list_conversations(
     limit: int = Query(default=50, ge=1, le=100),
+    project_id: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=120),
     actor: dict = Depends(require_permission("chat.use")),
 ):
-    return await chat_store.list_conversations(actor["sub"], limit)
+    return await chat_store.list_conversations(actor["sub"], limit, project_id, q)
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
@@ -160,6 +199,15 @@ async def get_conversation(
     actor: dict = Depends(require_permission("chat.use")),
 ):
     return await chat_store.get_conversation(actor["sub"], conversation_id)
+
+
+@router.patch("/conversations/{conversation_id}/project", response_model=Conversation)
+async def move_conversation(
+    conversation_id: str,
+    payload: ConversationProjectUpdate,
+    actor: dict = Depends(require_permission("chat.use")),
+):
+    return await chat_store.move_conversation(actor["sub"], conversation_id, payload.project_id)
 
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
