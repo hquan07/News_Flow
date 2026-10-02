@@ -210,3 +210,128 @@ async def test_social_count_is_read_only_and_permission_checked(async_client, ch
         headers=headers("guest"),
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_social_author_ranking_uses_unique_posts_and_reports_ties(
+    async_client, chat_db, monkeypatch,
+):
+    captured = {}
+
+    def fake_query(sql, params):
+        captured.update(sql=sql, params=params)
+        return [
+            {"author": "An", "post_count": 8},
+            {"author": "Bình", "post_count": 8},
+            {"author": "Chi", "post_count": 5},
+        ]
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    response = await async_client.post(
+        "/api/v1/chat",
+        json={"message": "những tác giả nào có nhiều bài đăng nhất"},
+        headers=headers(),
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["tool"] == "rank_social_authors"
+    assert result["context"]["time_range"] == "7d"
+    assert result["context"]["source"] is None
+    assert "An: 8" in result["answer"]
+    assert "Bình: 8" in result["answer"]
+    assert "đồng hạng" in result["answer"]
+    assert "duy nhất nhất" not in result["answer"]
+    assert result["chart"]["points"][0] == {"label": "An", "value": 8.0}
+    assert "social_sentiment_metrics" in captured["sql"]
+    assert "uniqExact(source, post_id)" in captured["sql"]
+    assert "7 DAY" in captured["sql"]
+
+
+@pytest.mark.asyncio
+async def test_social_author_ranking_respects_source_and_time(async_client, chat_db, monkeypatch):
+    captured = {}
+
+    def fake_query(sql, params):
+        captured.update(sql=sql, params=params)
+        return []
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    response = await async_client.post(
+        "/api/v1/chat",
+        json={"message": "Tác giả nào có nhiều bài đăng từ VOZ trong 30 ngày qua?"},
+        headers=headers(),
+    )
+    assert response.status_code == 200
+    assert response.json()["tool"] == "rank_social_authors"
+    assert response.json()["context"]["source"] == "voz"
+    assert response.json()["context"]["time_range"] == "30d"
+    assert response.json()["chart"] is None
+    assert captured["params"] == {"source_names": ["voz", "voz_forum"]}
+    assert "30 DAY" in captured["sql"]
+
+
+@pytest.mark.asyncio
+async def test_article_author_ranking_does_not_mix_social(async_client, chat_db, monkeypatch):
+    captured = {}
+
+    def fake_query(sql, params):
+        captured.update(sql=sql, params=params)
+        return [{"author": "Lan", "post_count": 4}]
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    response = await async_client.post(
+        "/api/v1/chat", json={"message": "Tác giả nào có nhiều bài báo nhất?"},
+        headers=headers(),
+    )
+    assert response.json()["tool"] == "rank_article_authors"
+    assert "raw_articles" in captured["sql"]
+    assert "social_sentiment_metrics" not in captured["sql"]
+    assert "Lan: 4 bài báo" in response.json()["answer"]
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_author_scope_asks_without_query(async_client, chat_db, monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: pytest.fail("queried ambiguous authors"))
+    response = await async_client.post(
+        "/api/v1/chat", json={"message": "Tác giả nào nhiều nhất?"},
+        headers=headers(),
+    )
+    assert response.json()["tool"] == "clarify_scope"
+
+
+@pytest.mark.asyncio
+async def test_author_clarification_can_be_answered_with_data_kind(async_client, chat_db, monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: [{"author": "An", "post_count": 2}])
+    first = await async_client.post(
+        "/api/v1/chat", json={"message": "Tác giả nào nhiều nhất?"},
+        headers=headers(),
+    )
+    second = await async_client.post(
+        "/api/v1/chat",
+        json={"conversation_id": first.json()["conversation_id"], "message": "bài đăng"},
+        headers=headers(),
+    )
+    assert second.json()["tool"] == "rank_social_authors"
+
+
+@pytest.mark.asyncio
+async def test_followup_author_domain_change_drops_incompatible_source(async_client, chat_db, monkeypatch):
+    calls = []
+
+    def fake_query(sql, params):
+        calls.append((sql, params))
+        return [{"author": "An", "post_count": 2}]
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    first = await async_client.post(
+        "/api/v1/chat", json={"message": "Tác giả nào nhiều bài đăng nhất từ VOZ?"},
+        headers=headers(),
+    )
+    second = await async_client.post(
+        "/api/v1/chat",
+        json={"conversation_id": first.json()["conversation_id"], "message": "Còn tác giả bài báo?"},
+        headers=headers(),
+    )
+    assert second.json()["tool"] == "rank_article_authors"
+    assert second.json()["context"]["source"] is None
+    assert calls[1][1] == {}

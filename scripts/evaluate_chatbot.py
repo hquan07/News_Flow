@@ -23,6 +23,8 @@ TOOL_FOR_INTENT = {
     "articles": "search_articles",
     "article_count": "count_articles",
     "social_count": "count_social_posts",
+    "social_authors": "rank_social_authors",
+    "article_authors": "rank_article_authors",
     "trending": "get_trending_keywords",
     "sentiment": "get_sentiment_distribution",
     "sources": "compare_sources",

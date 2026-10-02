@@ -47,6 +47,12 @@ def _normalized(value: str) -> str:
 
 def _intent(message: str) -> str | None:
     normalized = _normalized(message)
+    if "tac gia" in normalized or "author" in normalized:
+        if any(word in normalized for word in ("bai dang", "post", "binh luan")):
+            return "social_authors"
+        if any(word in normalized for word in ("bai bao", "bai viet", "tin")):
+            return "article_authors"
+        return "authors_unspecified"
     if any(word in normalized for word in ("canh bao", "alert", "khung hoang", "bat thuong")):
         return "alerts"
     if any(word in normalized for word in ("so sanh nguon", "so sanh bao", "nguon nao", "bao nao", "compare sources")):
@@ -300,6 +306,71 @@ def _social_count(request: ChatRequest, time_range: str) -> ToolResult:
     return ToolResult(answer=answer, tool="count_social_posts", time_range=time_range)
 
 
+def _author_answer(rows: list[dict], *, kind: str, time_range: str, source_label: str) -> ToolResult:
+    tool = "rank_social_authors" if kind == "social" else "rank_article_authors"
+    visible = rows[:10]
+    if not visible:
+        data_label = "bài đăng/bình luận social" if kind == "social" else "bài báo"
+        return ToolResult(
+            answer=f"Chưa có dữ liệu tác giả {data_label} phù hợp trong {_TIME_LABELS[time_range]}.",
+            tool=tool, time_range=time_range,
+        )
+    unit = "bài đăng/bình luận duy nhất" if kind == "social" else "bài báo duy nhất"
+    headline_unit = "bài đăng/bình luận" if kind == "social" else "bài báo"
+    answer = (
+        f"Tác giả có nhiều {headline_unit} nhất từ {source_label} trong {_TIME_LABELS[time_range]} "
+        f"(tối đa 10 tác giả):\n"
+        + "\n".join(
+            f"{index}. {row['author']}: {row['post_count']} {unit}"
+            for index, row in enumerate(visible, 1)
+        )
+    )
+    if len(visible) > 1 and visible[0]["post_count"] == visible[1]["post_count"]:
+        answer += "\nCó tác giả đồng hạng ở vị trí đầu."
+    if len(rows) > 10:
+        answer += "\nDanh sách được giới hạn 10 người."
+        if rows[10]["post_count"] == visible[-1]["post_count"]:
+            answer += " Còn tác giả đồng hạng ngoài danh sách."
+    if kind == "social":
+        answer += "\nDữ liệu social có thể gồm dữ liệu thử nghiệm; một post_id được tính một lần trong mỗi nguồn."
+    return ToolResult(
+        answer=answer, tool=tool, time_range=time_range,
+        chart=_chart("Tác giả theo số bài đăng" if kind == "social" else "Tác giả theo số bài báo", unit, visible, "author", "post_count"),
+    )
+
+
+def _social_authors(request: ChatRequest, time_range: str) -> ToolResult:
+    where = ["length(trimBoth(author)) > 0", f"publish_time >= now() - INTERVAL {_TIME_WINDOWS[time_range]}"]
+    params = {}
+    if request.source:
+        group = _social_group(request.source)
+        if group is None:
+            raise HTTPException(status_code=422, detail="Choose a supported social source")
+        where.append("source IN {source_names:Array(String)}")
+        params["source_names"] = list(_SOCIAL_SOURCE_GROUPS[group])
+    rows = _query(
+        "SELECT trimBoth(author) AS author, uniqExact(source, post_id) AS post_count "
+        "FROM newspulse.social_sentiment_metrics WHERE " + " AND ".join(where) +
+        " GROUP BY author ORDER BY post_count DESC, author ASC LIMIT 11",
+        params,
+    )
+    label = f"nhóm nguồn {request.source}" if request.source else "tất cả nguồn social"
+    return _author_answer(rows, kind="social", time_range=time_range, source_label=label)
+
+
+def _article_authors(request: ChatRequest, time_range: str) -> ToolResult:
+    where, params = _where(request, time_range, title_query=_search_term(request))
+    where += " AND length(trimBoth(a.author)) > 0"
+    rows = _query(
+        "SELECT trimBoth(a.author) AS author, countDistinct(a.url_hash) AS post_count "
+        "FROM newspulse.raw_articles AS a FINAL "
+        f"WHERE {where} GROUP BY author ORDER BY post_count DESC, author ASC LIMIT 11",
+        params,
+    )
+    label = request.source or "tất cả nguồn báo"
+    return _author_answer(rows, kind="báo", time_range=time_range, source_label=label)
+
+
 def _trending(request: ChatRequest, time_range: str) -> ToolResult:
     where, params = _where(request, time_range)
     keyword_query = _search_term(request)
@@ -504,9 +575,20 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
     followup = previous_context is not None and (_is_followup(request.message) or pending)
     if followup and intent is None:
         intent = previous_context.get("intent")
+    if followup and previous_context.get("intent") == "authors_unspecified":
+        normalized_reply = _normalized(request.message)
+        if "bai dang" in normalized_reply or "binh luan" in normalized_reply or "social" in normalized_reply:
+            intent = "social_authors"
+        elif "bai bao" in normalized_reply or "bai viet" in normalized_reply:
+            intent = "article_authors"
     if followup and intent != "alerts":
         previous_time = previous_context.get("time_range")
         mentioned = _mentioned_sources(request.message)
+        previous_source = previous_context.get("source")
+        if intent in ("articles", "article_count", "article_authors", "trending", "sentiment", "entities", "rag") and _social_group(previous_source):
+            previous_source = None
+        if intent in ("social_count", "social_authors") and previous_source and not _social_group(previous_source):
+            previous_source = None
         inherited_time = previous_time if previous_time in ("today", "7d", "30d") or (
             previous_time == "all" and intent in ("article_count", "social_count")
         ) else None
@@ -515,7 +597,7 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
             "source": request.source or (
                 None if intent == "sources" else
                 (social_mentioned[0] if len(social_mentioned) == 1 else
-                 mentioned[0] if len(mentioned) == 1 else previous_context.get("source"))
+                 mentioned[0] if len(mentioned) == 1 else previous_source)
             ),
             "category": request.category or previous_context.get("category"),
             "query": request.query or _search_term(request) or previous_context.get("query"),
@@ -527,7 +609,22 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
     if intent in ("article_count", "social_count") and (social_mentioned or _social_group(request.source)):
         intent = "social_count"
     clarification = None
-    if intent == "social_count":
+    if intent == "authors_unspecified":
+        clarification = "Bạn muốn xếp hạng tác giả bài báo hay tác giả bài đăng/bình luận social?"
+    elif intent == "social_authors":
+        if not request.source and len(social_mentioned) == 1:
+            request = request.model_copy(update={"source": social_mentioned[0]})
+        if len(social_mentioned) > 1 or mentioned:
+            clarification = "Hãy chọn một nguồn social (VOZ hoặc YouTube), hoặc hỏi tất cả nguồn social."
+        elif request.source and _social_group(request.source) is None:
+            clarification = "Nguồn này không thuộc dữ liệu social đang hỗ trợ. Hãy chọn VOZ hoặc YouTube."
+        elif request.source and social_mentioned and _social_group(request.source) not in social_mentioned:
+            clarification = "Nguồn trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại nguồn hoặc sửa câu hỏi."
+        elif request.category or request.query or _search_term(request):
+            clarification = "Hiện thống kê tác giả social chỉ hỗ trợ lọc theo nguồn và thời gian, chưa lọc danh mục hoặc chủ đề."
+        elif request.source:
+            request = request.model_copy(update={"source": _social_group(request.source)})
+    elif intent == "social_count":
         if not request.source and len(social_mentioned) == 1:
             request = request.model_copy(update={"source": social_mentioned[0]})
         if len(social_mentioned) > 1 or (mentioned and social_mentioned):
@@ -546,7 +643,7 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
         elif len(mentioned) > 1 and intent == "article_count":
             clarification = "Bạn muốn đếm gộp hai nguồn hay so sánh từng nguồn? Hãy nêu rõ yêu cầu."
 
-    if intent not in ("sources", "alerts", "social_count") and request.source and mentioned and request.source not in mentioned:
+    if intent not in ("sources", "alerts", "social_count", "social_authors") and request.source and mentioned and request.source not in mentioned:
         clarification = "Nguồn trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại nguồn hoặc sửa câu hỏi."
     explicit_time = _time_hint(request.message)
     if request.time_range and explicit_time and request.time_range != explicit_time:
@@ -583,7 +680,7 @@ def answer_question(
     request, intent, time_range = plan.request, plan.intent, plan.time_range
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'alerts.read'")
-    if intent in ("articles", "article_count", "social_count", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
+    if intent in ("articles", "article_count", "social_count", "social_authors", "article_authors", "authors_unspecified", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'dashboard.read'")
     if intent is None:
         return ToolResult(answer=(
@@ -605,6 +702,8 @@ def answer_question(
         "articles": _articles,
         "article_count": _article_count,
         "social_count": _social_count,
+        "social_authors": _social_authors,
+        "article_authors": _article_authors,
         "trending": _trending,
         "sentiment": _sentiment,
         "sources": _sources,

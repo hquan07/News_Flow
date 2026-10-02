@@ -44,7 +44,7 @@ python3 scripts/evaluate_chatbot.py --live-url http://localhost:8001
 The live runner calls the real chat endpoint and creates conversations; use
 test accounts and a staging deployment. It checks status, tool selection,
 resolved time/source/category scope, clarification behavior, and citation URL
-shape without printing question/answer text. The 41 hand-written cases at
+shape without printing question/answer text. The 45 hand-written cases at
 `eval/chatbot_cases.json` are a regression benchmark, not an accuracy
 certification. They do not evaluate answer facts or citation relevance. Before
 production, extend this with 100–300 anonymized real Vietnamese questions and
