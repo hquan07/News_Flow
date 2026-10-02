@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import hashlib
+from datetime import datetime, timedelta, timezone
 import logging
 from airflow.decorators import dag, task
 
@@ -92,11 +93,39 @@ def gx_validation_pipeline():
             
             # Gửi cảnh báo qua Telegram
             try:
-                from monitoring.telegram_alert import send_telegram_alert
-                alert_msg = f"🚨 <b>NewsPulse Data Quality Alert</b>\n\nPhát hiện dữ liệu bất thường trong ClickHouse!\n<b>Chi tiết:</b> {failed_expectations}"
-                send_telegram_alert(alert_msg)
-            except Exception as e:
-                logger.error(f"Failed to load telegram_alert module: {e}")
+                from monitoring.alert_dispatcher import (
+                    AlertEvent,
+                    send_telegram_events,
+                )
+
+                expectation_names = sorted(
+                    {
+                        result.get("expectation_config", {}).get(
+                            "expectation_type", "unknown_expectation"
+                        )
+                        for result in failed_expectations
+                    }
+                )
+                signature = hashlib.sha256(
+                    "|".join(expectation_names).encode("utf-8")
+                ).hexdigest()[:12]
+                hour_key = datetime.now(timezone.utc).strftime("%Y%m%d%H")
+                send_telegram_events(
+                    [
+                        AlertEvent(
+                            alert_id=f"data-quality:{signature}:{hour_key}",
+                            alert_type="data_quality",
+                            severity="critical",
+                            title="Kiểm tra chất lượng dữ liệu thất bại",
+                            details=(
+                                f"{len(failed_expectations)} expectation bị lỗi",
+                                f"Rules: {', '.join(expectation_names[:5])}",
+                            ),
+                        )
+                    ]
+                )
+            except Exception:
+                logger.exception("Failed to send data quality alert")
                 
             # Raise exception để task fail
             raise ValueError(f"Data Quality Check Failed! {failed_expectations}")
