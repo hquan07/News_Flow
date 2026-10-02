@@ -163,3 +163,50 @@ async def test_related_article_question_filters_instead_of_listing_latest(
     assert "raw_article_keywords" in captured["sql"]
     assert "raw_article_entities" in captured["sql"]
     assert "7 DAY" in captured["sql"]
+
+
+@pytest.mark.asyncio
+async def test_social_source_counts_use_social_table_and_followup_switches_source(
+    async_client, chat_db, monkeypatch,
+):
+    calls = []
+
+    def fake_query(sql, params):
+        calls.append((sql, params))
+        return [{"post_count": 17, "record_count": 30}]
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    first = await async_client.post(
+        "/api/v1/chat", json={"message": "nguồn VOZ có bao nhiêu tin"},
+        headers=headers(),
+    )
+    assert first.status_code == 200
+    assert first.json()["tool"] == "count_social_posts"
+    assert first.json()["context"]["source"] == "voz"
+    assert first.json()["context"]["time_range"] == "all"
+    assert "17 bài đăng/bình luận social duy nhất" in first.json()["answer"]
+    assert "30 bản ghi thu thập" in first.json()["answer"]
+    assert "social_sentiment_metrics" in calls[0][0]
+    assert "raw_articles" not in calls[0][0]
+    assert calls[0][1] == {"source_names": ["voz", "voz_forum"]}
+
+    second = await async_client.post(
+        "/api/v1/chat",
+        json={"conversation_id": first.json()["conversation_id"], "message": "từ nguồn youtube"},
+        headers=headers(),
+    )
+    assert second.status_code == 200
+    assert second.json()["tool"] == "count_social_posts"
+    assert second.json()["context"]["source"] == "youtube"
+    assert second.json()["context"]["time_range"] == "all"
+    assert calls[1][1] == {"source_names": ["youtube", "youtube_comments"]}
+
+
+@pytest.mark.asyncio
+async def test_social_count_is_read_only_and_permission_checked(async_client, chat_db, monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: pytest.fail("queried without permission"))
+    response = await async_client.post(
+        "/api/v1/chat", json={"message": "nguồn VOZ có bao nhiêu tin"},
+        headers=headers("guest"),
+    )
+    assert response.status_code == 403

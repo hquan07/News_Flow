@@ -1,6 +1,6 @@
 # Chatbot evaluation
 
-`chatbot_cases.json` contains 38 hand-written Vietnamese regression cases for
+`chatbot_cases.json` contains 41 hand-written Vietnamese regression cases for
 intent, time/source/category scope, clarification, and role permissions. Each
 case has an independent `expected_tool` label. Optional `expected_time_range`,
 `expected_source`, `expected_category`, `expected_compare_sources`,

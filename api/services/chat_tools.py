@@ -89,7 +89,7 @@ def _has_time_hint(message: str) -> bool:
 
 def _is_followup(message: str) -> bool:
     normalized = _normalized(message).strip()
-    return normalized.startswith(("con ", "the ", "vay ", "neu ", "so voi "))
+    return normalized.startswith(("con ", "the ", "vay ", "neu ", "so voi ", "tu nguon ", "nguon "))
 
 
 _SOURCE_NAMES = {
@@ -105,6 +105,27 @@ _SOURCE_NAMES = {
     "tien phong": "tienphong",
     "tienphong": "tienphong",
 }
+
+_SOCIAL_SOURCE_GROUPS = {
+    "voz": ("voz", "voz_forum"),
+    "youtube": ("youtube", "youtube_comments"),
+}
+_SOCIAL_SOURCE_ALIASES = {
+    "voz": "voz", "voz_forum": "voz",
+    "youtube": "youtube", "you tube": "youtube", "youtube_comments": "youtube",
+}
+
+
+def _social_group(source: str | None) -> str | None:
+    return _SOCIAL_SOURCE_ALIASES.get(_normalized(source).strip()) if source else None
+
+
+def _mentioned_social_sources(message: str) -> list[str]:
+    normalized = _normalized(message)
+    return list(dict.fromkeys(
+        group for alias, group in _SOCIAL_SOURCE_ALIASES.items()
+        if re.search(rf"\b{re.escape(alias)}\b", normalized)
+    ))
 
 
 def _mentioned_sources(message: str) -> list[str]:
@@ -249,6 +270,34 @@ def _article_count(request: ChatRequest, time_range: str) -> ToolResult:
     if request.category:
         answer += f" Danh mục: {request.category}."
     return ToolResult(answer=answer, tool="count_articles", time_range=time_range)
+
+
+def _social_count(request: ChatRequest, time_range: str) -> ToolResult:
+    group = _social_group(request.source)
+    if group is None:
+        raise HTTPException(status_code=422, detail="Choose a supported social source")
+    where = "source IN {source_names:Array(String)}"
+    params = {"source_names": list(_SOCIAL_SOURCE_GROUPS[group])}
+    if time_range != "all":
+        where += f" AND publish_time >= now() - INTERVAL {_TIME_WINDOWS[time_range]}"
+    rows = _query(
+        "SELECT uniqExact(source, post_id) AS post_count, count() AS record_count "
+        f"FROM newspulse.social_sentiment_metrics WHERE {where}",
+        params,
+    )
+    count = int(rows[0]["post_count"]) if rows else 0
+    formatted_count = f"{count:,}".replace(",", ".")
+    record_count = int(rows[0].get("record_count", count)) if rows else 0
+    formatted_records = f"{record_count:,}".replace(",", ".")
+    period = "từ trước đến nay" if time_range == "all" else f"trong {_TIME_LABELS[time_range]}"
+    answer = (
+        f"Có {formatted_count} bài đăng/bình luận social duy nhất từ nhóm nguồn "
+        f"{group.upper() if group == 'voz' else 'YouTube'} {period} "
+        f"(gồm {', '.join(_SOCIAL_SOURCE_GROUPS[group])}). "
+        f"Bảng lưu {formatted_records} bản ghi thu thập; số duy nhất được tính theo nguồn và post_id. "
+        "Đây không phải số bài báo."
+    )
+    return ToolResult(answer=answer, tool="count_social_posts", time_range=time_range)
 
 
 def _trending(request: ChatRequest, time_range: str) -> ToolResult:
@@ -450,6 +499,7 @@ def _rag(request: ChatRequest, time_range: str) -> ToolResult:
 def plan_question(request: ChatRequest, previous_context: dict | None = None) -> ChatPlan:
     """Resolve intent and scope without touching a data service."""
     intent = _intent(request.message)
+    social_mentioned = _mentioned_social_sources(request.message)
     pending = bool(previous_context and previous_context.get("clarification"))
     followup = previous_context is not None and (_is_followup(request.message) or pending)
     if followup and intent is None:
@@ -458,13 +508,14 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
         previous_time = previous_context.get("time_range")
         mentioned = _mentioned_sources(request.message)
         inherited_time = previous_time if previous_time in ("today", "7d", "30d") or (
-            previous_time == "all" and intent == "article_count"
+            previous_time == "all" and intent in ("article_count", "social_count")
         ) else None
         request = request.model_copy(update={
             "time_range": request.time_range or _time_hint(request.message) or inherited_time,
             "source": request.source or (
                 None if intent == "sources" else
-                (mentioned[0] if len(mentioned) == 1 else previous_context.get("source"))
+                (social_mentioned[0] if len(social_mentioned) == 1 else
+                 mentioned[0] if len(mentioned) == 1 else previous_context.get("source"))
             ),
             "category": request.category or previous_context.get("category"),
             "query": request.query or _search_term(request) or previous_context.get("query"),
@@ -473,14 +524,29 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
             ),
         })
     mentioned = _mentioned_sources(request.message)
+    if intent in ("article_count", "social_count") and (social_mentioned or _social_group(request.source)):
+        intent = "social_count"
     clarification = None
-    if intent not in ("sources", "alerts") and not request.source:
+    if intent == "social_count":
+        if not request.source and len(social_mentioned) == 1:
+            request = request.model_copy(update={"source": social_mentioned[0]})
+        if len(social_mentioned) > 1 or (mentioned and social_mentioned):
+            clarification = "Bạn muốn đếm nguồn social nào? Hãy chọn riêng VOZ hoặc YouTube."
+        elif request.source and social_mentioned and _social_group(request.source) not in social_mentioned:
+            clarification = "Nguồn trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại nguồn hoặc sửa câu hỏi."
+        elif not _social_group(request.source):
+            clarification = "VOZ và YouTube là nguồn social. Bạn muốn đếm nguồn nào?"
+        elif request.category or request.query or _search_term(request):
+            clarification = "Hiện chỉ hỗ trợ đếm toàn bộ dữ liệu social theo nguồn và thời gian, chưa lọc danh mục hoặc chủ đề."
+        else:
+            request = request.model_copy(update={"source": _social_group(request.source)})
+    elif intent not in ("sources", "alerts") and not request.source:
         if len(mentioned) == 1:
             request = request.model_copy(update={"source": mentioned[0]})
         elif len(mentioned) > 1 and intent == "article_count":
             clarification = "Bạn muốn đếm gộp hai nguồn hay so sánh từng nguồn? Hãy nêu rõ yêu cầu."
 
-    if intent not in ("sources", "alerts") and request.source and mentioned and request.source not in mentioned:
+    if intent not in ("sources", "alerts", "social_count") and request.source and mentioned and request.source not in mentioned:
         clarification = "Nguồn trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại nguồn hoặc sửa câu hỏi."
     explicit_time = _time_hint(request.message)
     if request.time_range and explicit_time and request.time_range != explicit_time:
@@ -504,7 +570,7 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
     if clarification:
         return ChatPlan(request, intent, None, selected_sources, clarification)
     time_range = None if intent is None else (
-        "all" if intent == "article_count" and not request.time_range
+        "all" if intent in ("article_count", "social_count") and not request.time_range
         and not explicit_time else _time_range(request)
     )
     return ChatPlan(request, intent, time_range, selected_sources)
@@ -517,7 +583,7 @@ def answer_question(
     request, intent, time_range = plan.request, plan.intent, plan.time_range
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'alerts.read'")
-    if intent in ("articles", "article_count", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
+    if intent in ("articles", "article_count", "social_count", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'dashboard.read'")
     if intent is None:
         return ToolResult(answer=(
@@ -538,6 +604,7 @@ def answer_question(
     result = {
         "articles": _articles,
         "article_count": _article_count,
+        "social_count": _social_count,
         "trending": _trending,
         "sentiment": _sentiment,
         "sources": _sources,
