@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Pencil, SquarePen, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Pencil, ShieldCheck, SquarePen, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { API_BASE, apiFetch } from "@/lib/api";
@@ -117,6 +117,10 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   const [actionResult, setActionResult] = useState<ActionResult | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionPanelOpen, setActionPanelOpen] = useState(false);
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
+  const actionCloseRef = useRef<HTMLButtonElement>(null);
+  const actionPanelRef = useRef<HTMLElement>(null);
 
   const visibleConversations = conversations.filter((conversation) =>
     conversation.title.toLocaleLowerCase("vi").includes(chatSearch.trim().toLocaleLowerCase("vi"))
@@ -127,8 +131,16 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
 
   useEffect(() => {
     if (open) questionRef.current?.focus();
-    else setContextMenu(null);
+    else {
+      setContextMenu(null);
+      setActionPanelOpen(false);
+    }
   }, [open]);
+
+  useEffect(() => {
+    if (!actionPanelOpen) return;
+    actionCloseRef.current?.focus();
+  }, [actionPanelOpen]);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -633,7 +645,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
         </div>
         </div>
         <div className="chat-sidebar-time-range">
-          <label htmlFor="chat-time-range">Khoảng thời gian</label>
+          <label htmlFor="chat-time-range">Thời gian tra cứu</label>
           <select id="chat-time-range" value={timeRange} onChange={(event) => setTimeRange(event.target.value)} disabled={loading}>
             <option value="">Theo câu hỏi</option>
             <option value="today">24 giờ qua</option>
@@ -651,6 +663,13 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
               : "Hỏi về bài viết, từ khóa, cảm xúc, thực thể và nguồn tin."}</p>
           </div>
           <div className="chat-header-controls">
+            {availableActions.length > 0 && (
+              <button ref={actionButtonRef} type="button" className="chat-action-trigger"
+                onClick={() => setActionPanelOpen(true)} aria-label="Mở hành động có xác nhận"
+                title="Hành động có xác nhận" aria-haspopup="dialog" aria-expanded={actionPanelOpen}>
+                <ShieldCheck size={18} aria-hidden="true" />
+              </button>
+            )}
             <button type="button" className="chat-close-button" onClick={onClose} aria-label="Đóng Chat Assistant" title="Đóng Chat Assistant">
               <X size={18} aria-hidden="true" />
             </button>
@@ -740,9 +759,48 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
           {loading && <p className="chat-loading">Đang truy vấn dữ liệu…</p>}
         </div>
         {error && <p className="chat-error" role="alert">{error}</p>}
-        {availableActions.length > 0 && (
-          <section className="chat-action-panel" aria-label="Hành động có xác nhận">
-            <h3>Hành động có xác nhận</h3>
+        <form className="chat-form" onSubmit={submit}>
+          <label htmlFor="chat-question" className="chat-visually-hidden">Câu hỏi</label>
+          <input id="chat-question" ref={questionRef} value={question} onChange={(event) => setQuestion(event.target.value)}
+            placeholder="Ví dụ: So sánh nguồn VnExpress và Tuổi Trẻ" maxLength={2000} disabled={loading || historyLoading || !!deletingId} />
+          <button type="submit" disabled={loading || historyLoading || !!deletingId || !question.trim()}>Gửi</button>
+        </form>
+      </div>
+      {open && actionPanelOpen && availableActions.length > 0 && createPortal(
+        <div className="chat-action-overlay" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setActionPanelOpen(false);
+            actionButtonRef.current?.focus();
+          }
+        }}>
+          <section ref={actionPanelRef} className="chat-action-panel" role="dialog" aria-modal="true" aria-labelledby="chat-action-title"
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setActionPanelOpen(false);
+                actionButtonRef.current?.focus();
+              } else if (event.key === "Tab") {
+                const controls = actionPanelRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), select:not(:disabled)");
+                if (!controls?.length) return;
+                const first = controls[0];
+                const last = controls[controls.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                  event.preventDefault();
+                  last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first.focus();
+                }
+              }
+            }}>
+            <div className="chat-action-heading">
+              <h3 id="chat-action-title">Hành động có xác nhận</h3>
+              <button ref={actionCloseRef} type="button" className="chat-action-close" aria-label="Đóng hành động có xác nhận"
+                onClick={() => { setActionPanelOpen(false); actionButtonRef.current?.focus(); }}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
             <p>Câu chat không tự thực hiện hành động. Hãy xem tác động và xác nhận ở đây.</p>
             <div className="chat-action-controls">
               <label>
@@ -768,7 +826,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
               )}
               {action === "generate_report" && (
                 <>
-                  <label>Khoảng thời gian
+                  <label>Thời gian báo cáo
                     <select value={actionRange} onChange={(event) => { setActionRange(event.target.value); setActionPreview(null); }} disabled={actionBusy || !!actionPreview}>
                       <option value="today">24 giờ qua</option><option value="7d">7 ngày</option><option value="30d">30 ngày</option>
                     </select>
@@ -799,14 +857,8 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
             )}
             {actionError && <p className="chat-error" role="alert">{actionError}</p>}
           </section>
-        )}
-        <form className="chat-form" onSubmit={submit}>
-          <label htmlFor="chat-question" className="chat-visually-hidden">Câu hỏi</label>
-          <input id="chat-question" ref={questionRef} value={question} onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ví dụ: So sánh nguồn VnExpress và Tuổi Trẻ" maxLength={2000} disabled={loading || historyLoading || !!deletingId} />
-          <button type="submit" disabled={loading || historyLoading || !!deletingId || !question.trim()}>Gửi</button>
-        </form>
-      </div>
+        </div>, document.body
+      )}
       {open && contextMenu && contextConversation && createPortal(
         <div ref={contextMenuRef} className="chat-context-menu" role="menu"
           aria-label="Tùy chọn hội thoại" style={{ left: contextMenu.x, top: contextMenu.y }}

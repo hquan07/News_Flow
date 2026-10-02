@@ -3170,7 +3170,8 @@ h1 {
   gap: 0.5rem;
 }
 
-.chat-header-controls .chat-close-button {
+.chat-header-controls .chat-close-button,
+.chat-header-controls .chat-action-trigger {
   display: grid;
   place-items: center;
   padding: 0.55rem;
@@ -3316,14 +3317,40 @@ h1 {
   font-weight: 700;
 }
 
-.chat-action-panel {
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+.chat-action-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
   padding: 1rem;
-  margin: 0.75rem 0;
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(2, 6, 23, 0.68);
 }
 
+.chat-action-panel {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: #172338;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.5);
+}
+
+.chat-action-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.chat-action-panel button {
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  color: var(--text-main);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.chat-action-panel button:hover, .chat-action-panel button:focus-visible { border-color: var(--accent-blue); }
+.chat-action-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+.chat-action-close { display: grid; place-items: center; }
 .chat-action-panel h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
 .chat-action-panel p, .chat-action-panel small { color: var(--text-muted); font-size: 0.82rem; }
 .chat-action-controls { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: end; margin-top: 0.75rem; }
