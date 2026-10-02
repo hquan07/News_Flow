@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     TELEGRAM_ALLOWED_USER_IDS: str = ""
     TELEGRAM_POLL_TIMEOUT_SECONDS: int = 25
     TELEGRAM_RATE_LIMIT_PER_MINUTE: int = 20
+    TELEGRAM_AUDIT_RETENTION_DAYS: int = 90
 
     RAG_ENABLED: bool = False
     QDRANT_URL: str = "http://localhost:6333"

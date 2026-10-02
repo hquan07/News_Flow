@@ -34,8 +34,11 @@ class TelegramBotClient:
         if self._owns_client:
             await self.http_client.aclose()
 
-    async def disable_webhook(self) -> None:
-        await self._call("deleteWebhook", {"drop_pending_updates": False})
+    async def disable_webhook(self, drop_pending_updates: bool = False) -> None:
+        await self._call(
+            "deleteWebhook",
+            {"drop_pending_updates": drop_pending_updates},
+        )
 
     async def get_updates(
         self,

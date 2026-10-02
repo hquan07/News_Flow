@@ -1,14 +1,16 @@
 import asyncio
 import logging
 import signal
+import time
 
 from api.config import close_ch_client, get_settings
-from api.database import close_mongo
+from api.database import close_mongo, get_mongo_db
 from api.logging_config import configure_logging
 from api.models.telegram import TelegramUpdate, parse_telegram_query
 from api.services.telegram_access import TelegramAccessPolicy
 from api.services.telegram_client import TelegramAPIError, TelegramBotClient
 from api.services.telegram_queries import TelegramQueryService
+from api.services.telegram_runtime import TelegramAuditStore, TelegramRateLimiter
 
 logger = logging.getLogger("newspulse.telegram.worker")
 
@@ -20,15 +22,22 @@ class TelegramBotWorker:
         access_policy: TelegramAccessPolicy,
         query_service: TelegramQueryService,
         poll_timeout_seconds: int = 25,
+        rate_limiter: TelegramRateLimiter | None = None,
+        audit_store: TelegramAuditStore | None = None,
     ) -> None:
         self.client = client
         self.access_policy = access_policy
         self.query_service = query_service
         self.poll_timeout_seconds = max(poll_timeout_seconds, 1)
+        self.rate_limiter = rate_limiter
+        self.audit_store = audit_store
         self.offset: int | None = None
 
     async def run(self, stop_event: asyncio.Event) -> None:
-        await self.client.disable_webhook()
+        if self.audit_store:
+            await self.audit_store.ensure_indexes()
+            self.offset = await self.audit_store.load_offset()
+        await self.client.disable_webhook(drop_pending_updates=self.offset is None)
         logger.info("Telegram query worker started")
         while not stop_event.is_set():
             try:
@@ -38,7 +47,11 @@ class TelegramBotWorker:
                 )
                 for update in updates:
                     self.offset = update.update_id + 1
-                    await self.handle_update(update)
+                    try:
+                        await self.handle_update(update)
+                    finally:
+                        if self.audit_store:
+                            await self.audit_store.save_offset(self.offset)
             except TelegramAPIError:
                 logger.exception("Telegram polling failed")
                 try:
@@ -47,6 +60,7 @@ class TelegramBotWorker:
                     pass
 
     async def handle_update(self, update: TelegramUpdate) -> None:
+        started = time.monotonic()
         message = update.message
         if not message or not message.text:
             return
@@ -60,6 +74,28 @@ class TelegramBotWorker:
                 decision.reason,
                 message.chat.id,
                 message.sender.id if message.sender else None,
+            )
+            await self._record(
+                update,
+                command=None,
+                outcome="denied",
+                reason=decision.reason,
+                started=started,
+            )
+            return
+
+        rate_key = message.sender.id if message.sender else message.chat.id
+        if self.rate_limiter and not self.rate_limiter.allow(rate_key):
+            await self.client.send_message(
+                message.chat.id,
+                "Bạn gửi truy vấn quá nhanh. Vui lòng thử lại sau ít phút.",
+            )
+            await self._record(
+                update,
+                command=None,
+                outcome="rate_limited",
+                reason="per_minute_limit",
+                started=started,
             )
             return
 
@@ -79,9 +115,45 @@ class TelegramBotWorker:
                 message.chat.id,
                 "Không thể hoàn tất truy vấn lúc này. Vui lòng thử lại sau.",
             )
+            await self._record(
+                update,
+                command=request.command,
+                outcome="error",
+                reason="query_failed",
+                started=started,
+            )
             return
 
         await self.client.send_message(message.chat.id, response.text)
+        await self._record(
+            update,
+            command=response.command,
+            outcome="success",
+            reason=None,
+            started=started,
+        )
+
+    async def _record(
+        self,
+        update: TelegramUpdate,
+        *,
+        command: str | None,
+        outcome: str,
+        reason: str | None,
+        started: float,
+    ) -> None:
+        if not self.audit_store:
+            return
+        try:
+            await self.audit_store.record(
+                update,
+                command=command,
+                outcome=outcome,
+                reason=reason,
+                latency_ms=(time.monotonic() - started) * 1000,
+            )
+        except Exception:
+            logger.exception("Unable to persist Telegram query audit event")
 
 
 async def run_worker() -> None:
@@ -102,11 +174,19 @@ async def run_worker() -> None:
         loop.add_signal_handler(signal_name, stop_event.set)
 
     client = TelegramBotClient(settings.TELEGRAM_BOT_TOKEN)
+    audit_store = TelegramAuditStore(
+        get_mongo_db(),
+        retention_days=settings.TELEGRAM_AUDIT_RETENTION_DAYS,
+    )
     worker = TelegramBotWorker(
         client,
         access_policy,
         TelegramQueryService(),
         poll_timeout_seconds=settings.TELEGRAM_POLL_TIMEOUT_SECONDS,
+        rate_limiter=TelegramRateLimiter(
+            settings.TELEGRAM_RATE_LIMIT_PER_MINUTE
+        ),
+        audit_store=audit_store,
     )
     try:
         await worker.run(stop_event)

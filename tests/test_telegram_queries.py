@@ -5,7 +5,10 @@ import pytest
 
 from api.models.telegram import parse_telegram_query
 from api.services import telegram_queries
-from api.services.telegram_queries import TelegramQueryService
+from api.services.telegram_queries import (
+    TelegramQueryService,
+    interpret_natural_language,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -141,3 +144,29 @@ def test_unknown_command_is_read_only_help_response():
     response = execute("/delete_everything")
 
     assert "chưa được hỗ trợ" in response.text
+
+
+@pytest.mark.parametrize(
+    ("text", "command", "args"),
+    [
+        ("Có cảnh báo nào không?", "alerts", ()),
+        ("Hệ thống ổn không?", "status", ()),
+        ("Từ khóa nổi bật 24 giờ", "trend", ("today",)),
+        ("Thống kê vnexpress 7 ngày", "source", ("vnexpress", "7d")),
+        ("Báo cáo tháng này", "report", ("30d",)),
+    ],
+)
+def test_natural_language_intent_mapping(text, command, args):
+    request = interpret_natural_language(text)
+
+    assert request.command == command
+    assert request.args == args
+
+
+def test_natural_language_alert_query_uses_existing_handler(monkeypatch):
+    monkeypatch.setattr(telegram_queries, "get_alerts", lambda **_kwargs: [])
+
+    response = execute("Có cảnh báo nào không?")
+
+    assert response.command == "alerts"
+    assert "Không phát hiện" in response.text

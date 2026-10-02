@@ -11,6 +11,7 @@ from api.services.telegram_client import (
     split_plain_message,
 )
 from api.services.telegram_queries import TelegramQueryResponse
+from api.services.telegram_runtime import TelegramRateLimiter
 from api.telegram_bot_worker import TelegramBotWorker
 
 
@@ -55,6 +56,14 @@ class FakeQueryService:
         if self.error:
             raise self.error
         return TelegramQueryResponse("healthy", request.command)
+
+
+class FakeAuditStore:
+    def __init__(self):
+        self.records = []
+
+    async def record(self, update, **values):
+        self.records.append((update.update_id, values))
 
 
 def test_client_parses_updates_and_sends_messages():
@@ -146,3 +155,26 @@ def test_worker_returns_safe_error_message():
 
     assert "database secret" not in client.messages[0][1]
     assert "thử lại sau" in client.messages[0][1]
+
+
+def test_worker_rate_limits_and_audits_query():
+    client = FakeBotClient()
+    queries = FakeQueryService()
+    audit = FakeAuditStore()
+    worker = TelegramBotWorker(
+        client,
+        TelegramAccessPolicy({100}, {200}),
+        queries,
+        rate_limiter=TelegramRateLimiter(1),
+        audit_store=audit,
+    )
+
+    run(worker.handle_update(update(text="/status")))
+    second = update(text="/alerts")
+    second.update_id = 51
+    run(worker.handle_update(second))
+
+    assert len(queries.requests) == 1
+    assert "quá nhanh" in client.messages[1][1]
+    assert audit.records[0][1]["outcome"] == "success"
+    assert audit.records[1][1]["outcome"] == "rate_limited"

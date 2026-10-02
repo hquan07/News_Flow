@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
+import unicodedata
 
 from api.models.telegram import TelegramQueryRequest
 from api.services.analytics import (
@@ -21,6 +22,18 @@ TIME_RANGE_ALIASES = {
     "month": "30d",
     "all": "all",
 }
+
+KNOWN_SOURCES = (
+    "vnexpress",
+    "tuoitre",
+    "thanhnien",
+    "tienphong",
+    "dantri",
+    "laodong",
+    "voz_forum",
+    "reddit_vn",
+    "youtube_comments",
+)
 
 
 @dataclass(frozen=True)
@@ -44,10 +57,13 @@ class TelegramQueryService:
             "status": self._status,
         }
         if request.command == "query":
-            return TelegramQueryResponse(
-                "Mình chưa hiểu câu hỏi này. Gửi /help để xem các truy vấn hỗ trợ.",
-                "query",
-            )
+            interpreted = interpret_natural_language(request.raw_text)
+            if interpreted is None:
+                return TelegramQueryResponse(
+                    "Mình chưa hiểu câu hỏi này. Gửi /help để xem các truy vấn hỗ trợ.",
+                    "query",
+                )
+            return await self.execute(interpreted)
         handler = handlers.get(request.command)
         if handler is None:
             return TelegramQueryResponse(
@@ -215,3 +231,45 @@ def _format_datetime(value) -> str:
     if isinstance(value, datetime):
         return value.strftime("%H:%M %d/%m")
     return str(value or "N/A")
+
+
+def interpret_natural_language(text: str) -> TelegramQueryRequest | None:
+    normalized = _normalize_text(text)
+    time_range = _extract_natural_time_range(normalized)
+
+    if any(source in normalized for source in KNOWN_SOURCES):
+        source = next(source for source in KNOWN_SOURCES if source in normalized)
+        return TelegramQueryRequest(
+            command="source",
+            args=(source, time_range),
+            raw_text=text,
+        )
+    if any(term in normalized for term in ("canh bao", "alert", "bat thuong")):
+        return TelegramQueryRequest("alerts", (), text)
+    if any(term in normalized for term in ("trang thai", "he thong", "health", "status")):
+        return TelegramQueryRequest("status", (), text)
+    if any(term in normalized for term in ("tu khoa", "xu huong", "trend", "noi bat")):
+        return TelegramQueryRequest("trend", (time_range,), text)
+    if any(
+        term in normalized
+        for term in ("bao cao", "tong quan", "thong ke", "bao nhieu bai")
+    ):
+        return TelegramQueryRequest("report", (time_range,), text)
+    return None
+
+
+def _normalize_text(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value)
+    return "".join(
+        character
+        for character in decomposed
+        if not unicodedata.combining(character)
+    ).lower()
+
+
+def _extract_natural_time_range(normalized: str) -> str:
+    if any(term in normalized for term in ("30 ngay", "1 thang", "thang nay")):
+        return "30d"
+    if any(term in normalized for term in ("24 gio", "24h", "hom nay")):
+        return "today"
+    return "7d"
