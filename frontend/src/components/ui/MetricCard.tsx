@@ -37,7 +37,7 @@ export default function MetricCard({
       <div className="chart-description">
         {loading ? "Loading metric…" : hint}
       </div>
-      {onToggle && !loading && <div className="metric-hint">Click for details</div>}
+      {onToggle && !loading && <div className="metric-hint">View details →</div>}
     </div>
   );
 

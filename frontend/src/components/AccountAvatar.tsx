@@ -8,6 +8,7 @@ import type { CachedUser } from "@/lib/auth-storage";
 type Props = {
   user: CachedUser;
   onChange: (user: CachedUser) => void;
+  onLogout?: () => void;
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -39,7 +40,7 @@ async function prepareAvatar(file: File): Promise<string> {
   }
 }
 
-export default function AccountAvatar({ user, onChange }: Props) {
+export default function AccountAvatar({ user, onChange, onLogout }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +49,9 @@ export default function AccountAvatar({ user, onChange }: Props) {
   const avatar = typeof user.avatar_data_url === "string" && user.avatar_data_url.startsWith("data:image/jpeg;base64,")
     ? user.avatar_data_url
     : null;
+  const displayName = typeof user.full_name === "string" && user.full_name.trim()
+    ? user.full_name
+    : user.email;
 
   useEffect(() => {
     if (!open) return;
@@ -105,13 +109,18 @@ export default function AccountAvatar({ user, onChange }: Props) {
   };
 
   return <div className="account-avatar-wrapper" ref={menuRef}>
-    <button type="button" className="account-avatar-button" aria-label="Thay ảnh đại diện" aria-expanded={open} aria-haspopup="menu" onClick={() => { setOpen(!open); setError(null); }}>
+    <button type="button" className="account-avatar-button" aria-label="Mở menu tài khoản" aria-expanded={open} aria-haspopup="menu" onClick={() => { setOpen(!open); setError(null); }}>
       {avatar ? <Image src={avatar} alt="" width={32} height={32} unoptimized /> : user.email.charAt(0).toUpperCase()}
     </button>
     {open && <div className="account-avatar-menu" role="menu">
-      <div className="account-avatar-email">{user.email}</div>
+      <div className="account-avatar-identity">
+        <strong>{displayName}</strong>
+        <span>{user.email}</span>
+        <span className="role-badge">{user.role ?? "user"}</span>
+      </div>
       <button type="button" role="menuitem" disabled={busy} onClick={() => inputRef.current?.click()}>Tải ảnh đại diện lên</button>
       {avatar && <button type="button" role="menuitem" disabled={busy} onClick={removeAvatar}>Xóa ảnh đại diện</button>}
+      {onLogout && <button type="button" role="menuitem" className="account-avatar-logout" onClick={onLogout}>Đăng xuất</button>}
       {busy && <div className="account-avatar-status" role="status">Đang lưu ảnh…</div>}
       {error && <div className="account-avatar-error" role="alert">{error}</div>}
     </div>}

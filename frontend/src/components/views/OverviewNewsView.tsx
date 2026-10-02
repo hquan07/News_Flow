@@ -47,7 +47,7 @@ export default function OverviewNewsView({ overviewData, chartData, sourceData, 
           }
           return (
             <button type="button" key={kpi.label} className={`glass-panel metric-card ${activeCard === i ? "expanded" : ""}`} onClick={() => setActiveCard(activeCard === i ? null : i)}>
-              {activeCard !== i ? <div className="metric-content"><div className="metric-label">{kpi.label}</div><div className="metric-value">{kpi.value}</div><div className="metric-hint">Click for details</div></div> : <div className="metric-details"><div className="metric-label">{kpi.label} details</div>{details}</div>}
+              {activeCard !== i ? <div className="metric-content"><div className="metric-label">{kpi.label}</div><div className="metric-value">{kpi.value}</div><div className="metric-hint">View details →</div></div> : <div className="metric-details"><div className="metric-label">{kpi.label} details</div>{details}</div>}
             </button>
           );
         })}

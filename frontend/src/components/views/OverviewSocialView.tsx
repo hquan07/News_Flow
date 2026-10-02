@@ -115,7 +115,7 @@ export default function OverviewSocialView({
                 >
                   <div className="metric-label">{kpi.label}</div>
                   <div className="metric-value">{kpi.value}</div>
-                  <div className="metric-hint">Click for details</div>
+                  <div className="metric-hint">View details →</div>
                 </div>
                 {activeCard === i + 20 && (
                   <div className="metric-details">

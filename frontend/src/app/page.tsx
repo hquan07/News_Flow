@@ -16,9 +16,15 @@ import {
   Users,
   DatabaseZap,
   UserCog,
+  Newspaper,
+  Settings,
+  Sparkles,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AccountAvatar from "@/components/AccountAvatar";
+import DashboardSidebar, {
+  type DashboardNavigationItem,
+} from "@/components/DashboardSidebar";
 import AlertsPanel from "@/components/AlertsPanel";
 import AdminView from "@/components/views/AdminView";
 import DebatesView from "@/components/views/DebatesView";
@@ -729,6 +735,55 @@ export default function Home() {
       count: row.count,
     })) || [];
 
+  const navigationItems: DashboardNavigationItem[] = dashboardMode === "news"
+    ? [
+        { id: "overview", label: "Overview", icon: <Activity size={18} /> },
+        { id: "sentiment", label: "Sentiment", icon: <ThumbsUp size={18} /> },
+        { id: "entities", label: "Entities & NLP", icon: <Hash size={18} /> },
+        { id: "network", label: "Network", icon: <Share2 size={18} /> },
+        { id: "articles", label: "Latest News", icon: <BookOpen size={18} /> },
+        { id: "foryou", label: "For You", icon: <Sparkles size={18} />, featured: true },
+      ]
+    : dashboardMode === "social"
+      ? [
+          { id: "overview", label: "Overview", icon: <Activity size={18} /> },
+          { id: "sentiment", label: "Sentiment", icon: <ThumbsUp size={18} /> },
+          { id: "debates", label: "Top Debates", icon: <MessageSquare size={18} /> },
+          { id: "influencers", label: "Top Influencers", icon: <Users size={18} /> },
+          { id: "live_social", label: "Live Feed", icon: <Radio size={18} /> },
+        ]
+      : [
+          ...(hasPermission(user, "system.read") ? [
+            { id: "admin_dashboard", label: "Admin Dashboard", icon: <Activity size={18} /> },
+            { id: "articles", label: "System Articles", icon: <BookOpen size={18} /> },
+            { id: "stream", label: "Live Stream Debug", icon: <Radio size={18} /> },
+          ] : []),
+          ...(hasPermission(user, "alerts.read") ? [
+            { id: "alerts", label: "System Alerts", icon: <AlertTriangle size={18} /> },
+          ] : []),
+          ...(hasPermission(user, "crawler.read") ? [
+            { id: "crawlers", label: "Crawlers", icon: <DatabaseZap size={18} /> },
+          ] : []),
+          ...(hasPermission(user, "system.read") ? [
+            { id: "architecture", label: "Architecture", icon: <Server size={18} /> },
+          ] : []),
+          ...(canManageUsers ? [
+            { id: "users", label: "User Access", icon: <UserCog size={18} /> },
+          ] : []),
+        ];
+
+  const activeNavigationLabel = navigationItems.find((item) => item.id === activeTab)?.label ?? "Dashboard";
+  const workspaceLabel = dashboardMode === "news" ? "Official News" : dashboardMode === "social" ? "Social Media" : "Operations";
+  const canFilterCurrentView = dashboardMode !== "admin" && Boolean(TAB_FILTER_CAPABILITIES[activeTab]);
+
+  const handleNavigationChange = (nextTab: string) => {
+    setActiveTab(nextTab);
+    if (nextTab === "articles") {
+      setPage(1);
+      setArticleAlertFilter(null);
+    }
+  };
+
   return (
     <div className="container">
       {user && (
@@ -738,187 +793,48 @@ export default function Home() {
             <p className="subtitle">Real-time Data Pipeline Dashboard</p>
           </div>
           <div className="header-controls">
-            <div
-              className="mode-toggle"
-              style={{
-                display: "flex",
-                background: "rgba(255,255,255,0.05)",
-                borderRadius: "20px",
-                padding: "4px",
-                border: "1px solid rgba(255,255,255,0.1)",
-              }}
-            >
+            <div className="mode-toggle" aria-label="Dashboard workspace">
               <button
+                type="button"
+                className={dashboardMode === "news" ? "active news" : ""}
+                aria-pressed={dashboardMode === "news"}
                 onClick={() => {
                   setDashboardMode("news");
                   setSelectedSource("");
                   setActiveTab("overview");
                 }}
-                style={{
-                  padding: "6px 16px",
-                  border: "none",
-                  background:
-                    dashboardMode === "news" ? "#3b82f6" : "transparent",
-                  color: "white",
-                  borderRadius: "16px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  transition: "all 0.3s",
-                }}
               >
-                📰 Official News
+                <Newspaper size={16} /> Official News
               </button>
               <button
+                type="button"
+                className={dashboardMode === "social" ? "active social" : ""}
+                aria-pressed={dashboardMode === "social"}
                 onClick={() => {
                   setDashboardMode("social");
                   setSelectedSource("");
                   setActiveTab("overview");
                 }}
-                style={{
-                  padding: "6px 16px",
-                  border: "none",
-                  background:
-                    dashboardMode === "social" ? "#8b5cf6" : "transparent",
-                  color: "white",
-                  borderRadius: "16px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  transition: "all 0.3s",
-                }}
               >
-                💬 Social Media
+                <MessageSquare size={16} /> Social Media
               </button>
               {canAccessOperations && (
                 <button
+                  type="button"
+                  className={dashboardMode === "admin" ? "active operations" : ""}
+                  aria-pressed={dashboardMode === "admin"}
                   onClick={() => {
                     setDashboardMode("admin");
                     setSelectedSource("");
                     setActiveTab(hasPermission(user, "system.read") ? "admin_dashboard" : hasPermission(user, "crawler.read") ? "crawlers" : "alerts");
                   }}
-                  style={{
-                    padding: "6px 16px",
-                    border: "none",
-                    background:
-                      dashboardMode === "admin" ? "#ef4444" : "transparent",
-                    color: "white",
-                    borderRadius: "16px",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    transition: "all 0.3s",
-                  }}
                 >
-                  ⚙️ Operations
+                  <Settings size={16} /> Operations
                 </button>
               )}
             </div>
-            <div
-              className={`source-filter-slot ${dashboardMode === "admin" || TAB_FILTER_CAPABILITIES[activeTab] ? "" : "is-hidden"}`}
-              aria-hidden={dashboardMode !== "admin" && !TAB_FILTER_CAPABILITIES[activeTab]}
-            >
-              {dashboardMode === "admin" ? (
-                <select
-                  aria-label="Operations system"
-                  value={activeTab}
-                  onChange={(event) => {
-                    setActiveTab(event.target.value);
-                    if (event.target.value === "articles") {
-                      setPage(1);
-                      setArticleAlertFilter(null);
-                    }
-                  }}
-                >
-                  {hasPermission(user, "system.read") && <option value="admin_dashboard">All Systems</option>}
-                  {hasPermission(user, "system.read") && <option value="articles">System Articles</option>}
-                  {hasPermission(user, "system.read") && <option value="stream">Live Stream</option>}
-                  {hasPermission(user, "alerts.read") && <option value="alerts">Alerts</option>}
-                  {hasPermission(user, "crawler.read") && <option value="crawlers">Crawlers</option>}
-                  {hasPermission(user, "system.read") && <option value="architecture">Architecture</option>}
-                  {canManageUsers && <option value="users">User Access</option>}
-                </select>
-              ) : (
-                <select
-                  aria-label={dashboardMode === "news" ? "News source" : "Social platform"}
-                value={selectedSource}
-                onChange={(e) => setSelectedSource(e.target.value)}
-                disabled={!TAB_FILTER_CAPABILITIES[activeTab]}
-                tabIndex={TAB_FILTER_CAPABILITIES[activeTab] ? 0 : -1}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                background: "rgba(15, 23, 42, 0.8)",
-                color: "white",
-                border: "1px solid rgba(255,255,255,0.2)",
-                outline: "none",
-                cursor: "pointer",
-              }}
-            >
-              <option value="">All Sources</option>
-              {dashboardMode === "news" ? (
-                <>
-                  <option value="vnexpress">VnExpress</option>
-                  <option value="tuoitre">Tuổi Trẻ</option>
-                  <option value="thanhnien">Thanh Niên</option>
-                  <option value="dantri">Dân Trí</option>
-                  <option value="laodong">Lao Động</option>
-                  <option value="tienphong">Tiền Phong</option>
-                </>
-              ) : (
-                <>
-                  <option value="facebook">Facebook</option>
-                  <option value="youtube">YouTube</option>
-                  <option value="tiktok">TikTok</option>
-                  <option value="twitter">Twitter</option>
-                  <option value="voz">Voz Forum</option>
-                  <option value="reddit_vn">Reddit VN</option>
-                </>
-              )}
-              </select>
-              )}
-            </div>
-            <button
-              onClick={() => void handleExportPdf()}
-              className="print-hide"
-              style={{
-                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
-                border: "none",
-                padding: "6px 12px",
-                borderRadius: "8px",
-                color: "#fff",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontWeight: 600,
-              }}
-            >
-              <Download size={16} /> Export PDF
-            </button>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                marginLeft: "10px",
-                paddingLeft: "20px",
-                borderLeft: "1px solid rgba(255,255,255,0.2)",
-              }}
-            >
-              <AccountAvatar user={user} onChange={setUser} />
-              <span className="role-badge">{user.role ?? "user"}</span>
-              <button
-                onClick={handleLogout}
-                className="print-hide"
-                style={{
-                  background: "transparent",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  padding: "6px 12px",
-                  borderRadius: "8px",
-                  color: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                Logout
-              </button>
+            <div className="header-account print-hide">
+              <AccountAvatar user={user} onChange={setUser} onLogout={handleLogout} />
             </div>
           </div>
         </header>
@@ -938,102 +854,69 @@ export default function Home() {
         />
       ) : (
         <>
-          <div
-            className="tabs"
-            role="tablist"
-            aria-label="Dashboard sections"
-            onKeyDown={(event) => {
-              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-              const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-              const currentIndex = tabs.indexOf(document.activeElement as HTMLButtonElement);
-              if (currentIndex < 0) return;
-              event.preventDefault();
-              const offset = event.key === "ArrowRight" ? 1 : -1;
-              const next = tabs[(currentIndex + offset + tabs.length) % tabs.length];
-              next.focus();
-              next.click();
-            }}
-          >
-
-            {dashboardMode === "admin" && (<></>)}
-          </div>
+          <section className="dashboard-toolbar" aria-label="Dashboard controls">
+            <div className="toolbar-context">
+              <span className={`workspace-indicator ${dashboardMode}`}>{workspaceLabel}</span>
+              <h2>{activeNavigationLabel}</h2>
+            </div>
+            <div className="toolbar-actions print-hide">
+              {dashboardMode === "admin" ? (
+                <label className="toolbar-filter">
+                  <span>View</span>
+                  <select
+                    aria-label="Operations view"
+                    value={activeTab}
+                    onChange={(event) => handleNavigationChange(event.target.value)}
+                  >
+                    {navigationItems.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  </select>
+                </label>
+              ) : canFilterCurrentView ? (
+                <label className="toolbar-filter">
+                  <span>{dashboardMode === "news" ? "Source" : "Platform"}</span>
+                  <select
+                    aria-label={dashboardMode === "news" ? "News source" : "Social platform"}
+                    value={selectedSource}
+                    onChange={(event) => setSelectedSource(event.target.value)}
+                  >
+                    <option value="">All sources</option>
+                    {dashboardMode === "news" ? (
+                      <>
+                        <option value="vnexpress">VnExpress</option>
+                        <option value="tuoitre">Tuổi Trẻ</option>
+                        <option value="thanhnien">Thanh Niên</option>
+                        <option value="dantri">Dân Trí</option>
+                        <option value="laodong">Lao Động</option>
+                        <option value="tienphong">Tiền Phong</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="facebook">Facebook</option>
+                        <option value="youtube">YouTube</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="twitter">Twitter</option>
+                        <option value="voz">Voz Forum</option>
+                        <option value="reddit_vn">Reddit VN</option>
+                      </>
+                    )}
+                  </select>
+                </label>
+              ) : null}
+              <button type="button" className="export-button" onClick={() => void handleExportPdf()}>
+                <Download size={16} /> Export PDF
+              </button>
+            </div>
+          </section>
 
           {/* Admin sidebar layout */}
           {dashboardMode === "admin" && canAccessOperations && (
             <div className="admin-layout">
-              <aside className="admin-sidebar" role="tablist" aria-label="Admin navigation">
-                {hasPermission(user, "system.read") && (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "admin_dashboard"}
-                  className={`admin-sidebar-btn ${activeTab === "admin_dashboard" ? "active" : ""}`}
-                  onClick={() => setActiveTab("admin_dashboard")}
-                >
-                  <Activity size={18} /> Admin Dashboard
-                </button>
-                )}
-                {hasPermission(user, "system.read") && <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "articles"}
-                  className={`admin-sidebar-btn ${activeTab === "articles" ? "active" : ""}`}
-                  onClick={() => {
-                    setActiveTab("articles");
-                    setPage(1);
-                    setArticleAlertFilter(null);
-                  }}
-                >
-                  <BookOpen size={18} /> System Articles
-                </button>}
-                {hasPermission(user, "system.read") && <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "stream"}
-                  className={`admin-sidebar-btn ${activeTab === "stream" ? "active" : ""}`}
-                  onClick={() => setActiveTab("stream")}
-                >
-                  <Radio size={18} /> Live Stream Debug
-                </button>}
-                {hasPermission(user, "alerts.read") && <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "alerts"}
-                  className={`admin-sidebar-btn ${activeTab === "alerts" ? "active" : ""}`}
-                  onClick={() => setActiveTab("alerts")}
-                >
-                  <AlertTriangle size={18} /> System Alerts
-                </button>}
-                {hasPermission(user, "crawler.read") && <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "crawlers"}
-                  className={`admin-sidebar-btn ${activeTab === "crawlers" ? "active" : ""}`}
-                  onClick={() => setActiveTab("crawlers")}
-                >
-                  <DatabaseZap size={18} /> Crawlers
-                </button>}
-                {hasPermission(user, "system.read") && <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "architecture"}
-                  className={`admin-sidebar-btn ${activeTab === "architecture" ? "active" : ""}`}
-                  onClick={() => setActiveTab("architecture")}
-                >
-                  <Server size={18} /> Architecture
-                </button>}
-
-                {canManageUsers && <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "users"}
-                  className={`admin-sidebar-btn ${activeTab === "users" ? "active" : ""}`}
-                  onClick={() => setActiveTab("users")}
-                >
-                  <UserCog size={18} /> User Access
-                </button>}
-
-              </aside>
+              <DashboardSidebar
+                activeId={activeTab}
+                ariaLabel="Admin navigation"
+                items={navigationItems}
+                onChange={handleNavigationChange}
+              />
               <div className="admin-content">
 
           {activeTab === "admin_dashboard" && dashboardMode === "admin" && hasPermission(user, "system.read") && (
@@ -1143,72 +1026,12 @@ export default function Home() {
           {/* News sidebar layout */}
           {dashboardMode === "news" && (
             <div className="admin-layout">
-              <aside className="admin-sidebar" role="tablist" aria-label="News navigation">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "overview"}
-                  className={`admin-sidebar-btn ${activeTab === "overview" ? "active" : ""}`}
-                  onClick={() => setActiveTab("overview")}
-                >
-                  <Activity size={18} /> Overview
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "sentiment"}
-                  className={`admin-sidebar-btn ${activeTab === "sentiment" ? "active" : ""}`}
-                  onClick={() => setActiveTab("sentiment")}
-                >
-                  <ThumbsUp size={18} /> Sentiment
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "entities"}
-                  className={`admin-sidebar-btn ${activeTab === "entities" ? "active" : ""}`}
-                  onClick={() => setActiveTab("entities")}
-                >
-                  <Hash size={18} /> Entities & NLP
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "network"}
-                  className={`admin-sidebar-btn ${activeTab === "network" ? "active" : ""}`}
-                  onClick={() => setActiveTab("network")}
-                >
-                  <Share2 size={18} /> Network
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "articles"}
-                  className={`admin-sidebar-btn ${activeTab === "articles" ? "active" : ""}`}
-                  onClick={() => {
-                    setActiveTab("articles");
-                    setPage(1);
-                    setArticleAlertFilter(null);
-                  }}
-                >
-                  <BookOpen size={18} /> Latest News
-                </button>
-                {user && (
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === "foryou"}
-                    className={`admin-sidebar-btn ${activeTab === "foryou" ? "active" : ""}`}
-                    onClick={() => setActiveTab("foryou")}
-                    style={{
-                      background: activeTab === "foryou" ? "linear-gradient(90deg, #8b5cf6, #3b82f6)" : undefined,
-                      color: activeTab === "foryou" ? "white" : undefined,
-                    }}
-                  >
-                    ✨ For You
-                  </button>
-                )}
-              </aside>
+              <DashboardSidebar
+                activeId={activeTab}
+                ariaLabel="News navigation"
+                items={navigationItems}
+                onChange={handleNavigationChange}
+              />
               <div className="admin-content">
 
           {activeTab === "overview" && dashboardMode === "news" && (
@@ -1304,53 +1127,12 @@ export default function Home() {
           {/* Social sidebar layout */}
           {dashboardMode === "social" && (
             <div className="admin-layout">
-              <aside className="admin-sidebar" role="tablist" aria-label="Social navigation">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "overview"}
-                  className={`admin-sidebar-btn ${activeTab === "overview" ? "active" : ""}`}
-                  onClick={() => setActiveTab("overview")}
-                >
-                  <Activity size={18} /> Overview
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "sentiment"}
-                  className={`admin-sidebar-btn ${activeTab === "sentiment" ? "active" : ""}`}
-                  onClick={() => setActiveTab("sentiment")}
-                >
-                  <ThumbsUp size={18} /> Sentiment
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "debates"}
-                  className={`admin-sidebar-btn ${activeTab === "debates" ? "active" : ""}`}
-                  onClick={() => setActiveTab("debates")}
-                >
-                  <MessageSquare size={18} /> Top Debates
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "influencers"}
-                  className={`admin-sidebar-btn ${activeTab === "influencers" ? "active" : ""}`}
-                  onClick={() => setActiveTab("influencers")}
-                >
-                  <Users size={18} /> Top Influencers
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "live_social"}
-                  className={`admin-sidebar-btn ${activeTab === "live_social" ? "active" : ""}`}
-                  onClick={() => setActiveTab("live_social")}
-                >
-                  <Radio size={18} /> Live Feed
-                </button>
-              </aside>
+              <DashboardSidebar
+                activeId={activeTab}
+                ariaLabel="Social navigation"
+                items={navigationItems}
+                onChange={handleNavigationChange}
+              />
               <div className="admin-content">
 
           {activeTab === "overview" && dashboardMode === "social" && (
