@@ -377,6 +377,31 @@ services:
       retries: 3
       start_period: 30s
 
+  telegram-bot:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 35s
+    command: python -m api.telegram_bot_worker
+    env_file: ../../.env
+    environment:
+      MONGO_HOST: mongo
+      MONGO_PORT: "27017"
+      MONGO_DB: ${MONGO_DB:-newspulse}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-newspulse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-admin123}
+      TELEGRAM_POLL_TIMEOUT_SECONDS: ${TELEGRAM_POLL_TIMEOUT_SECONDS:-25}
+      TELEGRAM_RATE_LIMIT_PER_MINUTE: ${TELEGRAM_RATE_LIMIT_PER_MINUTE:-20}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
 
 
   spark-master:
