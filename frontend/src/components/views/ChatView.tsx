@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
+import ColoredTooltipValue, { DARK_TOOLTIP_CONTENT_STYLE, DARK_TOOLTIP_ITEM_STYLE } from "../ui/ColoredTooltipValue";
 
 type ChatSource = {
   article_id: string;
@@ -670,7 +671,16 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="label" angle={-25} textAnchor="end" interval={0} height={56} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                      <Tooltip />
+                      <Tooltip
+                        cursor={{ fill: "rgba(96, 165, 250, 0.1)" }}
+                        contentStyle={{ ...DARK_TOOLTIP_CONTENT_STYLE, borderRadius: 8 }}
+                        labelStyle={DARK_TOOLTIP_ITEM_STYLE}
+                        itemStyle={DARK_TOOLTIP_ITEM_STYLE}
+                        formatter={(value) => [
+                          <ColoredTooltipValue key="value" color="#60a5fa">{Number(value).toLocaleString("vi-VN")}</ColoredTooltipValue>,
+                          message.chart?.unit ?? "",
+                        ]}
+                      />
                       <Bar dataKey="value" fill="#60a5fa" name={message.chart.unit} />
                     </BarChart>
                   </ResponsiveContainer>
