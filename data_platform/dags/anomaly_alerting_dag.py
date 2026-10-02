@@ -27,12 +27,7 @@ def alerting_pipeline():
     @task
     def detect_anomalies_and_alert():
         import clickhouse_connect
-
-        try:
-            from monitoring.telegram_alert import send_telegram_alert
-        except ImportError:
-            logger.error("Could not import Telegram Alert module.")
-            return
+        from monitoring.telegram_alert import send_telegram_alert
 
         try:
             client = clickhouse_connect.get_client(host="clickhouse", port=8123, username="default", password="")
@@ -110,8 +105,9 @@ def alerting_pipeline():
             else:
                 logger.info("Hệ thống ổn định, không có cảnh báo nào.")
                 
-        except Exception as e:
-            logger.error(f"Lỗi khi chạy Alerting DAG: {e}")
+        except Exception:
+            logger.exception("Lỗi khi chạy Alerting DAG")
+            raise
 
     # Chạy task
     detect_anomalies_and_alert()

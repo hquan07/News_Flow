@@ -1,5 +1,3 @@
-import os
-import requests
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -13,10 +11,6 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
-
-# Assume these are set in Airflow Variables or environment variables in a real scenario
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', 'YOUR_TELEGRAM_BOT_TOKEN_HERE')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', 'YOUR_TELEGRAM_CHAT_ID_HERE')
 
 def fetch_metrics():
     """
@@ -36,6 +30,8 @@ def format_and_send_telegram_report(**kwargs):
     """
     Formats the fetched metrics into a readable HTML/Markdown message and sends it via Telegram.
     """
+    from monitoring.telegram_alert import send_telegram_alert
+
     metrics = fetch_metrics()
     
     # Format the message using HTML parse mode supported by Telegram
@@ -55,26 +51,7 @@ def format_and_send_telegram_report(**kwargs):
 <i>Generated automatically by Airflow DAG</i>
 """
 
-    if TELEGRAM_BOT_TOKEN == 'YOUR_TELEGRAM_BOT_TOKEN_HERE':
-        print("Mock execution: Telegram Bot Token not configured.")
-        print("Message that would have been sent:")
-        print(message)
-        return
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "HTML"
-    }
-    
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        print("Telegram report sent successfully!")
-    except Exception as e:
-        print(f"Failed to send Telegram report: {e}")
-        raise
+    send_telegram_alert(message)
 
 with DAG(
     'telegram_daily_report_dag',
