@@ -27,12 +27,9 @@ def alerting_pipeline():
     @task
     def detect_anomalies_and_alert():
         import clickhouse_connect
-        import sys
-        
-        # Load telegram alert module
-        sys.path.append("/opt/airflow/dags/infrastructure/monitoring") # Adjust path as needed
+
         try:
-            from infrastructure.monitoring.telegram_alert import send_telegram_alert
+            from monitoring.telegram_alert import send_telegram_alert
         except ImportError:
             logger.error("Could not import Telegram Alert module.")
             return

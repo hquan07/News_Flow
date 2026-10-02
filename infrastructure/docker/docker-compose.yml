@@ -26,6 +26,7 @@ x-airflow-common: &airflow-common
     PYTHONPATH: /opt/airflow
   volumes:
     - ../../data_platform/dags:/opt/airflow/dags
+    - ../../infrastructure/airflow/dags:/opt/airflow/dags/telegram
     - ../../crawlers:/opt/airflow/crawlers
     - ../kafka_utils:/opt/airflow/kafka_utils
     - ../../config:/opt/airflow/config

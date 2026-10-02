@@ -91,10 +91,8 @@ def gx_validation_pipeline():
             logger.error(f"Great Expectations Data Quality FAILED: {failed_expectations}")
             
             # Gửi cảnh báo qua Telegram
-            import sys
-            sys.path.append("/opt/airflow/dags/infrastructure/monitoring") # Adjust path if needed
             try:
-                from infrastructure.monitoring.telegram_alert import send_telegram_alert
+                from monitoring.telegram_alert import send_telegram_alert
                 alert_msg = f"🚨 <b>NewsPulse Data Quality Alert</b>\n\nPhát hiện dữ liệu bất thường trong ClickHouse!\n<b>Chi tiết:</b> {failed_expectations}"
                 send_telegram_alert(alert_msg)
             except Exception as e:
