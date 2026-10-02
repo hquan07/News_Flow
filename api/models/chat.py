@@ -57,6 +57,15 @@ class ChatMessage(BaseModel):
     queried_at: datetime | None = None
     chart: "ChatChart | None" = None
     context: "ChatContext | None" = None
+    feedback: "ChatFeedback | None" = None
+
+
+class ChatFeedbackRequest(BaseModel):
+    reason: Literal["helpful", "wrong_source", "wrong_number"]
+
+
+class ChatFeedback(ChatFeedbackRequest):
+    updated_at: datetime | None = None
 
 
 class ChatSource(BaseModel):
@@ -110,6 +119,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     conversation_id: str
+    message_id: str | None = None
     answer: str
     tool: str | None = None
     sources: list[ChatSource] = Field(default_factory=list)

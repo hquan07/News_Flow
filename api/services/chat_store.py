@@ -5,7 +5,7 @@ The audit log records metadata, never the message text.
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from bson import ObjectId
@@ -64,6 +64,7 @@ def _serialize_message(document: dict) -> dict:
         "queried_at": document.get("queried_at"),
         "chart": document.get("chart"),
         "context": document.get("context"),
+        "feedback": document.get("feedback"),
     }
 
 
@@ -75,6 +76,7 @@ async def ensure_chat_indexes() -> None:
     await db.chat_messages.create_index(
         [("conversation_id", ASCENDING), ("created_at", ASCENDING)]
     )
+    await db.chat_messages.create_index("feedback.updated_at")
     await db.chat_conversations.create_index(
         [("owner_id", ASCENDING), ("project_id", ASCENDING), ("updated_at", DESCENDING)]
     )
@@ -332,3 +334,36 @@ async def delete_conversation(owner_id: str, conversation_id: str) -> None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     await db.chat_messages.delete_many({"conversation_id": oid, "owner_id": owner_id})
     await _audit("chat.conversation_deleted", owner_id, oid)
+
+
+async def set_message_feedback(owner_id: str, conversation_id: str, message_id: str, reason: str) -> dict:
+    oid = _conversation_id(conversation_id)
+    if not ObjectId.is_valid(message_id):
+        raise HTTPException(status_code=404, detail="Message not found")
+    db = get_mongo_db()
+    if await db.chat_conversations.find_one({"_id": oid, "owner_id": owner_id}) is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    feedback = {"reason": reason, "updated_at": datetime.now(timezone.utc)}
+    updated = await db.chat_messages.update_one(
+        {"_id": ObjectId(message_id), "conversation_id": oid, "owner_id": owner_id, "role": "assistant"},
+        {"$set": {"feedback": feedback}},
+    )
+    if updated.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Assistant message not found")
+    return feedback
+
+
+async def feedback_summary(days: int) -> dict:
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    cursor = get_mongo_db().chat_messages.aggregate([
+        {"$match": {"role": "assistant", "feedback.updated_at": {"$gte": since}}},
+        {"$group": {"_id": {"reason": "$feedback.reason", "tool": "$tool"}, "count": {"$sum": 1}}},
+    ])
+    rows = await cursor.to_list(length=200)
+    return {
+        "window_days": days,
+        "counts": [
+            {"reason": row["_id"]["reason"], "tool": row["_id"].get("tool"), "count": row["count"]}
+            for row in rows
+        ],
+    }

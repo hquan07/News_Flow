@@ -37,10 +37,13 @@ type ChatMessage = {
   chart?: ChatChart | null;
   queried_at?: string | null;
   context?: ChatScope | null;
+  feedback?: { reason: FeedbackReason } | null;
 };
+type FeedbackReason = "helpful" | "wrong_source" | "wrong_number";
 type Conversation = { id: string; title: string; project_id: string | null };
 type Project = { id: string; title: string };
 type ChatResponse = {
+  message_id: string | null;
   conversation_id: string;
   answer: string;
   sources: ChatSource[];
@@ -104,6 +107,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const questionRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedbackBusyId, setFeedbackBusyId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<CachedUser | null>(null);
   const [action, setAction] = useState<ActionType>("generate_report");
   const [actionTarget, setActionTarget] = useState("");
@@ -302,7 +306,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
       setMessages((current) => [
         ...current,
         { role: "user", content: text },
-        { role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at, context: response.context },
+        { id: response.message_id ?? undefined, role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at, context: response.context },
       ]);
       setQuestion("");
       if (!activeId) {
@@ -318,6 +322,24 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
       setError(cause instanceof Error ? cause.message : "Không gửi được câu hỏi.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function submitFeedback(messageId: string, reason: FeedbackReason) {
+    if (!activeId || feedbackBusyId) return;
+    setFeedbackBusyId(messageId);
+    setError(null);
+    try {
+      const feedback = await apiFetch<{ reason: FeedbackReason }>(`${API_BASE}/chat/conversations/${activeId}/messages/${messageId}/feedback`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      setMessages((current) => current.map((item) => item.id === messageId ? { ...item, feedback } : item));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không gửi được phản hồi.");
+    } finally {
+      setFeedbackBusyId(null);
     }
   }
 
@@ -691,6 +713,19 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
                   <span>Nguồn bài viết</span>
                   {message.sources.map((source) => (
                     <a key={source.article_id} href={source.url} target="_blank" rel="noopener noreferrer">{source.title} · {source.source}</a>
+                  ))}
+                </div>
+              )}
+              {message.role === "assistant" && message.id && (
+                <div className="chat-feedback" aria-label="Đánh giá câu trả lời">
+                  <span>Phản hồi:</span>
+                  {([
+                    ["helpful", "Hữu ích"],
+                    ["wrong_source", "Sai nguồn"],
+                    ["wrong_number", "Sai số liệu"],
+                  ] as const).map(([reason, label]) => (
+                    <button key={reason} type="button" aria-pressed={message.feedback?.reason === reason}
+                      disabled={!!feedbackBusyId} onClick={() => void submitFeedback(message.id!, reason)}>{label}</button>
                   ))}
                 </div>
               )}

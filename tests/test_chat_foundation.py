@@ -185,7 +185,7 @@ async def test_chat_indexes_and_role_permission(chat_db):
     await chat_store.ensure_chat_indexes()
     assert len(chat_db.chat_conversations.indexes) == 2
     assert len(chat_db.chat_projects.indexes) == 1
-    assert len(chat_db.chat_messages.indexes) == 1
+    assert len(chat_db.chat_messages.indexes) == 2
     assert len(chat_db.audit_logs.indexes) == 1
     for role in ("user", "analyst", "operator", "admin"):
         assert "chat.use" in permissions_for_role(role)

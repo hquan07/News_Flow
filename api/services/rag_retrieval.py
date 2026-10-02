@@ -89,6 +89,30 @@ def _excerpt(content: str, query: str) -> str:
     return ("…" if start else "") + text[start:start + 320].strip() + ("…" if start + 320 < len(text) else "")
 
 
+def rank_candidate_ids(
+    keyword_ids: list[str], vector_hits: list[dict], *, mode: str = "hybrid",
+) -> tuple[list[str], dict[str, str]]:
+    """Article-level rank fusion shared by serving and retrieval evaluation."""
+    if mode not in ("keyword", "vector", "hybrid"):
+        raise ValueError("Unknown retrieval mode")
+    scores: dict[str, float] = {}
+    snippets: dict[str, str] = {}
+    if mode in ("vector", "hybrid"):
+        seen = set()
+        for rank, hit in enumerate(vector_hits, 1):
+            payload = hit.get("payload") or {}
+            article_id = str(payload.get("article_id", ""))
+            if not article_id or article_id in seen:
+                continue
+            seen.add(article_id)
+            scores[article_id] = 1 / (60 + rank)
+            snippets[article_id] = str(payload.get("text", ""))
+    if mode in ("keyword", "hybrid"):
+        for rank, article_id in enumerate(dict.fromkeys(keyword_ids), 1):
+            scores[article_id] = scores.get(article_id, 0) + 1 / (60 + rank)
+    return sorted(scores, key=lambda article_id: (-scores[article_id], article_id)), snippets
+
+
 def retrieve(query: str, *, time_range: str, source: str | None, category: str | None) -> tuple[str, list[dict]]:
     since = datetime.now(timezone.utc) - timedelta(days=_DAYS[time_range])
     semantic_enabled = get_settings().RAG_ENABLED
@@ -106,21 +130,9 @@ def retrieve(query: str, *, time_range: str, source: str | None, category: str |
         "Tìm kiếm ngữ nghĩa tạm thời không khả dụng" if degraded else None
     )
     keyword_ids = _keyword_candidates(query, since, source, category)
-    scores: dict[str, float] = {}
-    snippets: dict[str, str] = {}
-    seen = set()
-    for rank, hit in enumerate(vector_hits, 1):
-        payload = hit.get("payload") or {}
-        article_id = str(payload.get("article_id", ""))
-        if not article_id or article_id in seen:
-            continue
-        seen.add(article_id)
-        scores[article_id] = scores.get(article_id, 0) + 1 / (60 + rank)
-        snippets[article_id] = str(payload.get("text", ""))
-    for rank, article_id in enumerate(keyword_ids, 1):
-        scores[article_id] = scores.get(article_id, 0) + 1 / (60 + rank)
-    articles = _current_articles(list(scores), since, source, category)
-    ranked = sorted(articles, key=lambda key: scores[key], reverse=True)[:5]
+    candidate_ids, snippets = rank_candidate_ids(keyword_ids, vector_hits)
+    articles = _current_articles(candidate_ids, since, source, category)
+    ranked = [article_id for article_id in candidate_ids if article_id in articles][:5]
     sources = []
     lines = []
     for index, article_id in enumerate(ranked, 1):

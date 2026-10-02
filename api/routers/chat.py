@@ -12,6 +12,8 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 from api.models.chat import (
     ChatRequest,
     ChatResponse,
+    ChatFeedback,
+    ChatFeedbackRequest,
     Conversation,
     ConversationCreate,
     ConversationDetail,
@@ -77,7 +79,7 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
             conversation_id = conversation["id"]
 
         await chat_store.append_message(owner_id, conversation_id, "user", payload.message)
-        await chat_store.append_message(
+        assistant_message = await chat_store.append_message(
             owner_id,
             conversation_id,
             "assistant",
@@ -90,6 +92,7 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
         )
         response = ChatResponse(
             conversation_id=conversation_id,
+            message_id=assistant_message["id"],
             answer=result.answer,
             tool=result.tool,
             sources=result.sources,
@@ -135,6 +138,25 @@ async def stream_chat(
         "Cache-Control": "no-cache",
         "X-Accel-Buffering": "no",
     })
+
+
+@router.put("/conversations/{conversation_id}/messages/{message_id}/feedback", response_model=ChatFeedback)
+async def save_message_feedback(
+    conversation_id: str,
+    message_id: str,
+    payload: ChatFeedbackRequest,
+    actor: dict = Depends(require_permission("chat.use")),
+):
+    await chat_guard.check_rate_limit(actor["sub"])
+    return await chat_store.set_message_feedback(actor["sub"], conversation_id, message_id, payload.reason)
+
+
+@router.get("/feedback/summary")
+async def get_feedback_summary(
+    days: int = Query(default=7, ge=1, le=90),
+    _actor: dict = Depends(require_permission("system.read")),
+):
+    return await chat_store.feedback_summary(days)
 
 
 @router.post("/conversations", response_model=Conversation, status_code=status.HTTP_201_CREATED)

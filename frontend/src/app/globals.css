@@ -3233,6 +3233,21 @@ h1 {
 }
 .chat-clarification-tag { margin-top: 0.5rem; color: #fde68a; font-size: 0.75rem; }
 
+.chat-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.75rem; }
+.chat-feedback span { color: var(--text-muted); font-size: 0.72rem; margin-right: 0.2rem; }
+.chat-feedback button {
+  padding: 0.28rem 0.5rem;
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.08);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.chat-feedback button[aria-pressed="true"] { background: rgba(59, 130, 246, 0.28); border-color: #60a5fa; color: #fff; }
+.chat-feedback button:hover:not(:disabled) { border-color: #93c5fd; color: #fff; }
+.chat-feedback button:disabled { opacity: 0.55; cursor: wait; }
+
 .chat-message p {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
