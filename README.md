@@ -12,7 +12,7 @@ A real-time news analysis platform that collects and processes articles from Vie
 - **Streaming Pipeline** with Kafka → Spark Structured Streaming.
 - **Vietnamese NLP** — keyword extraction, Named Entity Recognition (PhoBERT), and sentiment analysis.
 - **Real-time Data Warehouse** powered by **ClickHouse**, offering sub-second query performance for analytics.
-- **Data Quality & Alerting** — automated Airflow DAGs using Great Expectations for validation, with Telegram bot integration for Crisis Detection, Volume Spikes, and Daily Reports.
+- **Data Quality & Alerting** — automated Airflow DAGs using Great Expectations for validation, with Telegram alerts, daily reports, and allowlisted read-only chat queries.
 - **Historical Backfilling Tools** — Optimized offline scripts for fast ingestion of massive historical dumps to ClickHouse and batch NLP extraction using multiprocessing.
 - **REST API** powered by FastAPI serving analytics endpoints and Server-Sent Events (SSE).
 - **Custom Dashboard** built with **Next.js 16**, React, Recharts, and TailwindCSS for real-time visualization — tracking trends, source comparisons, entity networks, volume spikes, and system alerts.
@@ -208,7 +208,7 @@ The Next.js dashboard includes 5 primary views:
 | Docker Healthchecks | Integrated health checks for all services (Kafka, ClickHouse, Spark, API) |
 | `/health` | FastAPI endpoint for deep-checking the API |
 | `health_monitor.py` | CLI tool for system validation returning standard exit codes (0/1) |
-| Telegram Bot | Push notifications for data pipeline anomalies and latency spikes |
+| Telegram Bot | Push alerts plus allowlisted read-only queries for trends, sources, reports, and health |
 | Great Expectations | Automated data quality validation suites running in Airflow |
 
 ## Performance Tuning
