@@ -40,6 +40,9 @@ class TelegramBotClient:
             {"drop_pending_updates": drop_pending_updates},
         )
 
+    async def set_commands(self, commands: list[dict[str, str]]) -> None:
+        await self._call("setMyCommands", {"commands": commands})
+
     async def get_updates(
         self,
         offset: int | None,

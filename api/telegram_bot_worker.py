@@ -14,6 +14,15 @@ from api.services.telegram_runtime import TelegramAuditStore, TelegramRateLimite
 
 logger = logging.getLogger("newspulse.telegram.worker")
 
+BOT_COMMANDS = [
+    {"command": "alerts", "description": "Cảnh báo volume spike"},
+    {"command": "trend", "description": "Từ khóa nổi bật"},
+    {"command": "source", "description": "Thống kê theo nguồn"},
+    {"command": "report", "description": "Báo cáo tổng quan"},
+    {"command": "status", "description": "Trạng thái hệ thống"},
+    {"command": "help", "description": "Hướng dẫn tra cứu"},
+]
+
 
 class TelegramBotWorker:
     def __init__(
@@ -38,6 +47,7 @@ class TelegramBotWorker:
             await self.audit_store.ensure_indexes()
             self.offset = await self.audit_store.load_offset()
         await self.client.disable_webhook(drop_pending_updates=self.offset is None)
+        await self.client.set_commands(BOT_COMMANDS)
         logger.info("Telegram query worker started")
         while not stop_event.is_set():
             try:

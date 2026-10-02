@@ -83,12 +83,14 @@ def test_client_parses_updates_and_sends_messages():
     client = TelegramBotClient("test-token", http_client=http)
 
     updates = run(client.get_updates(offset=40, timeout_seconds=1))
+    run(client.set_commands([{"command": "status", "description": "Health"}]))
     run(client.send_message(100, "hello"))
     run(http.aclose())
 
     assert updates[0].update_id == 50
     assert requests[0].url.path.endswith("/getUpdates")
-    assert requests[1].url.path.endswith("/sendMessage")
+    assert requests[1].url.path.endswith("/setMyCommands")
+    assert requests[2].url.path.endswith("/sendMessage")
 
 
 def test_client_raises_sanitized_api_error():
