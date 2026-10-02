@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     API_RATE_LIMIT_PER_MINUTE: int = 120
     API_MAX_BODY_BYTES: int = 1_048_576
 
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""
+    TELEGRAM_ALLOWED_CHAT_IDS: str = ""
+    TELEGRAM_ALLOWED_USER_IDS: str = ""
+    TELEGRAM_POLL_TIMEOUT_SECONDS: int = 25
+    TELEGRAM_RATE_LIMIT_PER_MINUTE: int = 20
+
     RAG_ENABLED: bool = False
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION: str = "newspulse_article_chunks_v1"
@@ -80,6 +87,30 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def telegram_allowed_chat_ids(self) -> set[int]:
+        values = self.TELEGRAM_ALLOWED_CHAT_IDS
+        if self.TELEGRAM_CHAT_ID:
+            values = f"{values},{self.TELEGRAM_CHAT_ID}"
+        return _parse_integer_set(values)
+
+    @property
+    def telegram_allowed_user_ids(self) -> set[int]:
+        return _parse_integer_set(self.TELEGRAM_ALLOWED_USER_IDS)
+
+
+def _parse_integer_set(value: str) -> set[int]:
+    result = set()
+    for item in value.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            result.add(int(item))
+        except ValueError as exc:
+            raise ValueError(f"Expected a comma-separated integer list, got {item!r}") from exc
+    return result
 
 
 @lru_cache()
