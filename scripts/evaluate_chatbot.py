@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from api.security import permissions_for_role  # noqa: E402
-from api.services.chat_tools import _intent  # noqa: E402
+from api.models.chat import ChatRequest  # noqa: E402
+from api.services.chat_tools import plan_question  # noqa: E402
 
 
 TOOL_FOR_INTENT = {
@@ -31,23 +32,42 @@ TOOL_FOR_INTENT = {
 
 
 def expected_status(case: dict) -> int:
-    if "expected_status" in case:
-        return case["expected_status"]
-    intent = _intent(case["message"])
-    needed = "alerts.read" if intent == "alerts" else "dashboard.read"
-    return 200 if intent is None or needed in permissions_for_role(case["role"]) else 403
+    return case.get("expected_status", 200)
+
+
+def _request(case: dict) -> ChatRequest:
+    return ChatRequest(**{
+        field: case[field]
+        for field in ("message", "time_range", "source", "category", "query", "compare_sources")
+        if field in case
+    })
+
+
+def _tool(plan) -> str | None:
+    return "clarify_scope" if plan.clarification else TOOL_FOR_INTENT.get(plan.intent)
 
 
 def evaluate_offline(cases: list[dict]) -> list[str]:
     failures = []
     for index, case in enumerate(cases, 1):
-        if expected_status(case) == 403:
-            if case.get("role") != "user" or _intent(case["message"]) != "alerts":
-                failures.append(f"case {index}: unexpected permission expectation")
-            continue
-        actual_tool = TOOL_FOR_INTENT.get(_intent(case["message"]))
+        label = case.get("id", f"case {index}")
+        plan = plan_question(_request(case))
+        actual_tool = _tool(plan)
         if actual_tool != case.get("expected_tool"):
-            failures.append(f"case {index}: expected {case.get('expected_tool')}, got {actual_tool}")
+            failures.append(f"{label}: expected {case.get('expected_tool')}, got {actual_tool}")
+        for key, actual in (
+            ("expected_time_range", plan.time_range),
+            ("expected_source", plan.request.source),
+            ("expected_category", plan.request.category),
+            ("expected_compare_sources", plan.compare_sources),
+            ("needs_clarification", bool(plan.clarification)),
+        ):
+            if key in case and actual != case[key]:
+                failures.append(f"{label}: {key} expected {case[key]}, got {actual}")
+        needed = "alerts.read" if plan.intent == "alerts" else "dashboard.read" if plan.intent else None
+        allowed = needed is None or needed in permissions_for_role(case["role"])
+        if allowed != (expected_status(case) == 200):
+            failures.append(f"{label}: permission expectation does not match role")
     return failures
 
 
@@ -65,7 +85,7 @@ def evaluate_live(cases: list[dict], base_url: str, tokens: dict[str, str]) -> l
                 response = client.post(
                     base_url.rstrip("/") + "/api/v1/chat",
                     headers={"Authorization": f"Bearer {token}"},
-                    json={"message": case["message"], **({"time_range": case["time_range"]} if case.get("time_range") else {})},
+                    json=_request(case).model_dump(exclude_none=True),
                 )
             except httpx.HTTPError as exc:
                 failures.append(f"case {index}: request failed ({type(exc).__name__})")
@@ -78,8 +98,18 @@ def evaluate_live(cases: list[dict], base_url: str, tokens: dict[str, str]) -> l
                 result = response.json()
                 if result.get("tool") != case.get("expected_tool"):
                     failures.append(f"case {index}: wrong tool")
-                if case.get("time_range") and result.get("time_range") != case["time_range"]:
-                    failures.append(f"case {index}: wrong time range")
+                context = result.get("context") or {}
+                for key, actual in (
+                    ("expected_time_range", context.get("time_range") if not context.get("clarification") else None),
+                    ("expected_source", context.get("source")),
+                    ("expected_category", context.get("category")),
+                    ("expected_compare_sources", context.get("compare_sources")),
+                    ("needs_clarification", bool(context.get("clarification"))),
+                ):
+                    if key in case and actual != case[key]:
+                        failures.append(f"case {index}: wrong {key}")
+                if result.get("tool") == "clarify_scope" and result.get("queried_at") is not None:
+                    failures.append(f"case {index}: clarification queried data")
                 for source in result.get("sources", []):
                     if not str(source.get("url", "")).startswith(("https://", "http://")):
                         failures.append(f"case {index}: invalid citation URL")
@@ -98,7 +128,7 @@ def main() -> int:
         failures.extend(evaluate_live(cases, args.live_url, tokens))
     for failure in failures:
         print(failure)
-    print(f"{len(cases) - len(failures)}/{len(cases)} checks passed" if not args.live_url else f"{len(failures)} failures across {len(cases)} cases")
+    print(f"{len(cases)} cases, {len(failures)} failures")
     return int(bool(failures))
 
 

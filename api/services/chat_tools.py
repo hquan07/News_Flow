@@ -31,6 +31,15 @@ class ToolResult:
     context: dict | None = None
 
 
+@dataclass
+class ChatPlan:
+    request: ChatRequest
+    intent: str | None
+    time_range: str | None
+    compare_sources: list[str] | None = None
+    clarification: str | None = None
+
+
 def _normalized(value: str) -> str:
     decomposed = unicodedata.normalize("NFD", value.casefold())
     return "".join(char for char in decomposed if unicodedata.category(char) != "Mn").replace("đ", "d")
@@ -59,22 +68,23 @@ def _intent(message: str) -> str | None:
     return None
 
 
-def _time_range(request: ChatRequest) -> str:
-    if request.time_range:
-        return request.time_range
-    normalized = _normalized(request.message)
+def _time_hint(message: str) -> str | None:
+    normalized = _normalized(message)
     if "hom nay" in normalized or "today" in normalized or "24 gio" in normalized:
         return "today"
     if "30 ngay" in normalized or "30d" in normalized or "thang qua" in normalized:
         return "30d"
-    return "7d"
+    if "7 ngay" in normalized or "7d" in normalized or "tuan qua" in normalized or "tuan nay" in normalized:
+        return "7d"
+    return None
+
+
+def _time_range(request: ChatRequest) -> str:
+    return request.time_range or _time_hint(request.message) or "7d"
 
 
 def _has_time_hint(message: str) -> bool:
-    normalized = _normalized(message)
-    return any(value in normalized for value in (
-        "hom nay", "today", "24 gio", "7 ngay", "7d", "30 ngay", "30d", "thang qua"
-    ))
+    return _time_hint(message) is not None
 
 
 def _is_followup(message: str) -> bool:
@@ -183,6 +193,16 @@ def _articles(request: ChatRequest, time_range: str) -> ToolResult:
     return ToolResult(answer=answer, tool="search_articles", sources=sources, time_range=time_range)
 
 
+def _count_term(request: ChatRequest) -> str | None:
+    term = _search_term(request)
+    if term and request.source:
+        term = re.sub(
+            r"\s+(?:từ|của|from)\s+.+$",
+            "", term, flags=re.IGNORECASE,
+        ).strip()
+    return term or None
+
+
 def _article_count(request: ChatRequest, time_range: str) -> ToolResult:
     conditions = []
     params = {}
@@ -194,12 +214,7 @@ def _article_count(request: ChatRequest, time_range: str) -> ToolResult:
     if request.category:
         conditions.append("a.category = {category:String}")
         params["category"] = request.category.strip()
-    term = _search_term(request)
-    if term and request.source:
-        term = re.sub(
-            r"\s+(?:từ|của|from)\s+.+$",
-            "", term, flags=re.IGNORECASE,
-        ).strip()
+    term = _count_term(request)
     if term:
         conditions.append("a.title ILIKE {title_query:String}")
         params["title_query"] = f"%{term}%"
@@ -342,11 +357,16 @@ def _sources(request: ChatRequest, time_range: str) -> ToolResult:
     )
 
 
-def _entities(request: ChatRequest, time_range: str) -> ToolResult:
+def _entity_subject(request: ChatRequest) -> str | None:
     subject = _search_term(request)
     if not subject:
         match = re.search(r"(?:liên quan đến|lien quan den)\s+(.+)", request.message, re.IGNORECASE)
         subject = match.group(1).strip(" ?.!")[:120] if match else None
+    return subject
+
+
+def _entities(request: ChatRequest, time_range: str) -> ToolResult:
+    subject = _entity_subject(request)
     where, params = _where(request, time_range)
     if subject:
         where += " AND target.entity ILIKE {entity_query:String} AND e.entity != target.entity"
@@ -411,34 +431,74 @@ def _rag(request: ChatRequest, time_range: str) -> ToolResult:
     return ToolResult(answer=answer, tool="search_article_content", sources=sources, time_range=time_range)
 
 
-def answer_question(
-    request: ChatRequest, actor: dict, previous_context: dict | None = None
-) -> ToolResult:
+def plan_question(request: ChatRequest, previous_context: dict | None = None) -> ChatPlan:
+    """Resolve intent and scope without touching a data service."""
     intent = _intent(request.message)
-    followup = _is_followup(request.message) and previous_context is not None
+    pending = bool(previous_context and previous_context.get("clarification"))
+    followup = previous_context is not None and (_is_followup(request.message) or pending)
     if followup and intent is None:
         intent = previous_context.get("intent")
     if followup and intent != "alerts":
-        previous_time = previous_context.get("time_range", "7d")
+        previous_time = previous_context.get("time_range")
         mentioned = _mentioned_sources(request.message)
+        inherited_time = previous_time if previous_time in ("today", "7d", "30d") or (
+            previous_time == "all" and intent == "article_count"
+        ) else None
         request = request.model_copy(update={
-            "time_range": request.time_range or (
-                _time_range(request) if _has_time_hint(request.message) else
-                (previous_time if intent == "article_count" or previous_time != "all" else "7d")
-            ),
+            "time_range": request.time_range or _time_hint(request.message) or inherited_time,
             "source": request.source or (
                 None if intent == "sources" else
-                (mentioned[0] if mentioned else previous_context.get("source"))
+                (mentioned[0] if len(mentioned) == 1 else previous_context.get("source"))
             ),
             "category": request.category or previous_context.get("category"),
             "query": request.query or _search_term(request) or previous_context.get("query"),
+            "compare_sources": request.compare_sources or (
+                None if mentioned else previous_context.get("compare_sources")
+            ),
         })
+    mentioned = _mentioned_sources(request.message)
+    clarification = None
     if intent not in ("sources", "alerts") and not request.source:
-        mentioned = _mentioned_sources(request.message)
         if len(mentioned) == 1:
             request = request.model_copy(update={"source": mentioned[0]})
         elif len(mentioned) > 1 and intent == "article_count":
-            raise HTTPException(status_code=422, detail="Specify one source to count, or ask to compare sources")
+            clarification = "Bạn muốn đếm gộp hai nguồn hay so sánh từng nguồn? Hãy nêu rõ yêu cầu."
+
+    if intent not in ("sources", "alerts") and request.source and mentioned and request.source not in mentioned:
+        clarification = "Nguồn trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại nguồn hoặc sửa câu hỏi."
+    explicit_time = _time_hint(request.message)
+    if request.time_range and explicit_time and request.time_range != explicit_time:
+        clarification = "Khoảng thời gian trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại khoảng thời gian hoặc sửa câu hỏi."
+
+    selected_sources = None
+    if intent == "sources":
+        selected_sources = request.compare_sources or mentioned or None
+        if request.source:
+            clarification = "Hãy bỏ bộ lọc một nguồn khi muốn so sánh nhiều nguồn."
+        elif not selected_sources or len(selected_sources) < 2:
+            clarification = "Bạn muốn so sánh hai nguồn nào? Ví dụ: So sánh VnExpress và Tuổi Trẻ trong 7 ngày qua."
+    elif intent == "article_count" and not clarification:
+        normalized = _normalized(request.message)
+        explicit_all = any(phrase in normalized for phrase in ("tat ca nguon", "toan bo", "tat ca bai"))
+        if not request.source and not request.category and not request.time_range and not explicit_time and not explicit_all:
+            clarification = "Bạn muốn đếm bài từ nguồn nào, trong khoảng thời gian nào? Có thể nói 'tất cả nguồn từ trước đến nay'."
+    elif intent == "rag" and not (request.query or _search_term(request)):
+        clarification = "Bạn muốn tìm nội dung về chủ đề nào? Ví dụ: Tóm tắt nội dung về lãi suất trong 7 ngày qua."
+
+    if clarification:
+        return ChatPlan(request, intent, None, selected_sources, clarification)
+    time_range = None if intent is None else (
+        "all" if intent == "article_count" and not request.time_range
+        and not explicit_time else _time_range(request)
+    )
+    return ChatPlan(request, intent, time_range, selected_sources)
+
+
+def answer_question(
+    request: ChatRequest, actor: dict, previous_context: dict | None = None
+) -> ToolResult:
+    plan = plan_question(request, previous_context)
+    request, intent, time_range = plan.request, plan.intent, plan.time_range
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'alerts.read'")
     if intent in ("articles", "article_count", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
@@ -448,10 +508,17 @@ def answer_question(
             "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn, "
             "nội dung bài viết và cảnh báo tăng đột biến. Hãy hỏi rõ một trong các nội dung này."
         ))
-    time_range = (
-        "all" if intent == "article_count" and not request.time_range
-        and not _has_time_hint(request.message) else _time_range(request)
-    )
+    if plan.clarification:
+        return ToolResult(
+            answer=plan.clarification,
+            tool="clarify_scope",
+            context={
+                "intent": intent, "time_range": request.time_range,
+                "source": request.source, "compare_sources": plan.compare_sources,
+                "category": request.category, "query": request.query or _search_term(request),
+                "clarification": True,
+            },
+        )
     result = {
         "articles": _articles,
         "article_count": _article_count,
@@ -467,7 +534,13 @@ def answer_question(
         "intent": intent,
         "time_range": time_range,
         "source": request.source,
+        "compare_sources": plan.compare_sources,
         "category": request.category,
-        "query": _search_term(request) if intent != "article_count" else request.query,
+        "query": (
+            _count_term(request) if intent == "article_count" else
+            _entity_subject(request) if intent == "entities" else
+            _search_term(request)
+        ),
+        "clarification": False,
     }
     return result

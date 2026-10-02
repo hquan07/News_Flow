@@ -96,6 +96,7 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
             queried_at=result.queried_at,
             time_range=result.time_range,
             chart=result.chart,
+            context=result.context,
         )
     except HTTPException as exc:
         outcome = "rate_limited" if exc.status_code == 429 else "denied" if exc.status_code in (401, 403, 404) else "errors"

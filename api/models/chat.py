@@ -81,10 +81,12 @@ class ChatChart(BaseModel):
 
 class ChatContext(BaseModel):
     intent: str
-    time_range: Literal["today", "7d", "30d", "all"]
+    time_range: Literal["today", "7d", "30d", "all"] | None = None
     source: str | None = None
+    compare_sources: list[str] | None = None
     category: str | None = None
     query: str | None = None
+    clarification: bool = False
 
 
 class ChatRequest(BaseModel):
@@ -114,6 +116,7 @@ class ChatResponse(BaseModel):
     queried_at: datetime | None = None
     time_range: str | None = None
     chart: ChatChart | None = None
+    context: ChatContext | None = None
 
 
 class ConversationDetail(Conversation):

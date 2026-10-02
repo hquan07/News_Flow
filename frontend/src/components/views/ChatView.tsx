@@ -19,6 +19,15 @@ type ChatChart = {
   unit: string;
   points: { label: string; value: number }[];
 };
+type ChatScope = {
+  intent: string;
+  time_range: "today" | "7d" | "30d" | "all" | null;
+  source?: string | null;
+  compare_sources?: string[] | null;
+  category?: string | null;
+  query?: string | null;
+  clarification?: boolean;
+};
 type ChatMessage = {
   id?: string;
   role: "user" | "assistant";
@@ -26,6 +35,7 @@ type ChatMessage = {
   sources?: ChatSource[];
   chart?: ChatChart | null;
   queried_at?: string | null;
+  context?: ChatScope | null;
 };
 type Conversation = { id: string; title: string; project_id: string | null };
 type Project = { id: string; title: string };
@@ -35,6 +45,7 @@ type ChatResponse = {
   sources: ChatSource[];
   chart: ChatChart | null;
   queried_at: string | null;
+  context: ChatScope | null;
 };
 type ActionType = "acknowledge_alert" | "trigger_crawler" | "generate_report";
 type ActionPreview = {
@@ -56,6 +67,10 @@ const suggestions = [
   "So sánh nguồn VnExpress và Tuổi Trẻ",
   "Thực thể nào xuất hiện nhiều trong 7 ngày qua?",
 ];
+
+const timeRangeLabels: Record<NonNullable<ChatScope["time_range"]>, string> = {
+  today: "24 giờ qua", "7d": "7 ngày qua", "30d": "30 ngày qua", all: "Toàn bộ thời gian",
+};
 
 export default function ChatView({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -286,7 +301,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
       setMessages((current) => [
         ...current,
         { role: "user", content: text },
-        { role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at },
+        { role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at, context: response.context },
       ]);
       setQuestion("");
       if (!activeId) {
@@ -628,6 +643,20 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
             <div key={message.id ?? `${index}-${message.role}`} className={`chat-message ${message.role}`}>
               <span className="chat-speaker">{message.role === "assistant" ? "NewsPulse" : "Bạn"}</span>
               <p>{message.content}</p>
+              {message.role === "assistant" && message.context?.clarification && (
+                <div className="chat-clarification-tag">Cần làm rõ trước khi truy vấn dữ liệu</div>
+              )}
+              {message.role === "assistant" && message.context && !message.context.clarification && (
+                <div className="chat-scope" aria-label="Phạm vi đã dùng">
+                  <span>Phạm vi đã dùng</span>
+                  {message.context.time_range && <small>{timeRangeLabels[message.context.time_range]}</small>}
+                  <small>Nguồn: {message.context.compare_sources?.length
+                    ? message.context.compare_sources.join(", ")
+                    : message.context.source || "Tất cả nguồn"}</small>
+                  {message.context.category && <small>Danh mục: {message.context.category}</small>}
+                  {message.context.query && <small>Chủ đề: {message.context.query}</small>}
+                </div>
+              )}
               {message.queried_at && (
                 <small className="chat-query-time">
                   Truy vấn lúc {new Date(message.queried_at).toLocaleString("vi-VN")}
