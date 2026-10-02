@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import httpx
 import pytest
@@ -12,7 +13,7 @@ from api.services.telegram_client import (
 )
 from api.services.telegram_queries import TelegramQueryResponse
 from api.services.telegram_runtime import TelegramRateLimiter
-from api.telegram_bot_worker import TelegramBotWorker
+from api.telegram_bot_worker import TelegramBotWorker, suppress_sensitive_http_logs
 
 
 def run(coroutine):
@@ -180,3 +181,13 @@ def test_worker_rate_limits_and_audits_query():
     assert "quá nhanh" in client.messages[1][1]
     assert audit.records[0][1]["outcome"] == "success"
     assert audit.records[1][1]["outcome"] == "rate_limited"
+
+
+def test_worker_suppresses_http_client_url_logs():
+    logging.getLogger("httpx").setLevel(logging.INFO)
+    logging.getLogger("httpcore").setLevel(logging.INFO)
+
+    suppress_sensitive_http_logs()
+
+    assert logging.getLogger("httpx").level == logging.WARNING
+    assert logging.getLogger("httpcore").level == logging.WARNING

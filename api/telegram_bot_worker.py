@@ -24,6 +24,12 @@ BOT_COMMANDS = [
 ]
 
 
+def suppress_sensitive_http_logs() -> None:
+    """Prevent HTTP clients from logging Bot API URLs containing the token."""
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
 class TelegramBotWorker:
     def __init__(
         self,
@@ -178,6 +184,7 @@ async def run_worker() -> None:
         raise RuntimeError("A Telegram chat or user allowlist is required")
 
     configure_logging()
+    suppress_sensitive_http_logs()
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
     for signal_name in (signal.SIGINT, signal.SIGTERM):

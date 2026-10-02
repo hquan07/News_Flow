@@ -384,6 +384,8 @@ services:
     restart: unless-stopped
     stop_grace_period: 35s
     command: python -m api.telegram_bot_worker
+    healthcheck:
+      disable: true
     env_file: ../../.env
     environment:
       MONGO_HOST: mongo
