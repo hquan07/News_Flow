@@ -540,6 +540,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   return (
     <section className="chat-view" aria-label="NewsPulse chatbot">
       <div className="chat-sidebar chat-sidebar-tree glass-panel">
+        <div className="chat-sidebar-scroll">
         <button type="button" className="chat-new-chat" onClick={() => {
           chooseProject("all");
           setChatSearch("");
@@ -630,6 +631,16 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
           {!listLoading && visibleConversations.length === 0 && <p>Chưa có hội thoại phù hợp.</p>}
           {conversations.length >= 100 && <p>Đang hiển thị 100 hội thoại gần nhất trong bộ lọc.</p>}
         </div>
+        </div>
+        <div className="chat-sidebar-time-range">
+          <label htmlFor="chat-time-range">Khoảng thời gian</label>
+          <select id="chat-time-range" value={timeRange} onChange={(event) => setTimeRange(event.target.value)} disabled={loading}>
+            <option value="">Theo câu hỏi</option>
+            <option value="today">24 giờ qua</option>
+            <option value="7d">7 ngày qua</option>
+            <option value="30d">30 ngày qua</option>
+          </select>
+        </div>
       </div>
       <div className="chat-main glass-panel">
         <div className="chat-header">
@@ -640,12 +651,6 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
               : "Hỏi về bài viết, từ khóa, cảm xúc, thực thể và nguồn tin."}</p>
           </div>
           <div className="chat-header-controls">
-            <select aria-label="Khoảng thời gian" value={timeRange} onChange={(event) => setTimeRange(event.target.value)} disabled={loading}>
-              <option value="">Theo câu hỏi</option>
-              <option value="today">24 giờ qua</option>
-              <option value="7d">7 ngày qua</option>
-              <option value="30d">30 ngày qua</option>
-            </select>
             <button type="button" className="chat-close-button" onClick={onClose} aria-label="Đóng Chat Assistant" title="Đóng Chat Assistant">
               <X size={18} aria-hidden="true" />
             </button>

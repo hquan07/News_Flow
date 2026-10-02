@@ -2896,7 +2896,7 @@ h1 {
 
 .chat-drawer .chat-sidebar,
 .chat-drawer .chat-main { min-height: 0; }
-.chat-drawer .chat-sidebar { overflow-y: auto; }
+.chat-drawer .chat-sidebar { overflow: hidden; }
 .chat-drawer .chat-main { overflow-y: auto; }
 .chat-drawer .chat-messages { min-height: 0; max-height: none; }
 
@@ -2912,6 +2912,20 @@ h1 {
   padding: 1rem;
   min-width: 0;
 }
+
+.chat-sidebar-tree { display: flex; flex-direction: column; min-height: 0; }
+.chat-sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 0.2rem; }
+.chat-sidebar-time-range {
+  display: grid;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  padding-top: 0.85rem;
+  margin-top: 0.7rem;
+  border-top: 1px solid #303030;
+}
+.chat-sidebar-time-range label { color: var(--text-muted); font-size: 0.75rem; }
+.chat-sidebar-time-range select { width: 100%; min-width: 0; padding: 0.55rem; }
+.chat-sidebar-time-range select:disabled { opacity: 0.5; }
 
 .chat-sidebar-heading,
 .chat-header {
@@ -2935,7 +2949,7 @@ h1 {
 
 .chat-sidebar button,
 .chat-main button,
-.chat-header select,
+.chat-sidebar-time-range select,
 .chat-form input,
 .chat-search,
 .chat-project-editor input {
@@ -3150,10 +3164,6 @@ h1 {
   flex-direction: column;
 }
 
-.chat-header select {
-  padding: 0.55rem;
-}
-
 .chat-header-controls {
   display: flex;
   align-items: center;
@@ -3347,7 +3357,7 @@ h1 {
 
   .chat-sidebar {
     max-height: 200px;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .chat-header {
