@@ -18,6 +18,11 @@ x-airflow-common: &airflow-common
     KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
     MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
     MONGO_DB: ${MONGO_DB:-newspulse}
+    CLICKHOUSE_HOST: clickhouse
+    CLICKHOUSE_PORT: "8123"
+    CLICKHOUSE_DB: ${CLICKHOUSE_DB:-newspulse}
+    CLICKHOUSE_USER: ${CLICKHOUSE_USER:-admin}
+    CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-admin123}
     PG_HOST: ${PG_HOST:-postgres}
     PG_PORT: ${PG_PORT:-5432}
     PG_DB: ${PG_DB:-newspulse}
