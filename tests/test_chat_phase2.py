@@ -67,7 +67,11 @@ async def test_article_answer_has_real_sources_and_persisted_metadata(
     assert data["tool"] == "search_articles"
     assert data["sources"][0]["url"] == "https://example.com/ai"
     assert data["queried_at"]
-    assert captured["params"] == {"source": "vnexpress", "title_query": "%AI%"}
+    assert captured["params"] == {
+        "source": "vnexpress", "title_query": "%AI%", "related_term": "AI",
+    }
+    assert "raw_article_keywords" in captured["sql"]
+    assert "raw_article_entities" in captured["sql"]
     assert "24 HOUR" in captured["sql"]
     assert "a.source = {source:String}" in captured["sql"]
     assert [item["role"] for item in chat_db.chat_messages.documents] == ["user", "assistant"]

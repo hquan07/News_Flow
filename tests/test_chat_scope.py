@@ -135,3 +135,31 @@ def test_offline_eval_checks_expectations_not_just_router_output():
     assert evaluate_offline(dataset) == []
     wrong = [{**dataset[0], "expected_time_range": "30d"}]
     assert evaluate_offline(wrong)
+
+
+@pytest.mark.asyncio
+async def test_related_article_question_filters_instead_of_listing_latest(
+    async_client, chat_db, monkeypatch,
+):
+    captured = {}
+
+    def fake_query(sql, params):
+        captured.update(sql=sql, params=params)
+        return []
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    response = await async_client.post(
+        "/api/v1/chat",
+        json={"message": "những bài báo liên quan đến Mỹ"},
+        headers=headers(),
+    )
+    assert response.status_code == 200
+    assert response.json()["tool"] == "search_articles"
+    assert response.json()["context"]["query"] == "Mỹ"
+    assert response.json()["sources"] == []
+    assert "Không tìm thấy" in response.json()["answer"]
+    assert captured["params"] == {"title_query": "%Mỹ%", "related_term": "Mỹ"}
+    assert "a.title ILIKE {title_query:String}" in captured["sql"]
+    assert "raw_article_keywords" in captured["sql"]
+    assert "raw_article_entities" in captured["sql"]
+    assert "7 DAY" in captured["sql"]

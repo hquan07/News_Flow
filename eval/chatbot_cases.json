@@ -1,5 +1,6 @@
 [
   {"id":"articles-topic","message":"Tìm bài viết về AI","role":"user","expected_tool":"search_articles","expected_time_range":"7d"},
+  {"id":"articles-related-entity","message":"những bài báo liên quan đến Mỹ","role":"user","expected_tool":"search_articles","expected_time_range":"7d"},
   {"id":"articles-today","message":"Bài báo mới hôm nay","role":"user","expected_tool":"search_articles","expected_time_range":"today"},
   {"id":"articles-source","message":"Tin mới từ VnExpress","role":"user","expected_tool":"search_articles","expected_time_range":"7d","expected_source":"vnexpress"},
   {"id":"articles-thirty-days","message":"Tìm tin về lãi suất trong 30 ngày qua","role":"analyst","expected_tool":"search_articles","expected_time_range":"30d"},

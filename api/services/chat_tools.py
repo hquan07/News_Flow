@@ -132,7 +132,10 @@ def _chart(title: str, unit: str, rows: list[dict], label_key: str, value_key: s
 def _search_term(request: ChatRequest) -> str | None:
     if request.query:
         return request.query.strip() or None
-    match = re.search(r"\b(?:về|ve|about)\s+(.+)", request.message, re.IGNORECASE)
+    match = re.search(
+        r"\b(?:về|ve|about|liên quan đến|lien quan den)\s+(.+)",
+        request.message, re.IGNORECASE,
+    )
     if not match:
         return None
     term = match.group(1).strip(" ?.!")
@@ -162,7 +165,16 @@ def _where(request: ChatRequest, time_range: str, *, title_query: str | None = N
 
 def _articles(request: ChatRequest, time_range: str) -> ToolResult:
     term = _search_term(request)
-    where, params = _where(request, time_range, title_query=term)
+    where, params = _where(request, time_range)
+    if term:
+        where += (
+            " AND (a.title ILIKE {title_query:String} "
+            "OR a.url_hash IN (SELECT url_hash FROM newspulse.raw_article_keywords "
+            "WHERE lowerUTF8(keyword) = lowerUTF8({related_term:String})) "
+            "OR a.url_hash IN (SELECT url_hash FROM newspulse.raw_article_entities "
+            "WHERE lowerUTF8(entity) = lowerUTF8({related_term:String})))"
+        )
+        params.update(title_query=f"%{term}%", related_term=term)
     rows = _query(
         "SELECT a.url_hash AS article_id, a.title, a.url, a.source, "
         "a.publish_time AS published_at "
@@ -183,7 +195,11 @@ def _articles(request: ChatRequest, time_range: str) -> ToolResult:
     if not sources:
         answer = "Không tìm thấy bài viết phù hợp trong khoảng thời gian này."
     else:
-        heading = f"Các bài viết mới nhất{f' về {term}' if term else ''} trong {_TIME_LABELS[time_range]}:"
+        heading = (
+            f"Các bài viết mới nhất liên quan đến {term} trong {_TIME_LABELS[time_range]} "
+            "(khớp tiêu đề, từ khóa hoặc thực thể):"
+            if term else f"Các bài viết mới nhất trong {_TIME_LABELS[time_range]}:"
+        )
         answer = heading + "\n" + "\n".join(
             f"{index}. {item['title']} ({item['source']})"
             for index, item in enumerate(sources, 1)
