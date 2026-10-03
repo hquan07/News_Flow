@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { BookOpenCheck, FileBarChart, RefreshCw } from "lucide-react";
+import { BookOpenCheck, FileBarChart, RefreshCw, Trash2, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { API_BASE, apiFetch } from "@/lib/api";
 
@@ -21,6 +21,7 @@ export default function BriefingsView() {
   const [briefing, setBriefing] = useState<EventBriefing | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -51,6 +52,18 @@ export default function BriefingsView() {
     catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to create briefing"); }
   };
 
+  const deleteReport = async (report: Report) => {
+    if (!window.confirm(`Delete report “${report.name}”? This action cannot be undone.`)) return;
+
+    setDeletingReportId(report.id);
+    try {
+      await apiFetch(`${API_BASE}/briefings/reports/${report.id}`, { method: "DELETE" });
+      setReports((current) => current.filter((item) => item.id !== report.id));
+      setError("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to delete report"); }
+    finally { setDeletingReportId(""); }
+  };
+
   return <div className="briefings-grid">
     {error && <div className="error-state briefings-wide">{error}</div>}
     <section className="glass-panel briefing-builder">
@@ -64,7 +77,7 @@ export default function BriefingsView() {
       <p>Creates a factual timeline, sentiment distribution and cited keyword snapshot.</p>
     </section>
     {briefing && <section className="glass-panel briefing-report briefing-event-report briefings-wide">
-      <h3>{briefing.title}</h3>
+      <div className="briefing-event-heading"><h3>{briefing.title}</h3><button type="button" onClick={() => setBriefing(null)}><X size={15}/> Clear briefing</button></div>
       <div className="briefing-section">
         <h4>Snapshot</h4>
         <ul className="briefing-summary">{briefing.summary.map((line) => <li key={line}>{line}</li>)}</ul>
@@ -82,7 +95,7 @@ export default function BriefingsView() {
         <div className="briefing-citations">{briefing.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title}<small>{item.source}</small></a>)}</div>
       </div>
     </section>}
-    {reports.map((report) => <section className="glass-panel briefing-report" key={report.id}><div className="briefing-report-heading"><div><h3>{report.name}</h3><span>{report.article_count} articles · {report.source_count} sources</span></div><small>{new Date(report.created_at).toLocaleString("vi-VN")}</small></div><div className="briefing-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={report.chart.points}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)"/><XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }}/><YAxis tick={{ fill: "#94a3b8", fontSize: 10 }}/><Tooltip/><Bar dataKey="value" fill="#34d399"/></BarChart></ResponsiveContainer></div><div className="briefing-citations">{report.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title} · {item.source}</a>)}</div></section>)}
+    {reports.map((report) => <section className="glass-panel briefing-report" key={report.id}><div className="briefing-report-heading"><div><h3>{report.name}</h3><span>{report.article_count} articles · {report.source_count} sources</span></div><div className="briefing-report-actions"><small>{new Date(report.created_at).toLocaleString("vi-VN")}</small><button type="button" aria-label={`Delete report ${report.name}`} disabled={deletingReportId === report.id} onClick={() => void deleteReport(report)}><Trash2 size={15}/> {deletingReportId === report.id ? "Deleting…" : "Delete report"}</button></div></div><div className="briefing-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={report.chart.points}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)"/><XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }}/><YAxis tick={{ fill: "#94a3b8", fontSize: 10 }}/><Tooltip/><Bar dataKey="value" fill="#34d399"/></BarChart></ResponsiveContainer></div><div className="briefing-citations">{report.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title} · {item.source}</a>)}</div></section>)}
     {!reports.length && <div className="glass-panel detail-empty-copy briefings-wide">No reports generated yet.</div>}
   </div>;
 }

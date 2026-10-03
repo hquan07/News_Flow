@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from api.services import briefing_service, scheduled_reports
 from tests.test_chat_foundation import _Collection
@@ -56,3 +57,8 @@ async def test_saved_query_report_has_chart_and_citations(monkeypatch):
     assert report["article_count"] == 4
     assert report["chart"]["points"][0]["value"] == 4
     assert report["citations"][0]["article_id"] == "a"
+    with pytest.raises(HTTPException) as error:
+        await scheduled_reports.delete_report("bob", report["id"])
+    assert error.value.status_code == 404
+    await scheduled_reports.delete_report("alice", report["id"])
+    assert database.intelligence_reports.documents == []

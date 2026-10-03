@@ -105,3 +105,11 @@ async def get_report(owner_id: str, report_id: str) -> dict:
     if document is None:
         raise HTTPException(status_code=404, detail="Report not found")
     return _serialize(document)
+
+
+async def delete_report(owner_id: str, report_id: str) -> None:
+    if not ObjectId.is_valid(report_id):
+        raise HTTPException(status_code=404, detail="Report not found")
+    result = await get_mongo_db().intelligence_reports.delete_one({"_id": ObjectId(report_id), "owner_id": owner_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Report not found")

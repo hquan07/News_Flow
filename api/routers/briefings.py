@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from api.security import require_permission
 from api.services import briefing_service, scheduled_reports
@@ -25,6 +25,12 @@ async def reports(actor: dict = Depends(require_permission("reports.export"))):
 @router.get("/reports/{report_id}")
 async def report(report_id: str, actor: dict = Depends(require_permission("reports.export"))):
     return await scheduled_reports.get_report(actor["sub"], report_id)
+
+
+@router.delete("/reports/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_report(report_id: str, actor: dict = Depends(require_permission("reports.export"))):
+    await scheduled_reports.delete_report(actor["sub"], report_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/reports/run-due")
