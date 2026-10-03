@@ -3076,8 +3076,12 @@ h1 {
 .workspace-list form, .workspace-detail form { display: flex; gap: .45rem; margin: .7rem 0; }
 .workspace-list input, .workspace-detail input, .workspace-detail select { min-width: 0; flex: 1; border: 1px solid var(--border-color); background: rgba(15,23,42,.8); color: var(--text-primary); border-radius: .45rem; padding: .5rem; }
 .workspace-list button, .workspace-detail button { border: 1px solid rgba(59,130,246,.35); background: rgba(59,130,246,.1); color: #bfdbfe; border-radius: .45rem; padding: .45rem .65rem; cursor: pointer; }
-.workspace-list > button { width: 100%; display: flex; justify-content: space-between; gap: .5rem; margin-top: .4rem; text-align: left; }
-.workspace-list > button.active { border-color: #60a5fa; background: rgba(59,130,246,.18); }
+.workspace-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem; margin-top: .4rem; }
+.workspace-list-row > .workspace-select { width: 100%; min-width: 0; display: flex; justify-content: space-between; gap: .5rem; text-align: left; }
+.workspace-list-row > .workspace-select.active { border-color: #60a5fa; background: rgba(59,130,246,.18); }
+.workspace-list-row > .workspace-delete { display: inline-grid; place-items: center; color: #fca5a5; border-color: rgba(239,68,68,.38); background: rgba(239,68,68,.1); }
+.workspace-list-row > .workspace-delete:hover { color: #fee2e2; border-color: rgba(248,113,113,.65); background: rgba(239,68,68,.2); }
+.workspace-list-row > .workspace-delete:disabled { cursor: not-allowed; opacity: .55; }
 .workspace-list small, .workspace-detail span, .workspace-detail small, .workspace-detail p { color: var(--text-muted); }
 .workspace-heading h3 { margin: 0; }
 .workspace-members, .workspace-watchlists { display: grid; gap: .35rem; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--border-color); }

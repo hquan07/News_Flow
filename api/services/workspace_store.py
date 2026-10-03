@@ -60,6 +60,15 @@ async def list_accessible(actor: dict) -> list[dict]:
     return [_serialize(document) for document in documents if document["owner_id"] == actor_id or any(item["email"].casefold() == email and email for item in document.get("members", []))]
 
 
+async def delete_workspace(workspace_id: str, actor: dict) -> None:
+    db = get_mongo_db()
+    document = await _access(workspace_id, actor, owner=True)
+    result = await db.team_workspaces.delete_one({"_id": document["_id"], "owner_id": document["owner_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    await db.workspace_resources.delete_many({"workspace_id": document["_id"]})
+
+
 async def upsert_member(workspace_id: str, actor: dict, email: str, role: str) -> dict:
     db = get_mongo_db()
     document = await _access(workspace_id, actor, owner=True)

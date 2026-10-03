@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from api.models.workspaces import SharedWatchlistCreate, WorkspaceCreate, WorkspaceMemberUpsert
 from api.security import require_permission
@@ -16,6 +16,12 @@ async def create_workspace(payload: WorkspaceCreate, actor: dict = Depends(requi
 @router.get("")
 async def list_workspaces(actor: dict = Depends(require_permission("dashboard.read"))):
     return await workspace_store.list_accessible(actor)
+
+
+@router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workspace(workspace_id: str, actor: dict = Depends(require_permission("dashboard.read"))):
+    await workspace_store.delete_workspace(workspace_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.put("/{workspace_id}/members")

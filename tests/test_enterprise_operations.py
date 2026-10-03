@@ -84,3 +84,9 @@ async def test_team_workspace_roles_and_shared_watchlists(async_client: AsyncCli
     shared = await async_client.post(f"/api/v1/workspaces/{workspace_id}/watchlists", json={"name": "AI", "kind": "keyword", "value": "AI"}, headers=member)
     assert shared.status_code == 201
     assert (await async_client.get(f"/api/v1/workspaces/{workspace_id}/watchlists", headers=owner)).json()[0]["value"] == "AI"
+    denied_delete = await async_client.delete(f"/api/v1/workspaces/{workspace_id}", headers=member)
+    assert denied_delete.status_code == 403
+    deleted = await async_client.delete(f"/api/v1/workspaces/{workspace_id}", headers=owner)
+    assert deleted.status_code == 204
+    assert (await async_client.get("/api/v1/workspaces", headers=owner)).json() == []
+    assert workspace_db.workspace_resources.documents == []
