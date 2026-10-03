@@ -66,36 +66,40 @@ export default function BriefingsView() {
 
   return <div className="briefings-grid">
     {error && <div className="error-state briefings-wide">{error}</div>}
-    <section className="glass-panel briefing-builder">
-      <h3><FileBarChart size={18}/> Saved-query reports</h3>
-      <form onSubmit={(event) => void generate(event)}><select name="query_id" required defaultValue=""><option value="" disabled>Select a saved query</option>{queries.map((query) => <option value={query.id} key={query.id}>{query.name} · {query.schedule}</option>)}</select><button disabled={busy}><RefreshCw size={15}/> Generate now</button></form>
-      <p>Scheduled queries are generated hourly by Airflow when due.</p>
-    </section>
-    <section className="glass-panel briefing-builder">
-      <h3><BookOpenCheck size={18}/> Event briefing</h3>
-      <form onSubmit={(event) => void loadBriefing(event)}><input name="event_id" required placeholder="Event ID"/><button>Build briefing</button></form>
-      <p>Creates a factual timeline, sentiment distribution and cited keyword snapshot.</p>
-    </section>
-    {briefing && <section className="glass-panel briefing-report briefing-event-report briefings-wide">
-      <div className="briefing-event-heading"><h3>{briefing.title}</h3><button type="button" onClick={() => setBriefing(null)}><X size={15}/> Clear briefing</button></div>
-      <div className="briefing-section">
-        <h4>Snapshot</h4>
-        <ul className="briefing-summary">{briefing.summary.map((line) => <li key={line}>{line}</li>)}</ul>
-      </div>
-      {briefing.keywords.length > 0 && <div className="briefing-section">
-        <h4>Keywords</h4>
-        <div className="briefing-tags">{briefing.keywords.map((item) => <span key={item.keyword}>{item.keyword} · {item.article_count}</span>)}</div>
-      </div>}
-      <div className="briefing-section">
-        <h4>Timeline</h4>
-        <ul className="briefing-timeline">{briefing.timeline.map((item) => <li key={`${item.citation}-${item.title}`}><span className="briefing-citation-number">[{item.citation}]</span><span>{item.title}<small>{item.source}</small></span></li>)}</ul>
-      </div>
-      <div className="briefing-section">
-        <h4>Sources</h4>
-        <div className="briefing-citations">{briefing.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title}<small>{item.source}</small></a>)}</div>
-      </div>
-    </section>}
-    {reports.map((report) => <section className="glass-panel briefing-report" key={report.id}><div className="briefing-report-heading"><div><h3>{report.name}</h3><span>{report.article_count} articles · {report.source_count} sources</span></div><div className="briefing-report-actions"><small>{new Date(report.created_at).toLocaleString("vi-VN")}</small><button type="button" aria-label={`Delete report ${report.name}`} disabled={deletingReportId === report.id} onClick={() => void deleteReport(report)}><Trash2 size={15}/> {deletingReportId === report.id ? "Deleting…" : "Delete report"}</button></div></div><div className="briefing-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={report.chart.points}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)"/><XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }}/><YAxis tick={{ fill: "#94a3b8", fontSize: 10 }}/><Tooltip/><Bar dataKey="value" fill="#34d399"/></BarChart></ResponsiveContainer></div><div className="briefing-citations">{report.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title} · {item.source}</a>)}</div></section>)}
-    {!reports.length && <div className="glass-panel detail-empty-copy briefings-wide">No reports generated yet.</div>}
+    <div className="briefing-column briefing-reports-column">
+      <section className="glass-panel briefing-builder">
+        <h3><FileBarChart size={18}/> Saved-query reports</h3>
+        <form onSubmit={(event) => void generate(event)}><select name="query_id" required defaultValue=""><option value="" disabled>Select a saved query</option>{queries.map((query) => <option value={query.id} key={query.id}>{query.name} · {query.schedule}</option>)}</select><button disabled={busy}><RefreshCw size={15}/> Generate now</button></form>
+        <p>Scheduled queries are generated hourly by Airflow when due.</p>
+      </section>
+      {reports.map((report) => <section className="glass-panel briefing-report" key={report.id}><div className="briefing-report-heading"><div><h3>{report.name}</h3><span>{report.article_count} articles · {report.source_count} sources</span></div><div className="briefing-report-actions"><small>{new Date(report.created_at).toLocaleString("vi-VN")}</small><button type="button" aria-label={`Delete report ${report.name}`} disabled={deletingReportId === report.id} onClick={() => void deleteReport(report)}><Trash2 size={15}/> {deletingReportId === report.id ? "Deleting…" : "Delete report"}</button></div></div><div className="briefing-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={report.chart.points}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)"/><XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }}/><YAxis tick={{ fill: "#94a3b8", fontSize: 10 }}/><Tooltip/><Bar dataKey="value" fill="#34d399"/></BarChart></ResponsiveContainer></div><div className="briefing-citations">{report.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title} · {item.source}</a>)}</div></section>)}
+      {!reports.length && <div className="glass-panel detail-empty-copy">No reports generated yet.</div>}
+    </div>
+    <div className="briefing-column briefing-events-column">
+      <section className="glass-panel briefing-builder">
+        <h3><BookOpenCheck size={18}/> Event briefing</h3>
+        <form onSubmit={(event) => void loadBriefing(event)}><input name="event_id" required placeholder="Event ID"/><button>Build briefing</button></form>
+        <p>Creates a factual timeline, sentiment distribution and cited keyword snapshot.</p>
+      </section>
+      {briefing ? <section className="glass-panel briefing-report briefing-event-report">
+        <div className="briefing-event-heading"><h3>{briefing.title}</h3><button type="button" onClick={() => setBriefing(null)}><X size={15}/> Clear briefing</button></div>
+        <div className="briefing-section">
+          <h4>Snapshot</h4>
+          <ul className="briefing-summary">{briefing.summary.map((line) => <li key={line}>{line}</li>)}</ul>
+        </div>
+        {briefing.keywords.length > 0 && <div className="briefing-section">
+          <h4>Keywords</h4>
+          <div className="briefing-tags">{briefing.keywords.map((item) => <span key={item.keyword}>{item.keyword} · {item.article_count}</span>)}</div>
+        </div>}
+        <div className="briefing-section">
+          <h4>Timeline</h4>
+          <ul className="briefing-timeline">{briefing.timeline.map((item) => <li key={`${item.citation}-${item.title}`}><span className="briefing-citation-number">[{item.citation}]</span><span>{item.title}<small>{item.source}</small></span></li>)}</ul>
+        </div>
+        <div className="briefing-section">
+          <h4>Sources</h4>
+          <div className="briefing-citations">{briefing.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title}<small>{item.source}</small></a>)}</div>
+        </div>
+      </section> : <div className="glass-panel detail-empty-copy">Build an event briefing to see its snapshot, timeline and sources.</div>}
+    </div>
   </div>;
 }
