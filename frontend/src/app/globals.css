@@ -3008,10 +3008,14 @@ h1 {
 .event-card li small { display: block; margin-top: .15rem; }
 .event-actions, .crisis-room-list article { display: flex; align-items: center; gap: .5rem; }
 .event-actions button, .crisis-room-list button, .chat-intelligence-scope button { border: 1px solid rgba(59,130,246,.35); background: rgba(59,130,246,.1); color: #bfdbfe; border-radius: .45rem; padding: .45rem .65rem; cursor: pointer; display: inline-flex; gap: .3rem; align-items: center; }
+.crisis-room-list button.danger { color: #fca5a5; border-color: rgba(239,68,68,.38); background: rgba(239,68,68,.1); }
+.crisis-room-list button.danger:hover { color: #fee2e2; border-color: rgba(248,113,113,.65); background: rgba(239,68,68,.2); }
+.crisis-room-list button:disabled, .crisis-room-list select:disabled { cursor: not-allowed; opacity: .55; }
 .crisis-room-list { padding: 1rem; display: grid; gap: .6rem; }
 .crisis-room-list article { border-top: 1px solid var(--border-color); padding-top: .6rem; }
 .crisis-room-list article > div { display: grid; gap: .2rem; flex: 1; min-width: 0; }
 .crisis-room-list small { color: var(--text-muted); }
+@media (max-width: 760px) { .crisis-room-list article { align-items: stretch; flex-wrap: wrap; } .crisis-room-list article > div { flex-basis: 100%; } }
 .chat-intelligence-scope { margin: 0 1rem; padding: .5rem .7rem; border: 1px solid rgba(59,130,246,.3); border-radius: .5rem; background: rgba(59,130,246,.08); display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: .78rem; }
 .insights-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .insights-wide { grid-column: 1 / -1; }

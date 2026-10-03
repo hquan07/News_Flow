@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, MessageCircle, RadioTower, ShieldAlert } from "lucide-react";
+import { ExternalLink, MessageCircle, RadioTower, ShieldAlert, Trash2 } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
 
 type EventArticle = { article_id: string; title: string; url: string; source: string; published_at?: string };
@@ -42,10 +42,27 @@ export default function EventsView({ onAsk }: { onAsk: (event: NewsEvent) => voi
   };
 
   const setRoomStatus = async (room: CrisisRoom, status: string) => {
-    await apiFetch(`${API_BASE}/events/rooms/${room.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
-    });
-    await load();
+    setBusyId(room.id);
+    try {
+      const updated = await apiFetch<CrisisRoom>(`${API_BASE}/events/rooms/${room.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+      });
+      setRooms((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setError("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to update room"); }
+    finally { setBusyId(""); }
+  };
+
+  const deleteRoom = async (room: CrisisRoom) => {
+    if (!window.confirm(`Delete crisis room “${room.name}”? This action cannot be undone.`)) return;
+
+    setBusyId(room.id);
+    try {
+      await apiFetch(`${API_BASE}/events/rooms/${room.id}`, { method: "DELETE" });
+      setRooms((current) => current.filter((item) => item.id !== room.id));
+      setError("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to delete room"); }
+    finally { setBusyId(""); }
   };
 
   return <div className="events-workspace">
@@ -58,8 +75,9 @@ export default function EventsView({ onAsk }: { onAsk: (event: NewsEvent) => voi
       <div className="panel-title"><ShieldAlert size={19} /> Crisis rooms</div>
       {rooms.map((room) => <article key={room.id}>
         <div><strong>{room.name}</strong><small>{room.event_snapshot.article_count} articles · {room.event_snapshot.sources.join(", ")}</small></div>
-        <select value={room.status} onChange={(event) => void setRoomStatus(room, event.target.value)}><option value="monitoring">Monitoring</option><option value="active">Active</option><option value="resolved">Resolved</option></select>
+        <select aria-label={`Status for ${room.name}`} value={room.status} disabled={busyId === room.id} onChange={(event) => void setRoomStatus(room, event.target.value)}><option value="monitoring">Monitoring</option><option value="active">Active</option><option value="resolved">Resolved</option></select>
         <button type="button" onClick={() => onAsk(room.event_snapshot)}><MessageCircle size={15} /> Ask</button>
+        <button type="button" className="danger" aria-label={`Delete crisis room ${room.name}`} disabled={busyId === room.id} onClick={() => void deleteRoom(room)}><Trash2 size={15} /> {busyId === room.id ? "Deleting…" : "Delete room"}</button>
       </article>)}
     </section>}
     <div className="event-card-grid">

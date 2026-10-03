@@ -71,3 +71,10 @@ async def test_crisis_rooms_are_owner_scoped(async_client: AsyncClient, crisis_d
     assert (await async_client.delete(
         f"/api/v1/events/rooms/{room_id}", headers=headers("bob")
     )).status_code == 404
+    deleted = await async_client.delete(
+        f"/api/v1/events/rooms/{room_id}", headers=headers("alice")
+    )
+    assert deleted.status_code == 204
+    assert (await async_client.get(
+        "/api/v1/events/rooms/mine", headers=headers("alice")
+    )).json() == []
