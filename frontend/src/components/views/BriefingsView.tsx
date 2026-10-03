@@ -15,12 +15,14 @@ type EventBriefing = {
   citations: { article_id: string; title: string; url: string; source: string }[];
 };
 
-export default function BriefingsView() {
+export default function BriefingsView({ initialEventId = "", onInitialEventHandled }: { initialEventId?: string; onInitialEventHandled?: () => void }) {
   const [queries, setQueries] = useState<SavedQuery[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [briefing, setBriefing] = useState<EventBriefing | null>(null);
+  const [eventId, setEventId] = useState(initialEventId);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [briefingBusy, setBriefingBusy] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState("");
 
   const load = useCallback(async () => {
@@ -44,12 +46,24 @@ export default function BriefingsView() {
     finally { setBusy(false); }
   };
 
-  const loadBriefing = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const id = String(new FormData(event.currentTarget).get("event_id") || "").trim();
+  const fetchBriefing = useCallback(async (id: string) => {
     if (!id) return;
+    setBriefingBusy(true);
     try { setBriefing(await apiFetch<EventBriefing>(`${API_BASE}/briefings/events/${encodeURIComponent(id)}`)); setError(""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to create briefing"); }
+    finally { setBriefingBusy(false); }
+  }, []);
+
+  useEffect(() => {
+    if (!initialEventId) return;
+    setEventId(initialEventId);
+    onInitialEventHandled?.();
+    void fetchBriefing(initialEventId);
+  }, [fetchBriefing, initialEventId, onInitialEventHandled]);
+
+  const loadBriefing = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await fetchBriefing(eventId.trim());
   };
 
   const deleteReport = async (report: Report) => {
@@ -78,7 +92,7 @@ export default function BriefingsView() {
     <div className="briefing-column briefing-events-column">
       <section className="glass-panel briefing-builder">
         <h3><BookOpenCheck size={18}/> Event briefing</h3>
-        <form onSubmit={(event) => void loadBriefing(event)}><input name="event_id" required placeholder="Event ID"/><button>Build briefing</button></form>
+        <form onSubmit={(event) => void loadBriefing(event)}><input name="event_id" required placeholder="Event ID" value={eventId} onChange={(event) => setEventId(event.target.value)}/><button disabled={briefingBusy}>{briefingBusy ? "Building…" : "Build briefing"}</button></form>
         <p>Build a cited timeline and sentiment snapshot for an event.</p>
       </section>
       {briefing ? <section className="glass-panel briefing-report briefing-event-report">

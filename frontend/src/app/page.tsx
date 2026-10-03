@@ -108,6 +108,7 @@ const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [briefingEventId, setBriefingEventId] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatIntelligenceScope, setChatIntelligenceScope] = useState<{ event_id?: string; watchlist_id?: string; label: string } | null>(null);
   const chatLauncherRef = useRef<HTMLButtonElement>(null);
@@ -824,6 +825,7 @@ export default function Home() {
       setArticleAlertFilter(null);
     }
   };
+  const handleInitialBriefingEvent = useCallback(() => setBriefingEventId(""), []);
 
   return (
     <div className="container">
@@ -1167,6 +1169,11 @@ export default function Home() {
             <EventsView onAsk={(event) => {
               setChatIntelligenceScope({ event_id: event.event_id, label: event.title });
               setChatOpen(true);
+            }} onBuildBriefing={(event) => {
+              setBriefingEventId(event.event_id);
+              setDashboardMode("intelligence");
+              setSelectedSource("");
+              setActiveTab("briefings");
             }} />
           )}
 
@@ -1221,7 +1228,7 @@ export default function Home() {
                   }} />
                 )}
 
-                {activeTab === "briefings" && <BriefingsView />}
+                {activeTab === "briefings" && <BriefingsView initialEventId={briefingEventId} onInitialEventHandled={handleInitialBriefingEvent} />}
                 {activeTab === "workspaces" && <WorkspacesView currentEmail={user.email} />}
 
                 {apiError && (
