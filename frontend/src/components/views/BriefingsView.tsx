@@ -7,11 +7,18 @@ import { API_BASE, apiFetch } from "@/lib/api";
 
 type SavedQuery = { id: string; name: string; schedule: string };
 type Report = { id: string; name: string; article_count: number; source_count: number; created_at: string; chart: { points: { label: string; value: number }[] }; citations: { article_id: string; title: string; url: string; source: string }[] };
+type EventBriefing = {
+  title: string;
+  summary: string[];
+  keywords: { keyword: string; article_count: number }[];
+  timeline: { citation: number; title: string; source: string }[];
+  citations: { article_id: string; title: string; url: string; source: string }[];
+};
 
 export default function BriefingsView() {
   const [queries, setQueries] = useState<SavedQuery[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  const [briefing, setBriefing] = useState<any>(null);
+  const [briefing, setBriefing] = useState<EventBriefing | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +47,7 @@ export default function BriefingsView() {
     event.preventDefault();
     const id = String(new FormData(event.currentTarget).get("event_id") || "").trim();
     if (!id) return;
-    try { setBriefing(await apiFetch(`${API_BASE}/briefings/events/${encodeURIComponent(id)}`)); setError(""); }
+    try { setBriefing(await apiFetch<EventBriefing>(`${API_BASE}/briefings/events/${encodeURIComponent(id)}`)); setError(""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to create briefing"); }
   };
 
@@ -56,7 +63,25 @@ export default function BriefingsView() {
       <form onSubmit={(event) => void loadBriefing(event)}><input name="event_id" required placeholder="Event ID"/><button>Build briefing</button></form>
       <p>Creates a factual timeline, sentiment distribution and cited keyword snapshot.</p>
     </section>
-    {briefing && <section className="glass-panel briefing-report briefings-wide"><h3>{briefing.title}</h3><ul>{briefing.summary.map((line: string) => <li key={line}>{line}</li>)}</ul><div className="briefing-tags">{briefing.keywords.map((item: any) => <span key={item.keyword}>{item.keyword} · {item.article_count}</span>)}</div><ol>{briefing.timeline.map((item: any) => <li key={`${item.citation}-${item.title}`}>[{item.citation}] {item.title} · {item.source}</li>)}</ol><div className="briefing-citations">{briefing.citations.map((item: any, index: number) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title} · {item.source}</a>)}</div></section>}
+    {briefing && <section className="glass-panel briefing-report briefing-event-report briefings-wide">
+      <h3>{briefing.title}</h3>
+      <div className="briefing-section">
+        <h4>Snapshot</h4>
+        <ul className="briefing-summary">{briefing.summary.map((line) => <li key={line}>{line}</li>)}</ul>
+      </div>
+      {briefing.keywords.length > 0 && <div className="briefing-section">
+        <h4>Keywords</h4>
+        <div className="briefing-tags">{briefing.keywords.map((item) => <span key={item.keyword}>{item.keyword} · {item.article_count}</span>)}</div>
+      </div>}
+      <div className="briefing-section">
+        <h4>Timeline</h4>
+        <ul className="briefing-timeline">{briefing.timeline.map((item) => <li key={`${item.citation}-${item.title}`}><span className="briefing-citation-number">[{item.citation}]</span><span>{item.title}<small>{item.source}</small></span></li>)}</ul>
+      </div>
+      <div className="briefing-section">
+        <h4>Sources</h4>
+        <div className="briefing-citations">{briefing.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title}<small>{item.source}</small></a>)}</div>
+      </div>
+    </section>}
     {reports.map((report) => <section className="glass-panel briefing-report" key={report.id}><div className="briefing-report-heading"><div><h3>{report.name}</h3><span>{report.article_count} articles · {report.source_count} sources</span></div><small>{new Date(report.created_at).toLocaleString("vi-VN")}</small></div><div className="briefing-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={report.chart.points}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.08)"/><XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }}/><YAxis tick={{ fill: "#94a3b8", fontSize: 10 }}/><Tooltip/><Bar dataKey="value" fill="#34d399"/></BarChart></ResponsiveContainer></div><div className="briefing-citations">{report.citations.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.article_id}>[{index + 1}] {item.title} · {item.source}</a>)}</div></section>)}
     {!reports.length && <div className="glass-panel detail-empty-copy briefings-wide">No reports generated yet.</div>}
   </div>;
