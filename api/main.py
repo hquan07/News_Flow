@@ -11,6 +11,7 @@ from api.services.chat_guard import ensure_indexes as ensure_chat_guard_indexes
 from api.services.chat_metrics import ensure_indexes as ensure_chat_metrics_indexes
 from api.services.chat_actions import ensure_indexes as ensure_chat_action_indexes
 from api.services.intelligence_store import ensure_indexes as ensure_intelligence_indexes
+from api.services.crisis_store import ensure_indexes as ensure_crisis_indexes
 from api.exceptions import DependencyUnavailableError
 from api.middleware import (
     RequestContextMiddleware,
@@ -20,7 +21,7 @@ from api.middleware import (
 from api.logging_config import configure_logging
 from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events
 from api.security import require_permission
 
 settings = get_settings()
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
             await ensure_chat_metrics_indexes()
             await ensure_chat_action_indexes()
             await ensure_intelligence_indexes()
+            await ensure_crisis_indexes()
             yield
     finally:
         metrics_stop.set()
@@ -115,6 +117,7 @@ app.include_router(public.router, prefix=prefix)
 app.include_router(chat.router, prefix=prefix)
 app.include_router(chat_actions.router, prefix=prefix)
 app.include_router(intelligence.router, prefix=prefix)
+app.include_router(events.router, prefix=prefix, dependencies=dashboard_access)
 
 
 @app.get("/health", tags=["Health"])

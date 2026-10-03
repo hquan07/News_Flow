@@ -13,7 +13,10 @@ const sectionMeta: Record<Section, { title: string; icon: typeof Bookmark }> = {
   "saved-queries": { title: "Saved searches & reports", icon: CalendarClock },
 };
 
-export default function IntelligenceView({ onRunQuery }: { onRunQuery: (item: Item) => void }) {
+export default function IntelligenceView({ onRunQuery, onAskWatchlist }: {
+  onRunQuery: (item: Item) => void;
+  onAskWatchlist: (item: Item) => void;
+}) {
   const [data, setData] = useState<Record<Section, Item[]>>({
     watchlists: [], "alert-rules": [], "saved-queries": [],
   });
@@ -92,6 +95,7 @@ export default function IntelligenceView({ onRunQuery }: { onRunQuery: (item: It
               <div><strong>{item.name}</strong><small>{String(item.value ?? item.target ?? item.query ?? "")}{item.schedule && item.schedule !== "none" ? ` · ${item.schedule}` : ""}</small></div>
               <div className="intelligence-actions">
                 {section === "saved-queries" && <button type="button" onClick={() => onRunQuery(item)}>Run</button>}
+                {section === "watchlists" && <button type="button" onClick={() => onAskWatchlist(item)}>Ask</button>}
                 <button type="button" onClick={() => void toggle(section, item)}>{item.enabled ? "Pause" : "Enable"}</button>
                 <button type="button" className="danger" aria-label={`Delete ${item.name}`} onClick={() => void remove(section, item.id)}><Trash2 size={15} /></button>
               </div>

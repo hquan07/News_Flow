@@ -78,6 +78,14 @@ async def list_items(kind: str, owner_id: str) -> list[dict]:
     return [_serialize(document) for document in documents]
 
 
+async def get_item(kind: str, owner_id: str, item_id: str) -> dict:
+    oid = _object_id(item_id, "Item")
+    document = await _collection(kind).find_one({"_id": oid, "owner_id": owner_id})
+    if document is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return _serialize(document)
+
+
 async def update(kind: str, owner_id: str, item_id: str, changes: dict) -> dict:
     collection = _collection(kind)
     oid = _object_id(item_id, "Item")

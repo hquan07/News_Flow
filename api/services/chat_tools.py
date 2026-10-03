@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from api.models.chat import ChatRequest
 from api.services.analytics import _query, get_alerts
 from api.services.rag_retrieval import retrieve
+from api.services.event_clustering import event_detail
 
 
 _TIME_WINDOWS = {
@@ -72,6 +73,25 @@ def _intent(message: str) -> str | None:
     if any(word in normalized for word in ("entity", "thuc the", "nhan vat", "to chuc nao", "dia danh", "lien quan den")):
         return "entities"
     return None
+
+
+def _event(request: ChatRequest, _time_range: str | None) -> ToolResult:
+    event = event_detail(request.event_id or "", days=30)
+    sources = [
+        {
+            "article_id": str(item["article_id"]), "title": item["title"],
+            "url": item["url"], "source": item["source"],
+            "published_at": item.get("published_at"),
+        }
+        for item in event["articles"][:8]
+        if str(item.get("url", "")).startswith(("http://", "https://"))
+    ]
+    answer = (
+        f"Sự kiện “{event['title']}” có {event['article_count']} bài từ "
+        f"{len(event['sources'])} nguồn; phát hiện {event['duplicate_count']} bài gần trùng.\n"
+        + "\n".join(f"{index}. {item['title']} ({item['source']})" for index, item in enumerate(sources, 1))
+    )
+    return ToolResult(answer=answer, tool="event_context", sources=sources)
 
 
 def _time_hint(message: str) -> str | None:
@@ -676,6 +696,16 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
 def answer_question(
     request: ChatRequest, actor: dict, previous_context: dict | None = None
 ) -> ToolResult:
+    if request.event_id:
+        result = _event(request, None)
+        result.queried_at = datetime.now(timezone.utc)
+        result.context = {
+            "intent": "event", "time_range": None, "source": None,
+            "compare_sources": None, "category": None, "query": None,
+            "clarification": False, "event_id": request.event_id,
+            "watchlist_id": request.watchlist_id,
+        }
+        return result
     plan = plan_question(request, previous_context)
     request, intent, time_range = plan.request, plan.intent, plan.time_range
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
@@ -724,5 +754,7 @@ def answer_question(
             _search_term(request)
         ),
         "clarification": False,
+        "event_id": request.event_id,
+        "watchlist_id": request.watchlist_id,
     }
     return result

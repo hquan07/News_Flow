@@ -23,7 +23,7 @@ from api.models.chat import (
     ProjectUpdate,
 )
 from api.security import require_permission
-from api.services import chat_guard, chat_metrics, chat_store, chat_tools
+from api.services import chat_guard, chat_metrics, chat_store, chat_tools, intelligence_store
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -55,6 +55,12 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
     previous_context = None
     tool = "unknown"
     try:
+        if payload.watchlist_id:
+            watchlist = await intelligence_store.get_item("watchlists", owner_id, payload.watchlist_id)
+            updates = {"query": watchlist["value"]}
+            if watchlist["kind"] == "source":
+                updates = {"source": watchlist["value"], "query": None}
+            payload = payload.model_copy(update=updates)
         if payload.conversation_id:
             # Check ownership before executing a query or writing any messages.
             conversation = await chat_store.get_conversation(owner_id, payload.conversation_id)

@@ -20,6 +20,7 @@ import {
   Settings,
   Sparkles,
   BellRing,
+  Layers3,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AccountAvatar from "@/components/AccountAvatar";
@@ -42,6 +43,7 @@ import ArchitectureView from "@/components/views/ArchitectureView";
 import CrawlerManagementView from "@/components/views/CrawlerManagementView";
 import UserManagementView from "@/components/views/UserManagementView";
 import IntelligenceView from "@/components/views/IntelligenceView";
+import EventsView from "@/components/views/EventsView";
 import SocialInfluencersView, {
   type SocialInfluencer,
 } from "@/components/views/SocialInfluencersView";
@@ -100,6 +102,7 @@ const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatIntelligenceScope, setChatIntelligenceScope] = useState<{ event_id?: string; watchlist_id?: string; label: string } | null>(null);
   const chatLauncherRef = useRef<HTMLButtonElement>(null);
   const [dashboardMode, setDashboardMode] = useState<
     "news" | "social" | "admin"
@@ -749,6 +752,7 @@ export default function Home() {
         { id: "articles", label: "Latest News", icon: <BookOpen size={18} /> },
         { id: "foryou", label: "For You", icon: <Sparkles size={18} />, featured: true },
         { id: "intelligence", label: "My Intelligence", icon: <BellRing size={18} />, featured: true },
+        { id: "events", label: "Events", icon: <Layers3 size={18} /> },
       ]
     : dashboardMode === "social"
       ? [
@@ -1113,7 +1117,10 @@ export default function Home() {
           )}
 
           {activeTab === "intelligence" && dashboardMode === "news" && (
-            <IntelligenceView onRunQuery={(item) => {
+            <IntelligenceView onAskWatchlist={(item) => {
+              setChatIntelligenceScope({ watchlist_id: item.id, label: item.name });
+              setChatOpen(true);
+            }} onRunQuery={(item) => {
               setArticleSearchInput(String(item.query || ""));
               setArticleSearchQuery(String(item.query || ""));
               setArticleFilters({
@@ -1126,6 +1133,13 @@ export default function Home() {
               });
               setPage(1);
               setActiveTab("articles");
+            }} />
+          )}
+
+          {activeTab === "events" && dashboardMode === "news" && (
+            <EventsView onAsk={(event) => {
+              setChatIntelligenceScope({ event_id: event.event_id, label: event.title });
+              setChatOpen(true);
             }} />
           )}
 
@@ -1237,7 +1251,12 @@ export default function Home() {
                   }
                 }}
               >
-                <ChatView open={chatOpen} onClose={() => { setChatOpen(false); chatLauncherRef.current?.focus(); }} />
+                <ChatView
+                  open={chatOpen}
+                  intelligenceScope={chatIntelligenceScope}
+                  onClearScope={() => setChatIntelligenceScope(null)}
+                  onClose={() => { setChatOpen(false); chatLauncherRef.current?.focus(); }}
+                />
               </div>
             </>
           )}

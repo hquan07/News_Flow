@@ -28,6 +28,8 @@ type ChatScope = {
   category?: string | null;
   query?: string | null;
   clarification?: boolean;
+  event_id?: string | null;
+  watchlist_id?: string | null;
 };
 type ChatMessage = {
   id?: string;
@@ -76,7 +78,12 @@ const timeRangeLabels: Record<NonNullable<ChatScope["time_range"]>, string> = {
   today: "24 giờ qua", "7d": "7 ngày qua", "30d": "30 ngày qua", all: "Toàn bộ thời gian",
 };
 
-export default function ChatView({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function ChatView({ open, onClose, intelligenceScope, onClearScope }: {
+  open: boolean;
+  onClose: () => void;
+  intelligenceScope?: { event_id?: string; watchlist_id?: string; label: string } | null;
+  onClearScope?: () => void;
+}) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [projectConversations, setProjectConversations] = useState<Record<string, Conversation[]>>({});
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
@@ -128,6 +135,13 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
   const contextConversation = contextMenu?.conversation ?? null;
 
   useEffect(() => { setCurrentUser(readCachedUser()); }, []);
+
+  useEffect(() => {
+    if (!intelligenceScope) return;
+    setActiveId(null);
+    setMessages([]);
+    setQuestion("");
+  }, [intelligenceScope]);
 
   useEffect(() => {
     if (open) questionRef.current?.focus();
@@ -313,6 +327,8 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
           ...(!activeId && selectedProject !== "all" && selectedProject !== "unassigned"
             ? { project_id: selectedProject } : {}),
           ...(timeRange ? { time_range: timeRange } : {}),
+          ...(intelligenceScope?.event_id ? { event_id: intelligenceScope.event_id } : {}),
+          ...(intelligenceScope?.watchlist_id ? { watchlist_id: intelligenceScope.watchlist_id } : {}),
         }),
       });
       setMessages((current) => [
@@ -675,6 +691,7 @@ export default function ChatView({ open, onClose }: { open: boolean; onClose: ()
             </button>
           </div>
         </div>
+        {intelligenceScope && <div className="chat-intelligence-scope"><span>Context: {intelligenceScope.label}</span><button type="button" onClick={onClearScope}>Clear</button></div>}
         <div className="chat-messages" aria-live="polite">
           {messages.length === 0 && (
             <div className="chat-empty">

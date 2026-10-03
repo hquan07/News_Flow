@@ -96,6 +96,8 @@ class ChatContext(BaseModel):
     category: str | None = None
     query: str | None = None
     clarification: bool = False
+    event_id: str | None = None
+    watchlist_id: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -107,6 +109,8 @@ class ChatRequest(BaseModel):
     category: str | None = Field(default=None, max_length=80)
     query: str | None = Field(default=None, max_length=120)
     compare_sources: list[str] | None = Field(default=None, min_length=2, max_length=6)
+    event_id: str | None = Field(default=None, max_length=64)
+    watchlist_id: str | None = Field(default=None, max_length=64)
 
     @field_validator("message")
     @classmethod
