@@ -3027,6 +3027,22 @@ h1 {
 .insight-tags span { border-radius: 999px; padding: .2rem .5rem; background: rgba(16,185,129,.1); color: #a7f3d0; font-size: .72rem; }
 .insight-result blockquote { margin: .2rem 0; padding: .5rem .7rem; border-left: 2px solid #60a5fa; color: #cbd5e1; background: rgba(15,23,42,.45); }
 @media (max-width: 760px) { .insights-grid { grid-template-columns: 1fr; } .insights-wide { grid-column: auto; } .insight-heading { flex-direction: column; } }
+.briefings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.briefings-wide { grid-column: 1 / -1; }
+.briefing-builder, .briefing-report { padding: 1rem; }
+.briefing-builder h3 { margin: 0; display: flex; align-items: center; gap: .4rem; }
+.briefing-builder p, .briefing-report span, .briefing-report small { color: var(--text-muted); }
+.briefing-builder form { display: flex; gap: .5rem; margin-top: .8rem; }
+.briefing-builder input, .briefing-builder select { flex: 1; min-width: 0; border: 1px solid var(--border-color); background: rgba(15,23,42,.8); color: var(--text-primary); border-radius: .5rem; padding: .55rem; }
+.briefing-builder button { border: 1px solid rgba(16,185,129,.35); background: rgba(16,185,129,.1); color: #a7f3d0; border-radius: .5rem; padding: .5rem .7rem; display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; }
+.briefing-report-heading { display: flex; justify-content: space-between; gap: 1rem; }
+.briefing-report-heading h3 { margin: 0 0 .25rem; }
+.briefing-chart { height: 220px; margin-top: .7rem; }
+.briefing-citations { display: grid; gap: .35rem; margin-top: .75rem; }
+.briefing-citations a { color: #bfdbfe; font-size: .8rem; }
+.briefing-tags { display: flex; flex-wrap: wrap; gap: .35rem; }
+.briefing-tags span { background: rgba(59,130,246,.1); color: #bfdbfe; border-radius: 999px; padding: .2rem .5rem; font-size: .72rem; }
+@media (max-width: 760px) { .briefings-grid { grid-template-columns: 1fr; } .briefings-wide { grid-column: auto; } .briefing-builder form { flex-direction: column; } }
 @media (max-width: 900px) { .intelligence-form { grid-template-columns: 1fr 1fr; } .intelligence-form button { grid-column: 1 / -1; } }
 @media (max-width: 600px) { .intelligence-form { grid-template-columns: 1fr; } .intelligence-form button { grid-column: auto; } .intelligence-list article { align-items: flex-start; flex-direction: column; } }
 

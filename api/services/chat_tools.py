@@ -11,6 +11,7 @@ from api.models.chat import ChatRequest
 from api.services.analytics import _query, get_alerts
 from api.services.rag_retrieval import retrieve
 from api.services.event_clustering import event_detail
+from api.services.briefing_service import citation_summary
 
 
 _TIME_WINDOWS = {
@@ -584,7 +585,7 @@ def _rag(request: ChatRequest, time_range: str) -> ToolResult:
     answer, sources = retrieve(
         query, time_range=time_range, source=request.source, category=request.category
     )
-    return ToolResult(answer=answer, tool="search_article_content", sources=sources, time_range=time_range)
+    return ToolResult(answer=citation_summary(answer, sources), tool="search_article_content", sources=sources, time_range=time_range)
 
 
 def plan_question(request: ChatRequest, previous_context: dict | None = None) -> ChatPlan:

@@ -22,6 +22,7 @@ import {
   BellRing,
   Layers3,
   BarChart3,
+  ClipboardList,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AccountAvatar from "@/components/AccountAvatar";
@@ -46,6 +47,7 @@ import UserManagementView from "@/components/views/UserManagementView";
 import IntelligenceView from "@/components/views/IntelligenceView";
 import EventsView from "@/components/views/EventsView";
 import InsightsView from "@/components/views/InsightsView";
+import BriefingsView from "@/components/views/BriefingsView";
 import SocialInfluencersView, {
   type SocialInfluencer,
 } from "@/components/views/SocialInfluencersView";
@@ -756,6 +758,7 @@ export default function Home() {
         { id: "intelligence", label: "My Intelligence", icon: <BellRing size={18} />, featured: true },
         { id: "events", label: "Events", icon: <Layers3 size={18} /> },
         { id: "insights", label: "Advanced Insights", icon: <BarChart3 size={18} /> },
+        { id: "briefings", label: "Briefings & Reports", icon: <ClipboardList size={18} /> },
       ]
     : dashboardMode === "social"
       ? [
@@ -1147,6 +1150,7 @@ export default function Home() {
           )}
 
           {activeTab === "insights" && dashboardMode === "news" && <InsightsView />}
+          {activeTab === "briefings" && dashboardMode === "news" && <BriefingsView />}
 
           {apiError && (
             <div className="error-toast">
