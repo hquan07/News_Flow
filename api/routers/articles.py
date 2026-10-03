@@ -20,12 +20,13 @@ def list_articles(
         published_to: Optional[datetime] = Query(default=None),
         entity: Optional[str] = Query(default=None, description="Filter by entity"),
         keyword: Optional[str] = Query(default=None, description="Filter by keyword"),
+        sentiment: Optional[str] = Query(default=None, pattern="^(positive|neutral|negative)$"),
 ):
     return get_articles(
         page=page, page_size=page_size, q=q, source=source,
         category=category, date_from=date_from, date_to=date_to,
         published_from=published_from, published_to=published_to,
-        entity=entity, keyword=keyword,
+        entity=entity, keyword=keyword, sentiment=sentiment,
     )
 
 

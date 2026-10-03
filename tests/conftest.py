@@ -65,6 +65,9 @@ def mock_data_services(monkeypatch):
         category=None,
         date_from=None,
         date_to=None,
+        entity=None,
+        keyword=None,
+        sentiment=None,
         **_kwargs,
     ):
         rows = ARTICLES
@@ -78,6 +81,11 @@ def mock_data_services(monkeypatch):
             rows = [row for row in rows if row["publish_date"].date() >= date_from]
         if date_to:
             rows = [row for row in rows if row["publish_date"].date() <= date_to]
+        if sentiment:
+            rows = [row for row in rows if (
+                "positive" if row["sentiment_score"] > 0 else
+                "negative" if row["sentiment_score"] < 0 else "neutral"
+            ) == sentiment]
         start = (page - 1) * page_size
         data = rows[start:start + page_size]
         return {

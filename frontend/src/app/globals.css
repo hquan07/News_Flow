@@ -2974,6 +2974,22 @@ h1 {
   .influencer-engagement { align-items: flex-end; }
   .feed-avatar { width: 36px; height: 36px; flex: 0 0 36px; }
 }
+.intelligence-grid { display: grid; gap: 1rem; }
+.intelligence-error { grid-column: 1 / -1; }
+.intelligence-card { padding: 1.1rem; }
+.intelligence-form { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(12rem, 2fr) auto auto auto; gap: .55rem; margin: 1rem 0; }
+.intelligence-form input, .intelligence-form select { min-width: 0; border: 1px solid var(--border-color); background: rgba(15,23,42,.62); color: var(--text-primary); border-radius: .55rem; padding: .62rem .7rem; }
+.intelligence-form button, .intelligence-actions button { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; border: 1px solid rgba(59,130,246,.4); background: rgba(59,130,246,.12); color: #bfdbfe; border-radius: .5rem; padding: .5rem .7rem; cursor: pointer; }
+.intelligence-list { display: grid; gap: .55rem; }
+.intelligence-list article { display: flex; justify-content: space-between; gap: 1rem; align-items: center; border-top: 1px solid var(--border-color); padding-top: .65rem; }
+.intelligence-list article.disabled { opacity: .56; }
+.intelligence-list article div:first-child { min-width: 0; display: grid; gap: .2rem; }
+.intelligence-list small { color: var(--text-muted); overflow-wrap: anywhere; }
+.intelligence-actions { display: flex; gap: .35rem; flex: 0 0 auto; }
+.intelligence-actions .danger { color: #fca5a5; border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.1); }
+@media (max-width: 900px) { .intelligence-form { grid-template-columns: 1fr 1fr; } .intelligence-form button { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .intelligence-form { grid-template-columns: 1fr; } .intelligence-form button { grid-column: auto; } .intelligence-list article { align-items: flex-start; flex-direction: column; } }
+
 /* Chat assistant */
 .chat-launcher {
   position: fixed;

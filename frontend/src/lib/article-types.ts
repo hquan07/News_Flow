@@ -3,6 +3,9 @@ export interface ArticleFilters {
   category: string;
   dateFrom: string;
   dateTo: string;
+  entity: string;
+  keyword: string;
+  sentiment: string;
 }
 
 export const EMPTY_ARTICLE_FILTERS: ArticleFilters = {
@@ -10,4 +13,7 @@ export const EMPTY_ARTICLE_FILTERS: ArticleFilters = {
   category: "",
   dateFrom: "",
   dateTo: "",
+  entity: "",
+  keyword: "",
+  sentiment: "",
 };

@@ -218,6 +218,36 @@ export default function ArticlesView({
                 onChange={(event) => updateFilter("dateTo", event.target.value)}
               />
             </label>
+            <label>
+              <span>Entity</span>
+              <input
+                type="search"
+                value={filters.entity}
+                placeholder="e.g. VinFast"
+                onChange={(event) => updateFilter("entity", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Keyword</span>
+              <input
+                type="search"
+                value={filters.keyword}
+                placeholder="e.g. lãi suất"
+                onChange={(event) => updateFilter("keyword", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Sentiment</span>
+              <select
+                value={filters.sentiment}
+                onChange={(event) => updateFilter("sentiment", event.target.value)}
+              >
+                <option value="">All sentiments</option>
+                <option value="positive">Positive</option>
+                <option value="neutral">Neutral</option>
+                <option value="negative">Negative</option>
+              </select>
+            </label>
           </div>
           {invalidDateRange && (
             <p className="article-filter-error" role="alert">

@@ -17,6 +17,7 @@ def _build_article_filters(
         published_to=None,
         entity=None,
         keyword=None,
+        sentiment=None,
 ):
     conditions = []
     params = {}
@@ -60,6 +61,9 @@ def _build_article_filters(
             )
         """)
         params["keyword"] = keyword
+    if sentiment:
+        conditions.append("ifNull(sentiment.sentiment_label, 'neutral') = {sentiment:String}")
+        params["sentiment"] = sentiment
 
     where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
     return where_clause, params
@@ -77,6 +81,7 @@ def get_articles(
         published_to: Optional[datetime] = None,
         entity: Optional[str] = None,
         keyword: Optional[str] = None,
+        sentiment: Optional[str] = None,
 ) -> dict:
     where_clause, params = _build_article_filters(
         q=q,
@@ -88,6 +93,7 @@ def get_articles(
         published_to=published_to,
         entity=entity,
         keyword=keyword,
+        sentiment=sentiment,
     )
     try:
         count_result = execute_clickhouse(lambda client: client.query(

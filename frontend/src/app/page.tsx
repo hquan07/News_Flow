@@ -19,6 +19,7 @@ import {
   Newspaper,
   Settings,
   Sparkles,
+  BellRing,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AccountAvatar from "@/components/AccountAvatar";
@@ -40,6 +41,7 @@ import OverviewNewsView from "@/components/views/OverviewNewsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
 import CrawlerManagementView from "@/components/views/CrawlerManagementView";
 import UserManagementView from "@/components/views/UserManagementView";
+import IntelligenceView from "@/components/views/IntelligenceView";
 import SocialInfluencersView, {
   type SocialInfluencer,
 } from "@/components/views/SocialInfluencersView";
@@ -464,6 +466,9 @@ export default function Home() {
       if (articleFilters.category) params.set("category", articleFilters.category);
       if (articleFilters.dateFrom) params.set("date_from", articleFilters.dateFrom);
       if (articleFilters.dateTo) params.set("date_to", articleFilters.dateTo);
+      if (articleFilters.entity) params.set("entity", articleFilters.entity);
+      if (articleFilters.keyword) params.set("keyword", articleFilters.keyword);
+      if (articleFilters.sentiment) params.set("sentiment", articleFilters.sentiment);
       if (articleAlertFilter) {
         params.set("published_from", articleAlertFilter.publishedFrom);
         params.set("published_to", articleAlertFilter.publishedTo);
@@ -743,6 +748,7 @@ export default function Home() {
         { id: "network", label: "Network", icon: <Share2 size={18} /> },
         { id: "articles", label: "Latest News", icon: <BookOpen size={18} /> },
         { id: "foryou", label: "For You", icon: <Sparkles size={18} />, featured: true },
+        { id: "intelligence", label: "My Intelligence", icon: <BellRing size={18} />, featured: true },
       ]
     : dashboardMode === "social"
       ? [
@@ -1104,6 +1110,23 @@ export default function Home() {
               trackClick={trackClick}
               timeAgo={timeAgo}
             />
+          )}
+
+          {activeTab === "intelligence" && dashboardMode === "news" && (
+            <IntelligenceView onRunQuery={(item) => {
+              setArticleSearchInput(String(item.query || ""));
+              setArticleSearchQuery(String(item.query || ""));
+              setArticleFilters({
+                ...EMPTY_ARTICLE_FILTERS,
+                source: String(item.source || ""),
+                category: String(item.category || ""),
+                entity: String(item.entity || ""),
+                keyword: String(item.keyword || ""),
+                sentiment: String(item.sentiment || ""),
+              });
+              setPage(1);
+              setActiveTab("articles");
+            }} />
           )}
 
           {apiError && (
