@@ -79,7 +79,7 @@ export default function BriefingsView() {
       <section className="glass-panel briefing-builder">
         <h3><BookOpenCheck size={18}/> Event briefing</h3>
         <form onSubmit={(event) => void loadBriefing(event)}><input name="event_id" required placeholder="Event ID"/><button>Build briefing</button></form>
-        <p>Creates a factual timeline, sentiment distribution and cited keyword snapshot.</p>
+        <p>Build a cited timeline and sentiment snapshot for an event.</p>
       </section>
       {briefing ? <section className="glass-panel briefing-report briefing-event-report">
         <div className="briefing-event-heading"><h3>{briefing.title}</h3><button type="button" onClick={() => setBriefing(null)}><X size={15}/> Clear briefing</button></div>
