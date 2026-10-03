@@ -34,6 +34,20 @@ async def test_list_articles_with_search(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("sentiment", ["positive", "neutral", "negative"])
+async def test_list_articles_with_sentiment_filter(async_client: AsyncClient, sentiment: str):
+    response = await async_client.get("/api/v1/articles", params={"sentiment": sentiment})
+
+    assert response.status_code == 200
+    for article in response.json()["data"]:
+        expected = (
+            "positive" if article["sentiment_score"] > 0 else
+            "negative" if article["sentiment_score"] < 0 else "neutral"
+        )
+        assert expected == sentiment
+
+
+@pytest.mark.asyncio
 async def test_list_articles_combines_title_source_category_and_dates(
     async_client: AsyncClient,
 ):

@@ -6,6 +6,17 @@ from api.services.clickhouse_resilience import execute_clickhouse
 
 logger = logging.getLogger("newspulse.crud")
 
+_LATEST_SENTIMENT_JOIN = """
+    LEFT JOIN (
+        SELECT
+            url_hash,
+            argMax(sentiment_score, loaded_at) AS sentiment_score,
+            argMax(sentiment_label, loaded_at) AS sentiment_label
+        FROM newspulse.raw_article_sentiment
+        GROUP BY url_hash
+    ) AS sentiment USING (url_hash)
+"""
+
 
 def _build_article_filters(
         q=None,
@@ -96,8 +107,9 @@ def get_articles(
         sentiment=sentiment,
     )
     try:
+        count_sentiment_join = _LATEST_SENTIMENT_JOIN if sentiment else ""
         count_result = execute_clickhouse(lambda client: client.query(
-            f"SELECT count() AS total FROM newspulse.raw_articles FINAL {where_clause}",
+            f"SELECT count() AS total FROM newspulse.raw_articles FINAL {count_sentiment_join} {where_clause}",
             parameters=params,
         ).first_row)
         total = count_result[0] if count_result else 0
@@ -115,14 +127,7 @@ def get_articles(
                 ifNull(sentiment.sentiment_score, toFloat32(0)) AS sentiment_score,
                 ifNull(sentiment.sentiment_label, 'neutral') AS sentiment_label
             FROM newspulse.raw_articles FINAL
-            LEFT JOIN (
-                SELECT
-                    url_hash,
-                    argMax(sentiment_score, loaded_at) AS sentiment_score,
-                    argMax(sentiment_label, loaded_at) AS sentiment_label
-                FROM newspulse.raw_article_sentiment
-                GROUP BY url_hash
-            ) AS sentiment USING (url_hash)
+            {_LATEST_SENTIMENT_JOIN}
             {where_clause}
             ORDER BY publish_time DESC, publish_hour DESC
             LIMIT {{page_size:UInt32}} OFFSET {{offset:UInt64}}
