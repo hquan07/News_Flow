@@ -1,20 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BookOpenCheck, Check, Copy, ExternalLink, MessageCircle, RadioTower, ShieldAlert, Trash2 } from "lucide-react";
+import { BookOpenCheck, BrainCircuit, Check, Copy, ExternalLink, GitCompareArrows, MessageCircle, RadioTower, ShieldAlert, Trash2 } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
 
 type EventArticle = { article_id: string; title: string; url: string; source: string; published_at?: string };
 type NewsEvent = { event_id: string; title: string; article_count: number; duplicate_count: number; sources: string[]; articles: EventArticle[] };
 type CrisisRoom = { id: string; event_id: string; name: string; notes: string; status: string; event_snapshot: NewsEvent };
 
-export default function EventsView({ onAsk, onBuildBriefing }: { onAsk: (event: NewsEvent) => void; onBuildBriefing: (event: NewsEvent) => void }) {
+export default function EventsView({ onAsk, onBuildBriefing, onCompareSources, onExplainArticle }: { onAsk: (event: NewsEvent) => void; onBuildBriefing: (event: NewsEvent) => void; onCompareSources: (event: NewsEvent) => void; onExplainArticle: (articleId: string) => void }) {
   const [events, setEvents] = useState<NewsEvent[]>([]);
   const [rooms, setRooms] = useState<CrisisRoom[]>([]);
   const [days, setDays] = useState(7);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
-  const [copiedEventId, setCopiedEventId] = useState("");
+  const [copiedId, setCopiedId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -66,13 +66,13 @@ export default function EventsView({ onAsk, onBuildBriefing }: { onAsk: (event: 
     finally { setBusyId(""); }
   };
 
-  const copyEventId = async (eventId: string) => {
+  const copyId = async (id: string) => {
     try {
-      await navigator.clipboard.writeText(eventId);
-      setCopiedEventId(eventId);
-      window.setTimeout(() => setCopiedEventId((current) => current === eventId ? "" : current), 1800);
+      await navigator.clipboard.writeText(id);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId((current) => current === id ? "" : current), 1800);
       setError("");
-    } catch { setError("Unable to copy the event ID"); }
+    } catch { setError("Unable to copy the ID"); }
   };
 
   return <div className="events-workspace">
@@ -96,9 +96,9 @@ export default function EventsView({ onAsk, onBuildBriefing }: { onAsk: (event: 
         return <article className="glass-panel event-card" key={event.event_id}>
           <div className="event-card-heading"><div><span>{event.article_count} articles · {event.sources.length} sources</span><h3>{event.title}</h3></div><span className="duplicate-badge">{event.duplicate_count} near-duplicates</span></div>
           <div className="event-sources">{event.sources.map((source) => <span key={source}>{source}</span>)}</div>
-          <div className="event-id-row"><code>Event ID: {event.event_id}</code><button type="button" aria-label={`Copy event ID ${event.event_id}`} onClick={() => void copyEventId(event.event_id)}>{copiedEventId === event.event_id ? <Check size={14} /> : <Copy size={14} />} {copiedEventId === event.event_id ? "Copied" : "Copy ID"}</button></div>
-          <ol>{event.articles.slice(0, 5).map((article) => <li key={article.article_id}><a href={article.url} target="_blank" rel="noreferrer">{article.title} <ExternalLink size={12} /></a><small>{article.source}</small></li>)}</ol>
-          <div className="event-actions"><button type="button" onClick={() => onAsk(event)}><MessageCircle size={15} /> Ask assistant</button><button type="button" onClick={() => onBuildBriefing(event)}><BookOpenCheck size={15} /> Build briefing</button><button type="button" disabled={hasRoom || busyId === event.event_id} onClick={() => void createRoom(event)}>{hasRoom ? "Room created" : "Create crisis room"}</button></div>
+          <div className="event-id-row"><code>Event ID: {event.event_id}</code><button type="button" aria-label={`Copy event ID ${event.event_id}`} onClick={() => void copyId(event.event_id)}>{copiedId === event.event_id ? <Check size={14} /> : <Copy size={14} />} {copiedId === event.event_id ? "Copied" : "Copy ID"}</button></div>
+          <ol>{event.articles.slice(0, 5).map((article) => <li key={article.article_id}><a href={article.url} target="_blank" rel="noreferrer">{article.title} <ExternalLink size={12} /></a><small>{article.source}</small><div className="event-article-tools"><code>Article ID: {article.article_id}</code><button type="button" aria-label={`Copy article ID ${article.article_id}`} onClick={() => void copyId(article.article_id)}>{copiedId === article.article_id ? <Check size={13} /> : <Copy size={13} />} {copiedId === article.article_id ? "Copied" : "Copy"}</button><button type="button" onClick={() => onExplainArticle(article.article_id)}><BrainCircuit size={13} /> Explain NLP</button></div></li>)}</ol>
+          <div className="event-actions"><button type="button" onClick={() => onAsk(event)}><MessageCircle size={15} /> Ask assistant</button><button type="button" onClick={() => onBuildBriefing(event)}><BookOpenCheck size={15} /> Build briefing</button><button type="button" onClick={() => onCompareSources(event)}><GitCompareArrows size={15} /> Compare sources</button><button type="button" disabled={hasRoom || busyId === event.event_id} onClick={() => void createRoom(event)}>{hasRoom ? "Room created" : "Create crisis room"}</button></div>
         </article>;
       })}
       {!events.length && !error && <div className="glass-panel detail-empty-copy">No multi-source event clusters found in this window.</div>}

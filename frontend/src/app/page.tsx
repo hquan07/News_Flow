@@ -109,6 +109,7 @@ const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
   const [briefingEventId, setBriefingEventId] = useState("");
+  const [initialInsightLookup, setInitialInsightLookup] = useState<{ type: "divergence" | "nlp"; value: string } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatIntelligenceScope, setChatIntelligenceScope] = useState<{ event_id?: string; watchlist_id?: string; label: string } | null>(null);
   const chatLauncherRef = useRef<HTMLButtonElement>(null);
@@ -826,6 +827,13 @@ export default function Home() {
     }
   };
   const handleInitialBriefingEvent = useCallback(() => setBriefingEventId(""), []);
+  const handleInitialInsightLookup = useCallback(() => setInitialInsightLookup(null), []);
+  const openAdvancedInsight = useCallback((type: "divergence" | "nlp", value: string) => {
+    setInitialInsightLookup({ type, value });
+    setDashboardMode("news");
+    setSelectedSource("");
+    setActiveTab("insights");
+  }, []);
 
   return (
     <div className="container">
@@ -1010,6 +1018,7 @@ export default function Home() {
               timeAgo={timeAgo}
               exportToCSV={exportToCSV}
               canExportCSV={canExportFull}
+              onExplainArticle={(articleId) => openAdvancedInsight("nlp", articleId)}
             />
           )}
 
@@ -1154,6 +1163,7 @@ export default function Home() {
               timeAgo={timeAgo}
               exportToCSV={exportToCSV}
               canExportCSV={canExportFull}
+              onExplainArticle={(articleId) => openAdvancedInsight("nlp", articleId)}
             />
           )}
 
@@ -1174,10 +1184,14 @@ export default function Home() {
               setDashboardMode("intelligence");
               setSelectedSource("");
               setActiveTab("briefings");
+            }} onCompareSources={(event) => {
+              openAdvancedInsight("divergence", event.event_id);
+            }} onExplainArticle={(articleId) => {
+              openAdvancedInsight("nlp", articleId);
             }} />
           )}
 
-          {activeTab === "insights" && dashboardMode === "news" && <InsightsView />}
+          {activeTab === "insights" && dashboardMode === "news" && <InsightsView initialLookup={initialInsightLookup} onInitialLookupHandled={handleInitialInsightLookup} />}
 
           {apiError && (
             <div className="error-toast">

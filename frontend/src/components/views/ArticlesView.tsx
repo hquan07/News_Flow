@@ -1,7 +1,7 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
-import { BookOpen, FileText, Filter, Search, X } from "lucide-react";
+import { useState, type Dispatch, type SetStateAction } from "react";
+import { BookOpen, BrainCircuit, Check, Copy, FileText, Filter, Search, X } from "lucide-react";
 import type { ArticleAlertFilter } from "@/lib/alert-types";
 import {
   EMPTY_ARTICLE_FILTERS,
@@ -62,6 +62,7 @@ type ArticlesViewProps = {
   timeAgo: (date: string) => string;
   exportToCSV: (data: Record<string, unknown>[], filename: string) => void;
   canExportCSV: boolean;
+  onExplainArticle: (articleId: string) => void;
 };
 
 export default function ArticlesView({
@@ -81,7 +82,9 @@ export default function ArticlesView({
   timeAgo,
   exportToCSV,
   canExportCSV,
+  onExplainArticle,
 }: ArticlesViewProps) {
+  const [copiedArticleId, setCopiedArticleId] = useState("");
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const invalidDateRange = Boolean(
     filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo,
@@ -89,6 +92,12 @@ export default function ArticlesView({
 
   const updateFilter = (field: keyof ArticleFilters, value: string) => {
     setFilters({ ...filters, [field]: value });
+  };
+
+  const copyArticleId = async (articleId: string) => {
+    await navigator.clipboard.writeText(articleId);
+    setCopiedArticleId(articleId);
+    window.setTimeout(() => setCopiedArticleId((current) => current === articleId ? "" : current), 1800);
   };
 
   return (
@@ -274,6 +283,7 @@ export default function ArticlesView({
               <th>Category</th>
               <th>Published</th>
               <th>Sentiment</th>
+              <th>Article ID</th>
             </tr>
           </thead>
           <tbody>
@@ -310,12 +320,13 @@ export default function ArticlesView({
                     {a.sentiment_score?.toFixed(2) || "0.00"}
                   </span>
                 </td>
+                <td><div className="article-id-actions"><code>{a.article_id}</code><div><button type="button" aria-label={`Copy article ID ${a.article_id}`} onClick={() => void copyArticleId(a.article_id)}>{copiedArticleId === a.article_id ? <Check size={13} /> : <Copy size={13} />} {copiedArticleId === a.article_id ? "Copied" : "Copy"}</button><button type="button" onClick={() => onExplainArticle(a.article_id)}><BrainCircuit size={13} /> Explain NLP</button></div></div></td>
               </tr>
             ))}
             {articles.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   style={{
                     textAlign: "center",
                     padding: "3rem",
