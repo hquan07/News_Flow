@@ -11,7 +11,8 @@ _LATEST_SENTIMENT_JOIN = """
         SELECT
             url_hash,
             argMax(sentiment_score, loaded_at) AS sentiment_score,
-            argMax(sentiment_label, loaded_at) AS sentiment_label
+            argMax(sentiment_label, loaded_at) AS sentiment_label,
+            toUInt8(1) AS sentiment_analyzed
         FROM newspulse.raw_article_sentiment
         GROUP BY url_hash
     ) AS sentiment USING (url_hash)
@@ -72,8 +73,11 @@ def _build_article_filters(
             )
         """)
         params["keyword"] = keyword
-    if sentiment:
-        conditions.append("ifNull(sentiment.sentiment_label, 'neutral') = {sentiment:String}")
+    if sentiment == "unanalyzed":
+        conditions.append("ifNull(sentiment.sentiment_analyzed, 0) = 0")
+    elif sentiment:
+        conditions.append("ifNull(sentiment.sentiment_analyzed, 0) = 1")
+        conditions.append("sentiment.sentiment_label = {sentiment:String}")
         params["sentiment"] = sentiment
 
     where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
@@ -124,8 +128,17 @@ def get_articles(
                 url_hash AS article_id, title, url, source, category,
                 publish_time AS publish_date, publish_hour,
                 author, word_count, keyword_count, crawl_latency_minutes,
-                ifNull(sentiment.sentiment_score, toFloat32(0)) AS sentiment_score,
-                ifNull(sentiment.sentiment_label, 'neutral') AS sentiment_label
+                if(
+                    ifNull(sentiment.sentiment_analyzed, 0) = 1,
+                    toNullable(sentiment.sentiment_score),
+                    NULL
+                ) AS sentiment_score,
+                if(
+                    ifNull(sentiment.sentiment_analyzed, 0) = 1,
+                    toNullable(sentiment.sentiment_label),
+                    NULL
+                ) AS sentiment_label,
+                ifNull(sentiment.sentiment_analyzed, 0) = 1 AS sentiment_analyzed
             FROM newspulse.raw_articles FINAL
             {_LATEST_SENTIMENT_JOIN}
             {where_clause}
@@ -157,14 +170,24 @@ def get_article_detail(article_id: str) -> Optional[dict]:
             url_hash as article_id, title, url, source, category,
             publish_time as publish_date, publish_hour,
             author, word_count, keyword_count, crawl_latency_minutes,
-            ifNull(sentiment.sentiment_score, toFloat32(0)) AS sentiment_score,
-            ifNull(sentiment.sentiment_label, 'neutral') AS sentiment_label
+            if(
+                ifNull(sentiment.sentiment_analyzed, 0) = 1,
+                toNullable(sentiment.sentiment_score),
+                NULL
+            ) AS sentiment_score,
+            if(
+                ifNull(sentiment.sentiment_analyzed, 0) = 1,
+                toNullable(sentiment.sentiment_label),
+                NULL
+            ) AS sentiment_label,
+            ifNull(sentiment.sentiment_analyzed, 0) = 1 AS sentiment_analyzed
         FROM newspulse.raw_articles FINAL
         LEFT JOIN (
             SELECT
                 url_hash,
                 argMax(sentiment_score, loaded_at) AS sentiment_score,
-                argMax(sentiment_label, loaded_at) AS sentiment_label
+                argMax(sentiment_label, loaded_at) AS sentiment_label,
+                toUInt8(1) AS sentiment_analyzed
             FROM newspulse.raw_article_sentiment
             GROUP BY url_hash
         ) AS sentiment USING (url_hash)

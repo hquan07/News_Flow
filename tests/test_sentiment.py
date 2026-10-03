@@ -48,12 +48,15 @@ def test_sentiment_by_source_uses_linked_article_source(monkeypatch):
 
 def test_sentiment_coverage_reports_orphans(monkeypatch):
     monkeypatch.setattr(
-        analytics, "_query_one", lambda _sql: {"total": 5000, "linked": 1250}
+        analytics,
+        "_query_one",
+        lambda _sql: {"total": 5000, "linked": 1250, "sentiment_total": 1500},
     )
 
     assert analytics.get_sentiment_coverage() == {
         "total": 5000,
         "linked": 1250,
-        "unlinked": 3750,
+        "unanalyzed": 3750,
+        "unlinked": 250,
         "coverage_pct": 25.0,
     }

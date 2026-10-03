@@ -544,17 +544,22 @@ def get_sentiment_by_source(time_range="7d", source=None, category=None):
 def get_sentiment_coverage():
     row = _query_one("""
         SELECT
-            (SELECT uniqExact(url_hash) FROM newspulse.raw_article_sentiment) AS total,
+            (SELECT uniqExact(url_hash) FROM newspulse.raw_articles FINAL) AS total,
             (SELECT uniqExact(s.url_hash)
              FROM newspulse.raw_article_sentiment s
-             INNER JOIN newspulse.raw_articles a ON s.url_hash = a.url_hash) AS linked
+             INNER JOIN (
+                 SELECT url_hash FROM newspulse.raw_articles FINAL GROUP BY url_hash
+             ) a ON s.url_hash = a.url_hash) AS linked,
+            (SELECT uniqExact(url_hash) FROM newspulse.raw_article_sentiment) AS sentiment_total
     """)
     total = int(row.get("total", 0))
     linked = int(row.get("linked", 0))
+    sentiment_total = int(row.get("sentiment_total", linked))
     return {
         "total": total,
         "linked": linked,
-        "unlinked": max(total - linked, 0),
+        "unanalyzed": max(total - linked, 0),
+        "unlinked": max(sentiment_total - linked, 0),
         "coverage_pct": round(linked * 100 / total, 1) if total else 100.0,
     }
 

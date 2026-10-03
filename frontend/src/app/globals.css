@@ -858,6 +858,19 @@ h1 {
   font-size: 0.78rem;
 }
 
+.sentiment-unavailable {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
 .article-context-filter button {
   display: inline-flex;
   align-items: center;

@@ -20,7 +20,10 @@ def list_articles(
         published_to: Optional[datetime] = Query(default=None),
         entity: Optional[str] = Query(default=None, description="Filter by entity"),
         keyword: Optional[str] = Query(default=None, description="Filter by keyword"),
-        sentiment: Optional[str] = Query(default=None, pattern="^(positive|neutral|negative)$"),
+        sentiment: Optional[str] = Query(
+            default=None,
+            pattern="^(positive|neutral|negative|unanalyzed)$",
+        ),
 ):
     return get_articles(
         page=page, page_size=page_size, q=q, source=source,

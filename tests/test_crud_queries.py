@@ -34,6 +34,7 @@ def test_article_filters_and_sentiment_are_applied(monkeypatch):
             "title": "AI tại Việt Nam",
             "sentiment_score": 0.75,
             "sentiment_label": "positive",
+            "sentiment_analyzed": True,
         }]),
     ])
     monkeypatch.setattr(crud, "execute_clickhouse", lambda operation: operation(client))
@@ -67,6 +68,7 @@ def test_sentiment_filter_joins_latest_sentiment_in_count_and_data(monkeypatch):
             "title": "Positive article",
             "sentiment_score": 0.8,
             "sentiment_label": "positive",
+            "sentiment_analyzed": True,
         }]),
     ])
     monkeypatch.setattr(crud, "execute_clickhouse", lambda operation: operation(client))
@@ -78,11 +80,35 @@ def test_sentiment_filter_joins_latest_sentiment_in_count_and_data(monkeypatch):
     for sql in (count_sql, data_sql):
         assert "raw_article_sentiment" in sql
         assert "argMax(sentiment_label, loaded_at)" in sql
-        assert "ifNull(sentiment.sentiment_label, 'neutral') = {sentiment:String}" in sql
+        assert "ifNull(sentiment.sentiment_analyzed, 0) = 1" in sql
+        assert "sentiment.sentiment_label = {sentiment:String}" in sql
     assert count_params == {"sentiment": "positive"}
     assert data_params["sentiment"] == "positive"
     assert response["total"] == 1
     assert response["data"][0]["sentiment_label"] == "positive"
+
+
+def test_unanalyzed_filter_does_not_treat_missing_sentiment_as_neutral(monkeypatch):
+    client = _Client([
+        _Result(first_row=(1,)),
+        _Result(rows=[{
+            "article_id": "hash-missing",
+            "title": "Article awaiting NLP",
+            "sentiment_score": None,
+            "sentiment_label": None,
+            "sentiment_analyzed": False,
+        }]),
+    ])
+    monkeypatch.setattr(crud, "execute_clickhouse", lambda operation: operation(client))
+
+    response = crud.get_articles(sentiment="unanalyzed")
+
+    for sql, params in client.calls:
+        assert "raw_article_sentiment" in sql
+        assert "ifNull(sentiment.sentiment_analyzed, 0) = 0" in sql
+        assert "sentiment" not in params
+    assert response["data"][0]["sentiment_score"] is None
+    assert response["data"][0]["sentiment_analyzed"] is False
 
 
 def test_article_detail_deduplicates_enrichment_rows(monkeypatch):

@@ -37,7 +37,9 @@ type Article = {
   source: string;
   category?: string;
   publish_date?: string;
-  sentiment_score: number;
+  sentiment_score: number | null;
+  sentiment_label?: string | null;
+  sentiment_analyzed?: boolean | number;
 };
 
 type ArticlesMeta = {
@@ -255,6 +257,7 @@ export default function ArticlesView({
                 <option value="positive">Positive</option>
                 <option value="neutral">Neutral</option>
                 <option value="negative">Negative</option>
+                <option value="unanalyzed">Not analyzed</option>
               </select>
             </label>
           </div>
@@ -307,18 +310,25 @@ export default function ArticlesView({
                 <td>{a.category || "-"}</td>
                 <td>{a.publish_date ? timeAgo(a.publish_date) : "-"}</td>
                 <td>
-                  <span
-                    style={{
-                      color:
-                        a.sentiment_score > 0
-                          ? "var(--accent-green)"
-                          : a.sentiment_score < 0
-                            ? "#ef4444"
-                            : "var(--text-muted)",
-                    }}
-                  >
-                    {a.sentiment_score?.toFixed(2) || "0.00"}
-                  </span>
+                  {a.sentiment_analyzed && a.sentiment_score !== null ? (
+                    <span
+                      style={{
+                        color:
+                          a.sentiment_score > 0
+                            ? "var(--accent-green)"
+                            : a.sentiment_score < 0
+                              ? "#ef4444"
+                              : "var(--text-muted)",
+                      }}
+                      title={a.sentiment_label || "Analyzed sentiment"}
+                    >
+                      {a.sentiment_score.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="sentiment-unavailable" title="Waiting for NLP analysis">
+                      Not analyzed
+                    </span>
+                  )}
                 </td>
                 <td><div className="article-id-actions"><code>{a.article_id}</code><div><button type="button" aria-label={`Copy article ID ${a.article_id}`} onClick={() => void copyArticleId(a.article_id)}>{copiedArticleId === a.article_id ? <Check size={13} /> : <Copy size={13} />} {copiedArticleId === a.article_id ? "Copied" : "Copy"}</button><button type="button" onClick={() => onExplainArticle(a.article_id)}><BrainCircuit size={13} /> Explain NLP</button></div></div></td>
               </tr>

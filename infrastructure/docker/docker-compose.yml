@@ -469,6 +469,7 @@ services:
       - ../../config:/opt/spark-apps/config
       - ../../data_platform/warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
+      - huggingface-cache:/tmp/hf_cache
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081 || exit 1"]
       interval: 30s
@@ -502,9 +503,11 @@ services:
       SPARK_CHECKPOINT_ROOT: /tmp/spark-checkpoints
       RAW_MAX_OFFSETS_PER_TRIGGER: ${RAW_MAX_OFFSETS_PER_TRIGGER:-500}
       NLP_ENABLED: ${NLP_ENABLED:-false}
-      NLP_MAX_OFFSETS_PER_TRIGGER: ${NLP_MAX_OFFSETS_PER_TRIGGER:-50}
-      NLP_PROCESSING_PARTITIONS: ${NLP_PROCESSING_PARTITIONS:-8}
+      NLP_MAX_OFFSETS_PER_TRIGGER: ${NLP_MAX_OFFSETS_PER_TRIGGER:-20}
+      NLP_PROCESSING_PARTITIONS: ${NLP_PROCESSING_PARTITIONS:-2}
       NLP_STREAMING_TRIGGER_INTERVAL: ${NLP_STREAMING_TRIGGER_INTERVAL:-60 seconds}
+      NLP_BACKFILL_WORKERS: ${NLP_BACKFILL_WORKERS:-2}
+      CLICKBAIT_ENABLED: ${CLICKBAIT_ENABLED:-false}
       SOCIAL_MAX_OFFSETS_PER_TRIGGER: ${SOCIAL_MAX_OFFSETS_PER_TRIGGER:-250}
       RAW_STARTING_OFFSETS: ${RAW_STARTING_OFFSETS:-latest}
       GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-10}
@@ -522,6 +525,7 @@ services:
       - ../../config:/opt/spark-apps/config
       - ../../data_platform/warehouse:/opt/spark-apps/warehouse
       - spark-checkpoints:/tmp/spark-checkpoints
+      - huggingface-cache:/tmp/hf_cache
     stop_grace_period: 60s
     restart: unless-stopped
     healthcheck:
@@ -530,6 +534,44 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+
+  sentiment-backfill:
+    profiles: [backfill]
+    build:
+      context: spark
+      dockerfile: Dockerfile
+    container_name: newspulse-sentiment-backfill
+    entrypoint: ["/usr/bin/tini", "-s", "--"]
+    command:
+      - python3
+      - /opt/spark-apps/warehouse/sentiment_backfill.py
+      - --workers
+      - "${NLP_BACKFILL_WORKERS:-2}"
+      - --threads-per-worker
+      - "${NLP_BACKFILL_THREADS_PER_WORKER:-2}"
+      - --batch-size
+      - "${NLP_BACKFILL_BATCH_SIZE:-20}"
+    env_file:
+      - ../../.env
+    environment:
+      PYTHONPATH: /opt/spark-apps
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-newspulse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-admin123}
+      NLP_BACKFILL_WORKERS: ${NLP_BACKFILL_WORKERS:-2}
+      NLP_BACKFILL_THREADS_PER_WORKER: ${NLP_BACKFILL_THREADS_PER_WORKER:-2}
+      NLP_BACKFILL_BATCH_SIZE: ${NLP_BACKFILL_BATCH_SIZE:-20}
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ../../spark:/opt/spark-apps/spark
+      - ../../config:/opt/spark-apps/config
+      - ../../data_platform/warehouse:/opt/spark-apps/warehouse
+      - huggingface-cache:/tmp/hf_cache
+    restart: "no"
 
   frontend:
     build:
@@ -613,6 +655,7 @@ volumes:
   airflow-logs:
   metabase-data:
   spark-checkpoints:
+  huggingface-cache:
   minio-data:
   clickhouse-data:
   qdrant-data:

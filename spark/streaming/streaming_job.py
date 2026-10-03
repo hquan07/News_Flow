@@ -7,6 +7,7 @@ from pyspark.sql import functions as F
 
 from config.spark_config import (
     CHECKPOINT_PATHS,
+    CLICKBAIT_ENABLED,
     NLP_ENABLED,
     NLP_MAX_OFFSETS_PER_TRIGGER,
     NLP_PROCESSING_PARTITIONS,
@@ -114,7 +115,7 @@ def _write_nlp_batch(batch_df: DataFrame, batch_id: int) -> None:
         kw_count = write_keywords_to_clickhouse(batch_df)
         ent_count = write_entities_to_clickhouse(batch_df)
         sent_count = write_sentiment_to_clickhouse(batch_df)
-        clickbait_count = write_clickbait_to_clickhouse(batch_df)
+        clickbait_count = write_clickbait_to_clickhouse(batch_df) if CLICKBAIT_ENABLED else 0
         logger.info(
             f"[NLP enrichment] Batch {batch_id}: {kw_count} keywords, "
             f"{ent_count} entities, {sent_count} sentiment, "
@@ -244,7 +245,10 @@ def main() -> None:
             enriched_stream = apply_keyword_extraction(enriched_stream)
             enriched_stream = apply_ner_extraction(enriched_stream)
             enriched_stream = apply_sentiment_analysis(enriched_stream)
-            enriched_stream = apply_clickbait_detection(enriched_stream)
+            if CLICKBAIT_ENABLED:
+                enriched_stream = apply_clickbait_detection(enriched_stream)
+            else:
+                logger.info("Clickbait inference is disabled by CLICKBAIT_ENABLED=false")
             queries.append(
                 enriched_stream.writeStream.foreachBatch(_write_nlp_batch)
                 .outputMode("append")
