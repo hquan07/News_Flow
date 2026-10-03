@@ -103,6 +103,7 @@ header {
 
 .mode-toggle button.active.news { background: #2563eb; }
 .mode-toggle button.active.social { background: #7c3aed; }
+.mode-toggle button.active.intelligence { background: #0f766e; }
 .mode-toggle button.active.operations { background: #b91c1c; }
 
 .header-account {
@@ -196,6 +197,7 @@ h1 {
 }
 
 .workspace-indicator.social { color: #c4b5fd; }
+.workspace-indicator.intelligence { color: #5eead4; }
 .workspace-indicator.admin { color: #fca5a5; }
 
 .toolbar-actions,

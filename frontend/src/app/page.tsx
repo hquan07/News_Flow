@@ -112,7 +112,7 @@ export default function Home() {
   const [chatIntelligenceScope, setChatIntelligenceScope] = useState<{ event_id?: string; watchlist_id?: string; label: string } | null>(null);
   const chatLauncherRef = useRef<HTMLButtonElement>(null);
   const [dashboardMode, setDashboardMode] = useState<
-    "news" | "social" | "admin"
+    "news" | "social" | "intelligence" | "admin"
   >("news");
   const [selectedSource, setSelectedSource] = useState<string>("");
   const [feed, setFeed] = useState<FeedEvent[]>([]);
@@ -217,6 +217,7 @@ export default function Home() {
     localStorage.removeItem("user_cache");
     setUser(null);
     setChatOpen(false);
+    setDashboardMode("news");
     setActiveTab("overview");
   };
 
@@ -293,8 +294,18 @@ export default function Home() {
   useEffect(() => {
     const savedMode = localStorage.getItem("newsFlowMode");
     const savedTab = localStorage.getItem("newsFlowTab");
-    if (savedMode) setDashboardMode(savedMode as any);
-    if (savedTab) setActiveTab(savedTab === "chat" ? "overview" : savedTab);
+    const migratedTab = savedTab === "chat" ? "overview" : savedTab;
+    const intelligenceTabs = new Set(["intelligence", "briefings", "workspaces"]);
+
+    if (migratedTab && intelligenceTabs.has(migratedTab)) {
+      setDashboardMode("intelligence");
+      setActiveTab(migratedTab);
+    } else {
+      if (savedMode === "news" || savedMode === "social" || savedMode === "intelligence" || savedMode === "admin") {
+        setDashboardMode(savedMode);
+      }
+      if (migratedTab) setActiveTab(migratedTab);
+    }
     setIsInitialized(true);
   }, []);
 
@@ -758,11 +769,8 @@ export default function Home() {
         { id: "network", label: "Network", icon: <Share2 size={18} /> },
         { id: "articles", label: "Latest News", icon: <BookOpen size={18} /> },
         { id: "foryou", label: "For You", icon: <Sparkles size={18} />, featured: true },
-        { id: "intelligence", label: "My Intelligence", icon: <BellRing size={18} />, featured: true },
         { id: "events", label: "Events", icon: <Layers3 size={18} /> },
         { id: "insights", label: "Advanced Insights", icon: <BarChart3 size={18} /> },
-        { id: "briefings", label: "Briefings & Reports", icon: <ClipboardList size={18} /> },
-        { id: "workspaces", label: "Team Workspaces", icon: <Users size={18} /> },
       ]
     : dashboardMode === "social"
       ? [
@@ -772,6 +780,12 @@ export default function Home() {
           { id: "influencers", label: "Top Influencers", icon: <Users size={18} /> },
           { id: "live_social", label: "Live Feed", icon: <Radio size={18} /> },
         ]
+      : dashboardMode === "intelligence"
+        ? [
+            { id: "intelligence", label: "My Intelligence", icon: <BellRing size={18} />, featured: true },
+            { id: "briefings", label: "Briefings & Reports", icon: <ClipboardList size={18} /> },
+            { id: "workspaces", label: "Team Workspaces", icon: <Users size={18} /> },
+          ]
       : [
           ...(hasPermission(user, "system.read") ? [
             { id: "admin_dashboard", label: "Admin Dashboard", icon: <Activity size={18} /> },
@@ -794,8 +808,14 @@ export default function Home() {
         ];
 
   const activeNavigationLabel = navigationItems.find((item) => item.id === activeTab)?.label ?? "Dashboard";
-  const workspaceLabel = dashboardMode === "news" ? "Official News" : dashboardMode === "social" ? "Social Media" : "Operations";
-  const canFilterCurrentView = dashboardMode !== "admin" && Boolean(TAB_FILTER_CAPABILITIES[activeTab]);
+  const workspaceLabel = dashboardMode === "news"
+    ? "Official News"
+    : dashboardMode === "social"
+      ? "Social Media"
+      : dashboardMode === "intelligence"
+        ? "Intelligence"
+        : "Operations";
+  const canFilterCurrentView = (dashboardMode === "news" || dashboardMode === "social") && Boolean(TAB_FILTER_CAPABILITIES[activeTab]);
 
   const handleNavigationChange = (nextTab: string) => {
     setActiveTab(nextTab);
@@ -838,6 +858,18 @@ export default function Home() {
                 }}
               >
                 <MessageSquare size={16} /> Social Media
+              </button>
+              <button
+                type="button"
+                className={dashboardMode === "intelligence" ? "active intelligence" : ""}
+                aria-pressed={dashboardMode === "intelligence"}
+                onClick={() => {
+                  setDashboardMode("intelligence");
+                  setSelectedSource("");
+                  setActiveTab("intelligence");
+                }}
+              >
+                <BellRing size={16} /> Intelligence
               </button>
               {canAccessOperations && (
                 <button
@@ -1131,26 +1163,6 @@ export default function Home() {
             />
           )}
 
-          {activeTab === "intelligence" && dashboardMode === "news" && (
-            <IntelligenceView onAskWatchlist={(item) => {
-              setChatIntelligenceScope({ watchlist_id: item.id, label: item.name });
-              setChatOpen(true);
-            }} onRunQuery={(item) => {
-              setArticleSearchInput(String(item.query || ""));
-              setArticleSearchQuery(String(item.query || ""));
-              setArticleFilters({
-                ...EMPTY_ARTICLE_FILTERS,
-                source: String(item.source || ""),
-                category: String(item.category || ""),
-                entity: String(item.entity || ""),
-                keyword: String(item.keyword || ""),
-                sentiment: String(item.sentiment || ""),
-              });
-              setPage(1);
-              setActiveTab("articles");
-            }} />
-          )}
-
           {activeTab === "events" && dashboardMode === "news" && (
             <EventsView onAsk={(event) => {
               setChatIntelligenceScope({ event_id: event.event_id, label: event.title });
@@ -1159,8 +1171,6 @@ export default function Home() {
           )}
 
           {activeTab === "insights" && dashboardMode === "news" && <InsightsView />}
-          {activeTab === "briefings" && dashboardMode === "news" && <BriefingsView />}
-          {activeTab === "workspaces" && dashboardMode === "news" && <WorkspacesView currentEmail={user.email} />}
 
           {apiError && (
             <div className="error-toast">
@@ -1176,6 +1186,57 @@ export default function Home() {
             </div>
           )}
 
+              </div>
+            </div>
+          )}
+
+          {/* Personal and collaborative intelligence workspace */}
+          {dashboardMode === "intelligence" && (
+            <div className="admin-layout">
+              <DashboardSidebar
+                activeId={activeTab}
+                ariaLabel="Intelligence navigation"
+                items={navigationItems}
+                onChange={handleNavigationChange}
+              />
+              <div className="admin-content">
+                {activeTab === "intelligence" && (
+                  <IntelligenceView onAskWatchlist={(item) => {
+                    setChatIntelligenceScope({ watchlist_id: item.id, label: item.name });
+                    setChatOpen(true);
+                  }} onRunQuery={(item) => {
+                    setArticleSearchInput(String(item.query || ""));
+                    setArticleSearchQuery(String(item.query || ""));
+                    setArticleFilters({
+                      ...EMPTY_ARTICLE_FILTERS,
+                      source: String(item.source || ""),
+                      category: String(item.category || ""),
+                      entity: String(item.entity || ""),
+                      keyword: String(item.keyword || ""),
+                      sentiment: String(item.sentiment || ""),
+                    });
+                    setPage(1);
+                    setDashboardMode("news");
+                    setActiveTab("articles");
+                  }} />
+                )}
+
+                {activeTab === "briefings" && <BriefingsView />}
+                {activeTab === "workspaces" && <WorkspacesView currentEmail={user.email} />}
+
+                {apiError && (
+                  <div className="error-toast">
+                    <AlertTriangle
+                      size={16}
+                      style={{
+                        display: "inline",
+                        verticalAlign: "middle",
+                        marginRight: "0.5rem",
+                      }}
+                    />
+                    {apiError}
+                  </div>
+                )}
               </div>
             </div>
           )}
