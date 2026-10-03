@@ -21,7 +21,7 @@ from api.middleware import (
 from api.logging_config import configure_logging
 from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events, insights
 from api.security import require_permission
 
 settings = get_settings()
@@ -118,6 +118,7 @@ app.include_router(chat.router, prefix=prefix)
 app.include_router(chat_actions.router, prefix=prefix)
 app.include_router(intelligence.router, prefix=prefix)
 app.include_router(events.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(insights.router, prefix=prefix, dependencies=dashboard_access)
 
 
 @app.get("/health", tags=["Health"])

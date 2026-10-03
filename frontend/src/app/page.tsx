@@ -21,6 +21,7 @@ import {
   Sparkles,
   BellRing,
   Layers3,
+  BarChart3,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AccountAvatar from "@/components/AccountAvatar";
@@ -44,6 +45,7 @@ import CrawlerManagementView from "@/components/views/CrawlerManagementView";
 import UserManagementView from "@/components/views/UserManagementView";
 import IntelligenceView from "@/components/views/IntelligenceView";
 import EventsView from "@/components/views/EventsView";
+import InsightsView from "@/components/views/InsightsView";
 import SocialInfluencersView, {
   type SocialInfluencer,
 } from "@/components/views/SocialInfluencersView";
@@ -753,6 +755,7 @@ export default function Home() {
         { id: "foryou", label: "For You", icon: <Sparkles size={18} />, featured: true },
         { id: "intelligence", label: "My Intelligence", icon: <BellRing size={18} />, featured: true },
         { id: "events", label: "Events", icon: <Layers3 size={18} /> },
+        { id: "insights", label: "Advanced Insights", icon: <BarChart3 size={18} /> },
       ]
     : dashboardMode === "social"
       ? [
@@ -1142,6 +1145,8 @@ export default function Home() {
               setChatOpen(true);
             }} />
           )}
+
+          {activeTab === "insights" && dashboardMode === "news" && <InsightsView />}
 
           {apiError && (
             <div className="error-toast">
