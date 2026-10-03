@@ -8,12 +8,19 @@ import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
+from pydantic import BaseModel, Field
 from api.security import require_permission
 from api.services.analytics import _query
+from api.services import source_config
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/crawlers", tags=["Crawler Management"])
+
+
+class SourceSettingsUpdate(BaseModel):
+    enabled: bool | None = None
+    rate_limit_seconds: float | None = Field(default=None, ge=0.2, le=60)
 
 # Airflow REST API config (internal Docker network)
 AIRFLOW_BASE_URL = os.getenv("AIRFLOW_API_URL", "http://airflow-webserver:8080/api/v1")
@@ -110,6 +117,11 @@ async def list_crawlers(user: dict = Depends(require_permission("crawler.read"))
         task_instances = {}
 
     # Build response per spider
+    try:
+        overrides = await source_config.settings_map()
+    except Exception:
+        logger.exception("Unable to load source setting overrides")
+        overrides = {}
     crawlers = []
     for spider_name, info in SPIDER_REGISTRY.items():
         task_id = f"crawl_{spider_name}"
@@ -125,6 +137,8 @@ async def list_crawlers(user: dict = Depends(require_permission("crawler.read"))
             "last_end": ti.get("end_date"),
             "duration_sec": round(ti.get("duration", 0) or 0, 1),
             "try_number": ti.get("try_number", 0),
+            "enabled": overrides.get(spider_name, {}).get("enabled", True),
+            "rate_limit_seconds": overrides.get(spider_name, {}).get("rate_limit_seconds", 2.0),
         })
 
     # Get article counts per source from ClickHouse
@@ -161,6 +175,19 @@ async def list_crawlers(user: dict = Depends(require_permission("crawler.read"))
         "dag_run_id": latest_run.get("dag_run_id"),
         "dag_execution_date": latest_run.get("execution_date"),
     }
+
+
+@router.patch("/{spider_name}/settings")
+async def update_source_settings(
+    spider_name: str,
+    payload: SourceSettingsUpdate,
+    user: dict = Depends(require_permission("crawler.run")),
+):
+    if spider_name not in SPIDER_REGISTRY:
+        raise HTTPException(status_code=404, detail="Crawler source not found")
+    return await source_config.update(
+        spider_name, payload.model_dump(exclude_none=True), user["sub"]
+    )
 
 
 @router.post("/trigger/{spider_name}")

@@ -23,6 +23,7 @@ import {
   Layers3,
   BarChart3,
   ClipboardList,
+  HardDrive,
 } from "lucide-react";
 import LandingHero from "@/components/LandingHero";
 import AccountAvatar from "@/components/AccountAvatar";
@@ -48,6 +49,8 @@ import IntelligenceView from "@/components/views/IntelligenceView";
 import EventsView from "@/components/views/EventsView";
 import InsightsView from "@/components/views/InsightsView";
 import BriefingsView from "@/components/views/BriefingsView";
+import DataOperationsView from "@/components/views/DataOperationsView";
+import WorkspacesView from "@/components/views/WorkspacesView";
 import SocialInfluencersView, {
   type SocialInfluencer,
 } from "@/components/views/SocialInfluencersView";
@@ -759,6 +762,7 @@ export default function Home() {
         { id: "events", label: "Events", icon: <Layers3 size={18} /> },
         { id: "insights", label: "Advanced Insights", icon: <BarChart3 size={18} /> },
         { id: "briefings", label: "Briefings & Reports", icon: <ClipboardList size={18} /> },
+        { id: "workspaces", label: "Team Workspaces", icon: <Users size={18} /> },
       ]
     : dashboardMode === "social"
       ? [
@@ -782,6 +786,7 @@ export default function Home() {
           ] : []),
           ...(hasPermission(user, "system.read") ? [
             { id: "architecture", label: "Architecture", icon: <Server size={18} /> },
+            { id: "data_operations", label: "Data Operations", icon: <HardDrive size={18} /> },
           ] : []),
           ...(canManageUsers ? [
             { id: "users", label: "User Access", icon: <UserCog size={18} /> },
@@ -1021,6 +1026,10 @@ export default function Home() {
             <ArchitectureView />
           )}
 
+          {activeTab === "data_operations" && dashboardMode === "admin" && hasPermission(user, "system.read") && (
+            <DataOperationsView canMutate={hasPermission(user, "crawler.run")} />
+          )}
+
           {apiError && (
             <div className="error-toast">
               <AlertTriangle
@@ -1151,6 +1160,7 @@ export default function Home() {
 
           {activeTab === "insights" && dashboardMode === "news" && <InsightsView />}
           {activeTab === "briefings" && dashboardMode === "news" && <BriefingsView />}
+          {activeTab === "workspaces" && dashboardMode === "news" && <WorkspacesView currentEmail={user.email} />}
 
           {apiError && (
             <div className="error-toast">

@@ -13,6 +13,9 @@ from api.services.chat_actions import ensure_indexes as ensure_chat_action_index
 from api.services.intelligence_store import ensure_indexes as ensure_intelligence_indexes
 from api.services.crisis_store import ensure_indexes as ensure_crisis_indexes
 from api.services.scheduled_reports import ensure_indexes as ensure_report_indexes
+from api.services.source_config import ensure_indexes as ensure_source_indexes
+from api.services.retention import ensure_indexes as ensure_retention_indexes
+from api.services.workspace_store import ensure_indexes as ensure_workspace_indexes
 from api.exceptions import DependencyUnavailableError
 from api.middleware import (
     RequestContextMiddleware,
@@ -22,7 +25,7 @@ from api.middleware import (
 from api.logging_config import configure_logging
 from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events, insights, briefings
+from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events, insights, briefings, operations, retention, workspaces
 from api.security import require_permission
 
 settings = get_settings()
@@ -42,6 +45,9 @@ async def lifespan(app: FastAPI):
             await ensure_intelligence_indexes()
             await ensure_crisis_indexes()
             await ensure_report_indexes()
+            await ensure_source_indexes()
+            await ensure_retention_indexes()
+            await ensure_workspace_indexes()
             yield
     finally:
         metrics_stop.set()
@@ -122,6 +128,9 @@ app.include_router(intelligence.router, prefix=prefix)
 app.include_router(events.router, prefix=prefix, dependencies=dashboard_access)
 app.include_router(insights.router, prefix=prefix, dependencies=dashboard_access)
 app.include_router(briefings.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(operations.router, prefix=prefix)
+app.include_router(retention.router, prefix=prefix)
+app.include_router(workspaces.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])

@@ -14,6 +14,8 @@ type Crawler = {
   last_start?: string | null;
   duration_sec: number;
   total_items: number;
+  enabled: boolean;
+  rate_limit_seconds: number;
 };
 
 export default function CrawlerManagementView({ canRun, canCreateMock }: { canRun: boolean; canCreateMock: boolean }) {
@@ -60,6 +62,17 @@ export default function CrawlerManagementView({ canRun, canCreateMock }: { canRu
     }
   };
 
+  const updateSettings = async (crawler: Crawler, changes: Partial<Pick<Crawler, "enabled" | "rate_limit_seconds">>) => {
+    setTriggering(crawler.spider_name);
+    try {
+      await apiFetch(`${API_BASE}/admin/crawlers/${encodeURIComponent(crawler.spider_name)}/settings`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(changes),
+      });
+      await load();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Failed to update source"); }
+    finally { setTriggering(null); }
+  };
+
   return <div className="crawler-management">
     <section className="glass-panel access-panel">
       <div className="access-panel-header">
@@ -91,8 +104,12 @@ export default function CrawlerManagementView({ canRun, canCreateMock }: { canRu
               <div><dt>Duration</dt><dd>{crawler.duration_sec || 0}s</dd></div>
               <div><dt>Last start</dt><dd>{crawler.last_start ? new Date(crawler.last_start).toLocaleString() : "No run"}</dd></div>
             </dl>
+            <div className="crawler-source-settings">
+              <label><input type="checkbox" checked={crawler.enabled} disabled={!canRun || triggering !== null} onChange={() => void updateSettings(crawler, { enabled: !crawler.enabled })}/> Enabled</label>
+              <label>Delay<select value={crawler.rate_limit_seconds} disabled={!canRun || triggering !== null} onChange={(event) => void updateSettings(crawler, { rate_limit_seconds: Number(event.target.value) })}><option value={1}>1s</option><option value={2}>2s</option><option value={5}>5s</option><option value={10}>10s</option></select></label>
+            </div>
             {canRun && (
-              <button type="button" className="btn btn-primary" onClick={() => void trigger(crawler.spider_name)} disabled={triggering !== null}>
+              <button type="button" className="btn btn-primary" onClick={() => void trigger(crawler.spider_name)} disabled={triggering !== null || !crawler.enabled}>
                 {triggering === crawler.spider_name ? <Loader2 size={15} className="spin" /> : <Play size={15} />}
                 Run now
               </button>

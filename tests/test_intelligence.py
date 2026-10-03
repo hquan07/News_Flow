@@ -5,6 +5,7 @@ from httpx import AsyncClient
 
 from api.security import create_access_token
 from api.services import intelligence_store
+from api.services.crud import _build_article_filters
 from tests.test_chat_foundation import _Collection
 
 
@@ -71,8 +72,13 @@ async def test_saved_query_requires_a_filter(async_client: AsyncClient, intellig
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
-async def test_advanced_sentiment_filter(async_client: AsyncClient):
-    response = await async_client.get("/api/v1/articles?sentiment=positive")
-    assert response.status_code == 200
-    assert [item["article_id"] for item in response.json()["data"]] == ["hash_test_1"]
+def test_advanced_sentiment_filter_is_parameterized():
+    where, params = _build_article_filters(
+        q="AI", entity="VinFast", keyword="xe điện", sentiment="positive"
+    )
+    assert "sentiment.sentiment_label" in where
+    assert "raw_article_entities" in where
+    assert "raw_article_keywords" in where
+    assert params == {
+        "q": "%AI%", "entity": "VinFast", "keyword": "xe điện", "sentiment": "positive"
+    }

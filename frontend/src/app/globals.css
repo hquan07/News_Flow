@@ -3043,6 +3043,40 @@ h1 {
 .briefing-tags { display: flex; flex-wrap: wrap; gap: .35rem; }
 .briefing-tags span { background: rgba(59,130,246,.1); color: #bfdbfe; border-radius: 999px; padding: .2rem .5rem; font-size: .72rem; }
 @media (max-width: 760px) { .briefings-grid { grid-template-columns: 1fr; } .briefings-wide { grid-column: auto; } .briefing-builder form { flex-direction: column; } }
+.crawler-source-settings { display: flex; justify-content: space-between; gap: .6rem; align-items: center; color: var(--text-muted); font-size: .75rem; }
+.crawler-source-settings label { display: flex; align-items: center; gap: .35rem; }
+.crawler-source-settings select { border: 1px solid var(--border-color); background: rgba(15,23,42,.8); color: var(--text-primary); border-radius: .4rem; padding: .3rem; }
+.data-operations-grid { display: grid; grid-template-columns: minmax(18rem, .8fr) minmax(28rem, 1.2fr); gap: 1rem; }
+.operations-wide { grid-column: 1 / -1; }
+.lineage-panel, .retention-panel { padding: 1rem; }
+.lineage-panel h3, .retention-panel h3 { display: flex; align-items: center; gap: .4rem; margin: 0; }
+.lineage-panel form { display: flex; gap: .5rem; margin: .8rem 0; }
+.lineage-panel input, .retention-panel input[type="number"] { min-width: 0; border: 1px solid var(--border-color); background: rgba(15,23,42,.8); color: var(--text-primary); border-radius: .45rem; padding: .5rem; }
+.lineage-panel form input { flex: 1; }
+.lineage-panel button, .retention-panel button { border: 1px solid rgba(59,130,246,.35); background: rgba(59,130,246,.1); color: #bfdbfe; border-radius: .45rem; padding: .45rem .65rem; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; }
+.lineage-flow { display: grid; gap: .45rem; }
+.lineage-stage { display: flex; justify-content: space-between; gap: .5rem; border-left: 3px solid #64748b; padding: .5rem .65rem; background: rgba(15,23,42,.4); }
+.lineage-stage.complete { border-left-color: #10b981; }
+.lineage-stage.missing { border-left-color: #ef4444; }
+.lineage-stage small, .retention-panel p, .retention-panel small { color: var(--text-muted); }
+.retention-panel article { display: grid; grid-template-columns: minmax(8rem, 1fr) 5.5rem auto auto auto; gap: .5rem; align-items: center; border-top: 1px solid var(--border-color); padding: .65rem 0; }
+.retention-panel article > div { display: grid; gap: .2rem; }
+.retention-panel label { display: flex; gap: .3rem; color: var(--text-muted); font-size: .75rem; }
+.retention-panel button.danger { color: #fca5a5; border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
+.workspace-grid { display: grid; grid-template-columns: minmax(15rem, .35fr) minmax(0, 1fr); gap: 1rem; }
+.workspace-wide { grid-column: 1 / -1; }
+.workspace-list, .workspace-detail { padding: 1rem; }
+.workspace-list h3 { display: flex; align-items: center; gap: .4rem; margin: 0 0 .8rem; }
+.workspace-list form, .workspace-detail form { display: flex; gap: .45rem; margin: .7rem 0; }
+.workspace-list input, .workspace-detail input, .workspace-detail select { min-width: 0; flex: 1; border: 1px solid var(--border-color); background: rgba(15,23,42,.8); color: var(--text-primary); border-radius: .45rem; padding: .5rem; }
+.workspace-list button, .workspace-detail button { border: 1px solid rgba(59,130,246,.35); background: rgba(59,130,246,.1); color: #bfdbfe; border-radius: .45rem; padding: .45rem .65rem; cursor: pointer; }
+.workspace-list > button { width: 100%; display: flex; justify-content: space-between; gap: .5rem; margin-top: .4rem; text-align: left; }
+.workspace-list > button.active { border-color: #60a5fa; background: rgba(59,130,246,.18); }
+.workspace-list small, .workspace-detail span, .workspace-detail small, .workspace-detail p { color: var(--text-muted); }
+.workspace-heading h3 { margin: 0; }
+.workspace-members, .workspace-watchlists { display: grid; gap: .35rem; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--border-color); }
+.workspace-watchlists article { display: flex; justify-content: space-between; gap: 1rem; }
+@media (max-width: 900px) { .data-operations-grid, .workspace-grid { grid-template-columns: 1fr; } .retention-panel article { grid-template-columns: 1fr auto; } }
 @media (max-width: 900px) { .intelligence-form { grid-template-columns: 1fr 1fr; } .intelligence-form button { grid-column: 1 / -1; } }
 @media (max-width: 600px) { .intelligence-form { grid-template-columns: 1fr; } .intelligence-form button { grid-column: auto; } .intelligence-list article { align-items: flex-start; flex-direction: column; } }
 
