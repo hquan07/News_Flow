@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.models.retention import RetentionApply, RetentionPolicyUpdate
 from api.routers import crawler_admin
@@ -29,6 +29,8 @@ async def preview(dataset: str, _actor: dict = Depends(require_permission("syste
 @router.post("/{dataset}/apply")
 async def apply_policy(dataset: str, payload: RetentionApply, actor: dict = Depends(require_permission("crawler.run"))):
     result = await retention.preview(dataset)
+    if not result["enabled"]:
+        raise HTTPException(status_code=409, detail="Enable and save this retention policy before applying it")
     run_id = f"retention__{dataset}__{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
     scheduled = await crawler_admin._airflow_post(
         "/dags/newspulse_retention/dagRuns",

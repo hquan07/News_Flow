@@ -1,3 +1,4 @@
+import asyncio
 from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -6,6 +7,7 @@ import pytest
 from httpx import AsyncClient
 
 from api.security import create_access_token
+from api.routers import retention as retention_router
 from api.services import operations, retention, source_config, workspace_store
 from tests.test_chat_foundation import _Collection
 
@@ -59,6 +61,30 @@ async def test_retention_policy_is_disabled_until_configured(monkeypatch):
     await retention.update_policy("articles", 90, True, "operator")
     preview = await retention.preview("articles")
     assert preview == {"dataset": "articles", "retention_days": 90, "rows_to_delete": 25, "enabled": True}
+
+
+def test_disabled_retention_policy_cannot_be_applied(monkeypatch):
+    async def preview(_dataset: str):
+        return {"dataset": "articles", "retention_days": 365, "rows_to_delete": 25, "enabled": False}
+
+    async def unexpected_airflow_call(*_args, **_kwargs):
+        raise AssertionError("Airflow must not be called for a disabled retention policy")
+
+    monkeypatch.setattr(retention_router.retention, "preview", preview)
+    monkeypatch.setattr(retention_router.crawler_admin, "_airflow_post", unexpected_airflow_call)
+
+    async def apply_disabled_policy():
+        return await retention_router.apply_policy(
+            "articles",
+            retention_router.RetentionApply(confirm=True),
+            {"sub": "operator"},
+        )
+
+    with pytest.raises(retention_router.HTTPException) as raised:
+        asyncio.run(apply_disabled_policy())
+
+    assert raised.value.status_code == 409
+    assert raised.value.detail == "Enable and save this retention policy before applying it"
 
 
 @pytest.fixture
