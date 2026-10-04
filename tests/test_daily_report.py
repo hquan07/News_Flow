@@ -5,6 +5,7 @@ from infrastructure.monitoring.daily_report import (
     count_sent_alerts,
     fetch_clickhouse_daily_metrics,
     format_daily_report,
+    resolve_report_date,
 )
 
 
@@ -42,6 +43,18 @@ class FakeCollection:
     def count_documents(self, query):
         self.query = query
         return 6
+
+
+def test_report_date_uses_airflow_data_interval_end_in_local_timezone():
+    interval_end = datetime(2026, 10, 4, 1, 0, tzinfo=timezone.utc)
+
+    assert resolve_report_date(interval_end) == date(2026, 10, 3)
+
+
+def test_report_date_falls_back_to_previous_local_calendar_day():
+    local_now = datetime.fromisoformat("2026-10-04T08:40:00+07:00")
+
+    assert resolve_report_date(None, now=local_now) == date(2026, 10, 3)
 
 
 def test_fetch_clickhouse_daily_metrics_uses_bounded_window():

@@ -1,5 +1,21 @@
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+
+REPORT_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def resolve_report_date(
+    data_interval_end: datetime | None,
+    *,
+    now: datetime | None = None,
+) -> date:
+    """Return the previous local calendar day for an Airflow run."""
+    reference = data_interval_end or now or datetime.now(REPORT_TIMEZONE)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=REPORT_TIMEZONE)
+    return reference.astimezone(REPORT_TIMEZONE).date() - timedelta(days=1)
 
 
 @dataclass(frozen=True)

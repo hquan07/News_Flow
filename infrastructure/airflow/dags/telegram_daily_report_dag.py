@@ -45,12 +45,9 @@ def _crawler_task_counts(start_at: datetime, end_at: datetime) -> tuple[int, int
 
 
 def _resolve_report_date(context: dict) -> date:
-    logical_date = context.get("logical_date")
-    if logical_date is None:
-        local_now = datetime.now(LOCAL_TIMEZONE)
-    else:
-        local_now = logical_date.astimezone(LOCAL_TIMEZONE)
-    return local_now.date() - timedelta(days=1)
+    from monitoring.daily_report import resolve_report_date
+
+    return resolve_report_date(context.get("data_interval_end"))
 
 
 def format_and_send_telegram_report(**context):
