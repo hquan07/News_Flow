@@ -141,11 +141,15 @@ def inject_mock_social_posts(
 def get_crawl_latency(user: dict = Depends(require_permission("system.read"))):
     """Lấy độ trễ trung bình khi cào dữ liệu (từ bài báo xuất bản đến lúc cào)."""
     query = """
-        SELECT source, avg(crawl_latency_minutes) as avg_latency
-        FROM newspulse.raw_articles
-        WHERE crawl_latency_minutes IS NOT NULL
+        SELECT
+            source,
+            sum(crawl_latency_minutes) AS latency_sum,
+            count() AS latency_count
+        FROM newspulse.raw_articles FINAL
+        WHERE isFinite(crawl_latency_minutes)
+          AND crawl_latency_minutes >= 0
         GROUP BY source
-        ORDER BY avg_latency DESC
+        ORDER BY latency_sum / latency_count DESC
     """
     df = _query(query)
     if not df:
@@ -158,12 +162,23 @@ def get_crawl_latency(user: dict = Depends(require_permission("system.read"))):
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    latencies = [round(float(row["avg_latency"]), 2) for row in df]
+    # Keep the overall value weighted by article count. Averaging the source
+    # averages makes the KPI move when a small source is added or removed.
+    total_latency = sum(float(row.get("latency_sum", 0) or 0) for row in df)
+    total_samples = sum(int(row.get("latency_count", 0) or 0) for row in df)
+    latencies = [
+        round(
+            float(row.get("latency_sum", 0) or 0)
+            / int(row.get("latency_count", 0) or 1),
+            2,
+        )
+        for row in df
+    ]
 
     return {
         "sources": [row["source"] for row in df],
         "avg_latency": latencies,
-        "overall_average": round(sum(latencies) / len(latencies), 2),
+        "overall_average": round(total_latency / total_samples, 2) if total_samples else 0,
         "unit": "minutes",
         "sla_target": 5,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -238,17 +253,17 @@ def get_operations_metrics(user: dict = Depends(require_permission("system.read"
     """Return ingestion freshness and NLP coverage for the current article set."""
     row = _query_one("""
         SELECT
-            (SELECT uniqExact(url_hash)
-             FROM newspulse.raw_articles) AS total_articles,
-            (SELECT uniqExact(url_hash)
-             FROM newspulse.raw_articles
-             WHERE loaded_at >= now() - INTERVAL 24 HOUR) AS articles_last_24h,
-            (SELECT max(loaded_at)
-             FROM newspulse.raw_articles) AS latest_loaded_at,
-            (SELECT uniqExact(a.url_hash)
-             FROM newspulse.raw_articles a
-             INNER JOIN newspulse.raw_article_sentiment s
-                 ON a.url_hash = s.url_hash) AS nlp_linked_articles
+            uniqExact(a.url_hash) AS total_articles,
+            uniqExactIf(a.url_hash, a.loaded_at >= now() - INTERVAL 24 HOUR)
+                AS articles_last_24h,
+            max(a.loaded_at) AS latest_loaded_at,
+            uniqExactIf(a.url_hash, notEmpty(s.url_hash)) AS nlp_linked_articles
+        FROM newspulse.raw_articles AS a FINAL
+        LEFT ANY JOIN (
+            SELECT url_hash
+            FROM newspulse.raw_article_sentiment FINAL
+            GROUP BY url_hash
+        ) AS s USING (url_hash)
     """)
 
     total_articles = int(row.get("total_articles", 0) or 0)
