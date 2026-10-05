@@ -76,18 +76,20 @@ services:
       zookeeper:
         condition: service_healthy
     ports:
-      - "${KAFKA_PORT:-9092}:9092"
-      - "${KAFKA_EXT_PORT:-29093}:29092"
+      - "127.0.0.1:${KAFKA_EXT_PORT:-29092}:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:${KAFKA_EXT_PORT:-29092}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_MESSAGE_MAX_BYTES: 10485760
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 10485760
+      KAFKA_COMPRESSION_TYPE: producer
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
@@ -101,41 +103,9 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-    command: >
-      bash -c "
-        echo 'Creating Kafka topics...'
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.general
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.sports
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.tech
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.economy
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.politics
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.entertainment
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.health
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.education
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.world
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic social_posts
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic news.law
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic newspulse.dlq
-        echo 'Done!' && kafka-topics --list --bootstrap-server kafka:9092
-      "
-
-  schema-registry:
-    image: confluentinc/cp-schema-registry:7.5.0
-    restart: unless-stopped
-    depends_on:
-      kafka:
-        condition: service_healthy
-    ports:
-      - "8081:8081"
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:9092'
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
+    volumes:
+      - ../kafka_utils/init_topics.sh:/etc/kafka/init_topics.sh:ro
+    command: ["bash", "/etc/kafka/init_topics.sh"]
 
   # ==================== STORAGE ====================
 

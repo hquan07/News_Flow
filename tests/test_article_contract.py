@@ -22,9 +22,7 @@ def test_producer_event_matches_shared_contract_and_preserves_input():
         "crawl_time": "2026-01-02T12:00:00+00:00",
     }
     original = dict(source)
-    with patch("kafka_utils.producer.KafkaProducer") as factory, patch(
-        "kafka_utils.producer.requests.post"
-    ):
+    with patch("kafka_utils.producer.KafkaProducer") as factory:
         factory.return_value.send.return_value.get.return_value = MagicMock(
             topic="news.tech", partition=0, offset=1
         )

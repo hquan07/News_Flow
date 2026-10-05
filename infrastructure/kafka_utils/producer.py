@@ -2,7 +2,6 @@ import json
 import hashlib
 import logging
 import os
-import requests
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -33,9 +32,8 @@ class ArticleSchema(BaseModel):
     }
 
 class ArticleProducer:
-    def __init__(self, bootstrap_servers: str = "kafka:9092", schema_registry_url: str = "http://schema-registry:8081"):
+    def __init__(self, bootstrap_servers: str = "kafka:9092"):
         self.bootstrap_servers = bootstrap_servers
-        self.schema_registry_url = schema_registry_url
         
         self._producer = KafkaProducer(
             bootstrap_servers=bootstrap_servers,
@@ -48,30 +46,6 @@ class ArticleProducer:
             batch_size=32768,
         )
         
-        # Đăng ký Schema với Schema Registry (nếu registry đang chạy)
-        self._register_schema()
-
-    def _register_schema(self):
-        try:
-            # Lấy JSON Schema chuẩn từ Pydantic
-            schema_dict = ArticleSchema.model_json_schema()
-            payload = {
-                "schemaType": "JSON",
-                "schema": json.dumps(schema_dict)
-            }
-            # Đăng ký schema cho subject "news-value"
-            res = requests.post(
-                f"{self.schema_registry_url}/subjects/news-value/versions",
-                json=payload,
-                timeout=5
-            )
-            if res.status_code == 200:
-                logger.info("Successfully registered JSON Schema to Confluent Schema Registry.")
-            else:
-                logger.warning(f"Failed to register schema: {res.text}")
-        except Exception as e:
-            logger.warning(f"Could not connect to Schema Registry at {self.schema_registry_url}: {e}")
-
     def send_article(self, article: dict) -> bool:
         try:
             article = dict(article)

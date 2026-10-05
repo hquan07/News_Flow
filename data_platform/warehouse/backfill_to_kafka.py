@@ -55,7 +55,7 @@ def run_backfill():
         return
 
     # Use localhost:29092 for Kafka which is exposed to host
-    producer = ArticleProducer(bootstrap_servers="localhost:29092", schema_registry_url="http://localhost:8081")
+    producer = ArticleProducer(bootstrap_servers="localhost:29092")
     
     
     success_count = 0
