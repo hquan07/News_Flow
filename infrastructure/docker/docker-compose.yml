@@ -153,6 +153,7 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
+      - ../monitoring/clickhouse-prometheus.xml:/etc/clickhouse-server/config.d/prometheus.xml:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"]
       interval: 10s
@@ -206,6 +207,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-admin123}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
@@ -711,6 +713,51 @@ services:
       - /var/lib/docker:/var/lib/docker:ro
     command:
       - --docker_only=true
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: postgres:5432/${PG_DB:-newspulse}?sslmode=disable
+      DATA_SOURCE_USER: ${PG_USER:-newspulse}
+      DATA_SOURCE_PASS: ${PG_PASSWORD:-newspulse}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: airflow-db:5432/airflow?sslmode=disable
+      DATA_SOURCE_USER: airflow
+      DATA_SOURCE_PASS: airflow
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.53
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - --mongodb.uri=${MONGO_MONITOR_URI:-mongodb://mongo:27017}
+      - --collect-all
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.9.0
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - --kafka.server=kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
 
 
 volumes:
