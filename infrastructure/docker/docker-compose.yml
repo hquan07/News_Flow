@@ -15,7 +15,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
     AIRFLOW_API_USERNAME: ${AIRFLOW_API_USERNAME:-admin}
     AIRFLOW_API_PASSWORD: ${AIRFLOW_API_PASSWORD:-admin}
-    KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
     MONGO_DB: ${MONGO_DB:-newspulse}
     CLICKHOUSE_HOST: clickhouse
