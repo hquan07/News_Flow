@@ -1,5 +1,6 @@
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark import TaskContext
 import clickhouse_connect
 import time
 from typing import List, Tuple
@@ -15,11 +16,13 @@ from config.spark_config import (
     CLICKHOUSE_USER,
     CLICKHOUSE_PASSWORD,
     CLICKHOUSE_INSERT_BATCH_SIZE,
+    CLICKHOUSE_SINK_PARTITIONS,
     CLICKHOUSE_WRITE_RETRIES,
     RETRY_BASE_DELAY_SECONDS,
     KAFKA_BOOTSTRAP_SERVERS,
     KAFKA_DLQ_TOPIC,
 )
+from spark.streaming.insert_tokens import insert_token
 
 
 def _get_clickhouse_client():
@@ -44,12 +47,13 @@ def write_to_mongodb_batch(df: DataFrame, collection: str = MONGO_PROCESSED_COLL
     )
 
 
-def _insert_chunk(table: str, columns: List[str], data: List[Tuple]) -> None:
+def _insert_chunk(table: str, columns: List[str], data: List[Tuple], token=None) -> None:
     for attempt in range(1, CLICKHOUSE_WRITE_RETRIES + 1):
         client = None
         try:
             client = _get_clickhouse_client()
-            client.insert(table, data, column_names=columns)
+            options = {"settings": {"insert_deduplication_token": token}} if token else {}
+            client.insert(table, data, column_names=columns, **options)
             return
         except Exception:
             if attempt == CLICKHOUSE_WRITE_RETRIES:
@@ -60,23 +64,45 @@ def _insert_chunk(table: str, columns: List[str], data: List[Tuple]) -> None:
                 client.close()
 
 
-def _write_partition(rows, table: str, columns: List[str]) -> None:
+def _write_partition(rows, table: str, columns: List[str], stream_id=None, batch_id=None) -> None:
+    partition_id = TaskContext.get().partitionId() if stream_id is not None else None
+    chunk_index = 0
+
+    def token_for_chunk(index):
+        if stream_id is None:
+            return None
+        return insert_token(stream_id, table, batch_id, partition_id, index)
+
     chunk = []
     for row in rows:
         chunk.append(tuple(row[column] for column in columns))
         if len(chunk) >= CLICKHOUSE_INSERT_BATCH_SIZE:
-            _insert_chunk(table, columns, chunk)
+            _insert_chunk(table, columns, chunk, token_for_chunk(chunk_index))
             chunk = []
+            chunk_index += 1
     if chunk:
-        _insert_chunk(table, columns, chunk)
+        _insert_chunk(table, columns, chunk, token_for_chunk(chunk_index))
 
 
-def write_to_clickhouse_batch(df: DataFrame, table: str):
+def write_to_clickhouse_batch(df: DataFrame, table: str, *, stream_id=None, batch_id=None):
     """Insert one Spark partition at a time without collecting on the driver."""
     if df.isEmpty():
         return
     columns = df.columns
-    df.foreachPartition(lambda rows: _write_partition(rows, table, columns))
+    if stream_id is not None:
+        if batch_id is None:
+            raise ValueError("batch_id is required for deduplicated stream inserts")
+        key = "post_id" if table == "social_sentiment_metrics" else "url_hash"
+        tie_breakers = [
+            column for column in ("keyword", "entity_type", "entity", "kafka_partition", "kafka_offset")
+            if column in columns
+        ]
+        df = df.repartition(CLICKHOUSE_SINK_PARTITIONS, key).sortWithinPartitions(
+            key, *tie_breakers
+        )
+    df.foreachPartition(
+        lambda rows: _write_partition(rows, table, columns, stream_id, batch_id)
+    )
 
 
 def create_dead_letter_writer(df: DataFrame, checkpoint_location: str):
@@ -149,7 +175,9 @@ def create_clickhouse_streaming_writer(df: DataFrame, table: str = "raw_articles
             "crawl_latency_minutes": 0.0
         })
 
-        write_to_clickhouse_batch(output_df, table)
+        write_to_clickhouse_batch(
+            output_df, table, stream_id=f"clickhouse_{table}", batch_id=batch_id
+        )
         logger.info(f"[ClickHouse] Batch {batch_id}: wrote {output_df.count()} records to {table}")
 
     return (

@@ -55,6 +55,10 @@ def _raw_article_output(batch_df: DataFrame) -> DataFrame:
     return (
         batch_df.select(
             F.col("url_hash"),
+            F.coalesce(F.col("event_id"), F.col("url_hash")).alias("event_id"),
+            F.col("kafka_topic"),
+            F.col("kafka_partition"),
+            F.col("kafka_offset"),
             F.col("url"),
             F.coalesce(F.col("title"), F.lit("")).alias("title"),
             content.alias("content"),
@@ -97,7 +101,9 @@ def _write_raw_batch(batch_df: DataFrame, batch_id: int) -> None:
         output_df = _raw_article_output(batch_df).persist()
         try:
             article_count = output_df.count()
-            write_to_clickhouse_batch(output_df, "raw_articles")
+            write_to_clickhouse_batch(
+                output_df, "raw_articles", stream_id="news_raw", batch_id=batch_id
+            )
             logger.info(
                 f"[Raw ingest] Batch {batch_id}: wrote {article_count} records to raw_articles"
             )
@@ -113,10 +119,10 @@ def _write_nlp_batch(batch_df: DataFrame, batch_id: int) -> None:
         if batch_df.isEmpty():
             return
 
-        kw_count = write_keywords_to_clickhouse(batch_df)
-        ent_count = write_entities_to_clickhouse(batch_df)
-        sent_count = write_sentiment_to_clickhouse(batch_df)
-        clickbait_count = write_clickbait_to_clickhouse(batch_df) if CLICKBAIT_ENABLED else 0
+        kw_count = write_keywords_to_clickhouse(batch_df, batch_id=batch_id)
+        ent_count = write_entities_to_clickhouse(batch_df, batch_id=batch_id)
+        sent_count = write_sentiment_to_clickhouse(batch_df, batch_id=batch_id)
+        clickbait_count = write_clickbait_to_clickhouse(batch_df, batch_id=batch_id) if CLICKBAIT_ENABLED else 0
         logger.info(
             f"[NLP enrichment] Batch {batch_id}: {kw_count} keywords, "
             f"{ent_count} entities, {sent_count} sentiment, "
@@ -135,12 +141,15 @@ def _write_social_batch(batch_df: DataFrame, batch_id: int) -> None:
         output_df = (
             batch_df.select(
                 F.col("post_id"),
+                F.col("kafka_topic"),
+                F.col("kafka_partition"),
+                F.col("kafka_offset"),
                 F.col("source"),
                 F.col("title"),
                 F.col("content"),
                 F.col("url"),
                 F.col("author"),
-                F.col("top_comments"),
+                F.coalesce(F.col("top_comments"), F.array().cast("array<string>")).alias("top_comments"),
                 F.col("like_count").cast("int"),
                 F.col("upvote_ratio").cast("float"),
                 F.col("reply_count").cast("int"),
@@ -170,7 +179,9 @@ def _write_social_batch(batch_df: DataFrame, batch_id: int) -> None:
         )
         try:
             post_count = output_df.count()
-            write_to_clickhouse_batch(output_df, "social_sentiment_metrics")
+            write_to_clickhouse_batch(
+                output_df, "social_sentiment_metrics", stream_id="social", batch_id=batch_id
+            )
             logger.info(
                 f"[ClickHouse] Batch {batch_id}: wrote {post_count} records "
                 "to social_sentiment_metrics"

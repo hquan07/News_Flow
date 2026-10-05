@@ -3,6 +3,10 @@ CREATE DATABASE IF NOT EXISTS newspulse;
 -- Raw articles
 CREATE TABLE IF NOT EXISTS newspulse.raw_articles (
     url_hash String,
+    event_id String DEFAULT '',
+    kafka_topic String DEFAULT '',
+    kafka_partition Int32 DEFAULT -1,
+    kafka_offset Int64 DEFAULT -1,
     url String,
     title String,
     content String,
@@ -19,7 +23,14 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_articles (
     crawled_at DateTime,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(loaded_at)
-ORDER BY (url_hash);
+ORDER BY (url_hash)
+SETTINGS non_replicated_deduplication_window = 10000;
+
+ALTER TABLE newspulse.raw_articles ADD COLUMN IF NOT EXISTS event_id String DEFAULT '';
+ALTER TABLE newspulse.raw_articles ADD COLUMN IF NOT EXISTS kafka_topic String DEFAULT '';
+ALTER TABLE newspulse.raw_articles ADD COLUMN IF NOT EXISTS kafka_partition Int32 DEFAULT -1;
+ALTER TABLE newspulse.raw_articles ADD COLUMN IF NOT EXISTS kafka_offset Int64 DEFAULT -1;
+ALTER TABLE newspulse.raw_articles MODIFY SETTING non_replicated_deduplication_window = 10000;
 
 -- Raw keywords
 CREATE TABLE IF NOT EXISTS newspulse.raw_article_keywords (
@@ -28,7 +39,9 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_keywords (
     score Float32,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = MergeTree()
-ORDER BY (url_hash, keyword);
+ORDER BY (url_hash, keyword)
+SETTINGS non_replicated_deduplication_window = 10000;
+ALTER TABLE newspulse.raw_article_keywords MODIFY SETTING non_replicated_deduplication_window = 10000;
 
 -- Raw entities
 CREATE TABLE IF NOT EXISTS newspulse.raw_article_entities (
@@ -38,7 +51,9 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_entities (
     label String,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = MergeTree()
-ORDER BY (url_hash, entity_type, entity);
+ORDER BY (url_hash, entity_type, entity)
+SETTINGS non_replicated_deduplication_window = 10000;
+ALTER TABLE newspulse.raw_article_entities MODIFY SETTING non_replicated_deduplication_window = 10000;
 
 -- Raw sentiment
 CREATE TABLE IF NOT EXISTS newspulse.raw_article_sentiment (
@@ -47,7 +62,9 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_sentiment (
     sentiment_label String,
     loaded_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(loaded_at)
-ORDER BY (url_hash);
+ORDER BY (url_hash)
+SETTINGS non_replicated_deduplication_window = 10000;
+ALTER TABLE newspulse.raw_article_sentiment MODIFY SETTING non_replicated_deduplication_window = 10000;
 
 -- Clickbait enrichment is stored separately so raw ingestion never waits for an LLM.
 CREATE TABLE IF NOT EXISTS newspulse.raw_article_clickbait (
@@ -55,7 +72,9 @@ CREATE TABLE IF NOT EXISTS newspulse.raw_article_clickbait (
     clickbait_score Float32,
     processed_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(processed_at)
-ORDER BY (url_hash);
+ORDER BY (url_hash)
+SETTINGS non_replicated_deduplication_window = 10000;
+ALTER TABLE newspulse.raw_article_clickbait MODIFY SETTING non_replicated_deduplication_window = 10000;
 
 -- Raw AI Summaries (Groq LLM)
 CREATE TABLE IF NOT EXISTS newspulse.raw_article_summaries (
@@ -78,6 +97,12 @@ ORDER BY (url_hash);
 -- Social Sentiment Metrics (Mạng xã hội)
 CREATE TABLE IF NOT EXISTS newspulse.social_sentiment_metrics (
     post_id String,
+    url String DEFAULT '',
+    author String DEFAULT '',
+    top_comments Array(String) DEFAULT [],
+    kafka_topic String DEFAULT '',
+    kafka_partition Int32 DEFAULT -1,
+    kafka_offset Int64 DEFAULT -1,
     source String,
     title String,
     content String,
@@ -91,7 +116,16 @@ CREATE TABLE IF NOT EXISTS newspulse.social_sentiment_metrics (
     loaded_at DateTime DEFAULT now()
 ) ENGINE = ReplacingMergeTree(loaded_at)
 PARTITION BY toYYYYMM(publish_time)
-ORDER BY (source, publish_time, post_id);
+ORDER BY (source, publish_time, post_id)
+SETTINGS non_replicated_deduplication_window = 10000;
+
+ALTER TABLE newspulse.social_sentiment_metrics ADD COLUMN IF NOT EXISTS url String DEFAULT '';
+ALTER TABLE newspulse.social_sentiment_metrics ADD COLUMN IF NOT EXISTS author String DEFAULT '';
+ALTER TABLE newspulse.social_sentiment_metrics ADD COLUMN IF NOT EXISTS top_comments Array(String) DEFAULT [];
+ALTER TABLE newspulse.social_sentiment_metrics ADD COLUMN IF NOT EXISTS kafka_topic String DEFAULT '';
+ALTER TABLE newspulse.social_sentiment_metrics ADD COLUMN IF NOT EXISTS kafka_partition Int32 DEFAULT -1;
+ALTER TABLE newspulse.social_sentiment_metrics ADD COLUMN IF NOT EXISTS kafka_offset Int64 DEFAULT -1;
+ALTER TABLE newspulse.social_sentiment_metrics MODIFY SETTING non_replicated_deduplication_window = 10000;
 
 -- Event Clusters (Topic Modeling)
 CREATE TABLE IF NOT EXISTS newspulse.event_clusters (

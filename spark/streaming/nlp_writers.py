@@ -4,7 +4,7 @@ from pyspark.sql import functions as F
 from spark.streaming.sink_writers import write_to_clickhouse_batch
 
 
-def write_keywords_to_clickhouse(df: DataFrame) -> int:
+def write_keywords_to_clickhouse(df: DataFrame, *, batch_id=None) -> int:
     if df.isEmpty():
         return 0
 
@@ -22,14 +22,16 @@ def write_keywords_to_clickhouse(df: DataFrame) -> int:
         if kw_df.isEmpty():
             return 0
 
-        write_to_clickhouse_batch(kw_df, "raw_article_keywords")
+        write_to_clickhouse_batch(
+            kw_df, "raw_article_keywords", stream_id="news_nlp", batch_id=batch_id
+        )
         return kw_df.count()
     except Exception as e:
         logger.error(f"[Keywords] Failed to write: {e}")
         raise
 
 
-def write_entities_to_clickhouse(df: DataFrame) -> int:
+def write_entities_to_clickhouse(df: DataFrame, *, batch_id=None) -> int:
     if df.isEmpty():
         return 0
 
@@ -48,14 +50,16 @@ def write_entities_to_clickhouse(df: DataFrame) -> int:
         if ent_df.isEmpty():
             return 0
 
-        write_to_clickhouse_batch(ent_df, "raw_article_entities")
+        write_to_clickhouse_batch(
+            ent_df, "raw_article_entities", stream_id="news_nlp", batch_id=batch_id
+        )
         return ent_df.count()
     except Exception as e:
         logger.error(f"[Entities] Failed to write: {e}")
         raise
 
 
-def write_sentiment_to_clickhouse(df: DataFrame) -> int:
+def write_sentiment_to_clickhouse(df: DataFrame, *, batch_id=None) -> int:
     if df.isEmpty():
         return 0
 
@@ -69,14 +73,16 @@ def write_sentiment_to_clickhouse(df: DataFrame) -> int:
         if sentiment_df.isEmpty():
             return 0
 
-        write_to_clickhouse_batch(sentiment_df, "raw_article_sentiment")
+        write_to_clickhouse_batch(
+            sentiment_df, "raw_article_sentiment", stream_id="news_nlp", batch_id=batch_id
+        )
         return sentiment_df.count()
     except Exception as e:
         logger.error(f"[Sentiment] Failed to write: {e}")
         raise
 
 
-def write_clickbait_to_clickhouse(df: DataFrame) -> int:
+def write_clickbait_to_clickhouse(df: DataFrame, *, batch_id=None) -> int:
     if df.isEmpty():
         return 0
 
@@ -90,7 +96,9 @@ def write_clickbait_to_clickhouse(df: DataFrame) -> int:
         if clickbait_df.isEmpty():
             return 0
 
-        write_to_clickhouse_batch(clickbait_df, "raw_article_clickbait")
+        write_to_clickhouse_batch(
+            clickbait_df, "raw_article_clickbait", stream_id="news_nlp", batch_id=batch_id
+        )
         return clickbait_df.count()
     except Exception as e:
         logger.error(f"[Clickbait] Failed to write: {e}")

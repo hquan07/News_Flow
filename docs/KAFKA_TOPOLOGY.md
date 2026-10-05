@@ -36,3 +36,12 @@ changing `RAW_MAX_OFFSETS_PER_TRIGGER`, `NLP_MAX_OFFSETS_PER_TRIGGER`,
 consistently takes longer than its interval indicates an accumulating backlog.
 The raw and NLP queries keep independent checkpoints so NLP can lag without
 blocking raw article storage.
+
+Streaming inserts into ClickHouse use a token derived from query, Spark batch,
+sink partition, and chunk. The sink fixes its repartition count and row order
+before insertion. `non_replicated_deduplication_window=10000` is applied to the
+streaming tables when `clickhouse-init` runs. This protects retries while their
+tokens remain in ClickHouse's finite history; it is not permanent exactly-once
+delivery. Retain Spark checkpoints and keep `CLICKHOUSE_SINK_PARTITIONS` stable
+until all in-flight batches have completed. Raw articles also store the Kafka
+topic, partition, offset, and stable event ID for replay investigation.
