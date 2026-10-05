@@ -697,8 +697,10 @@ services:
     command:
       - --path.rootfs=/host
       - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+)($$|/)
+      - --collector.textfile.directory=/backup-metrics
     volumes:
       - /:/host:ro,rslave
+      - backup-metrics:/backup-metrics:ro
 
   cadvisor:
     image: ghcr.io/google/cadvisor:0.55.1
@@ -759,6 +761,67 @@ services:
       kafka:
         condition: service_healthy
 
+  postgres-backup:
+    image: postgres:16-alpine
+    profiles: [backups]
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${PG_USER:-newspulse}
+      PGPASSWORD: ${PG_PASSWORD:-newspulse}
+      PGDATABASE: ${PG_DB:-newspulse}
+      BACKUP_DATASET: postgres
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      RESTORE_TEST_INTERVAL_SECONDS: ${RESTORE_TEST_INTERVAL_SECONDS:-604800}
+    command: ["sh", "/scripts/postgres_backup.sh"]
+    volumes:
+      - ../monitoring/backup/postgres_backup.sh:/scripts/postgres_backup.sh:ro
+      - postgres-backups:/backups
+      - backup-metrics:/backup-metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-postgres-backup:
+    image: postgres:16-alpine
+    profiles: [backups]
+    restart: unless-stopped
+    environment:
+      PGHOST: airflow-db
+      PGUSER: airflow
+      PGPASSWORD: airflow
+      PGDATABASE: airflow
+      BACKUP_DATASET: airflow-postgres
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      RESTORE_TEST_INTERVAL_SECONDS: ${RESTORE_TEST_INTERVAL_SECONDS:-604800}
+    command: ["sh", "/scripts/postgres_backup.sh"]
+    volumes:
+      - ../monitoring/backup/postgres_backup.sh:/scripts/postgres_backup.sh:ro
+      - airflow-postgres-backups:/backups
+      - backup-metrics:/backup-metrics
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+
+  mongo-backup:
+    image: mongo:7.0
+    profiles: [backups]
+    restart: unless-stopped
+    environment:
+      BACKUP_MONGO_URI: ${MONGO_MONITOR_URI:-mongodb://mongo:27017}
+      BACKUP_MONGO_DB: ${MONGO_DB:-newspulse}
+      BACKUP_DATASET: mongodb
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      RESTORE_TEST_INTERVAL_SECONDS: ${RESTORE_TEST_INTERVAL_SECONDS:-604800}
+    command: ["sh", "/scripts/mongo_backup.sh"]
+    volumes:
+      - ../monitoring/backup/mongo_backup.sh:/scripts/mongo_backup.sh:ro
+      - mongo-backups:/backups
+      - backup-metrics:/backup-metrics
+    depends_on:
+      mongo:
+        condition: service_healthy
+
 
 volumes:
   zookeeper-data:
@@ -776,3 +839,7 @@ volumes:
   prometheus-data:
   alertmanager-data:
   grafana-data:
+  backup-metrics:
+  postgres-backups:
+  airflow-postgres-backups:
+  mongo-backups:

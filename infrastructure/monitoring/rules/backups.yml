@@ -1,0 +1,36 @@
+groups:
+  - name: backup-verification
+    rules:
+      - alert: PostgresBackupMissing
+        expr: absent(newspulse_backup_last_success_timestamp_seconds{dataset="postgres"})
+        for: 30m
+        labels: {severity: critical, component: backup}
+        annotations: {summary: "PostgreSQL backup metrics are missing"}
+      - alert: AirflowPostgresBackupMissing
+        expr: absent(newspulse_backup_last_success_timestamp_seconds{dataset="airflow-postgres"})
+        for: 30m
+        labels: {severity: critical, component: backup}
+        annotations: {summary: "Airflow PostgreSQL backup metrics are missing"}
+      - alert: MongoBackupMissing
+        expr: absent(newspulse_backup_last_success_timestamp_seconds{dataset="mongodb"})
+        for: 30m
+        labels: {severity: critical, component: backup}
+        annotations: {summary: "MongoDB backup metrics are missing"}
+      - alert: BackupStale
+        expr: time() - newspulse_backup_last_success_timestamp_seconds > 26 * 3600
+        for: 15m
+        labels: {severity: critical, component: backup}
+        annotations:
+          summary: "Backup for {{ $labels.dataset }} has not succeeded in 26 hours"
+      - alert: RestoreTestStale
+        expr: time() - newspulse_backup_last_restore_test_timestamp_seconds > 8 * 24 * 3600
+        for: 1h
+        labels: {severity: critical, component: backup}
+        annotations:
+          summary: "No successful restore test for {{ $labels.dataset }} in eight days"
+      - alert: BackupOrRestoreFailed
+        expr: newspulse_backup_last_failure_timestamp_seconds > newspulse_backup_last_success_timestamp_seconds
+        for: 5m
+        labels: {severity: critical, component: backup}
+        annotations:
+          summary: "Backup or restore test failed for {{ $labels.dataset }}"
