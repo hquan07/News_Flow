@@ -34,16 +34,24 @@ class ArticleSchema(BaseModel):
 class ArticleProducer:
     def __init__(self, bootstrap_servers: str = "kafka:9092"):
         self.bootstrap_servers = bootstrap_servers
+        self.published = 0
+        self.failed = 0
+        self.dead_lettered = 0
+        self.delivery_timeout_seconds = int(os.getenv("KAFKA_DELIVERY_TIMEOUT_SECONDS", "120"))
         
         self._producer = KafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v, ensure_ascii=False, default=str).encode('utf-8'),
             key_serializer=lambda k: k.encode("utf-8") if k else None,
             acks="all",
-            retries=3,
+            retries=10,
+            retry_backoff_ms=500,
+            request_timeout_ms=30000,
+            max_block_ms=30000,
             max_in_flight_requests_per_connection=1,
-            linger_ms=50,
+            linger_ms=20,
             batch_size=32768,
+            compression_type="lz4",
         )
         
     def send_article(self, article: dict) -> bool:
@@ -63,7 +71,8 @@ class ArticleProducer:
             key = valid_article.event_id
 
             future = self._producer.send(topic, key=key, value=valid_article.model_dump())
-            record_metadata = future.get(timeout=10)
+            record_metadata = future.get(timeout=self.delivery_timeout_seconds)
+            self.published += 1
 
             logger.info(
                 "Published to %s [partition=%d, offset=%d]: %s",
@@ -74,10 +83,12 @@ class ArticleProducer:
             )
             return True
         except ValidationError as ve:
+            self.failed += 1
             logger.error("Data Quality Error: Article failed schema validation %s: %s", article.get("url"), ve)
             self._send_dead_letter(article, "schema_validation", str(ve))
             return False
-        except KafkaError as e:
+        except (KafkaError, TimeoutError) as e:
+            self.failed += 1
             logger.error("Failed to publish article %s: %s", article.get("url"), e)
             return False
 
@@ -94,7 +105,8 @@ class ArticleProducer:
                     "payload": article,
                     "failed_at": datetime.now(timezone.utc).isoformat(),
                 },
-            ).get(timeout=10)
+            ).get(timeout=self.delivery_timeout_seconds)
+            self.dead_lettered += 1
         except Exception:
             logger.exception("Failed to publish invalid payload to DLQ")
 
@@ -104,6 +116,10 @@ class ArticleProducer:
     def close(self):
         self._producer.flush()
         self._producer.close()
+        logger.info(
+            "Article producer totals: published=%d failed=%d dead_lettered=%d",
+            self.published, self.failed, self.dead_lettered,
+        )
 
     @staticmethod
     def _make_key(url: str) -> str:

@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir \
     psycopg2-binary==2.9.10 \
     pymongo==4.9.2 \
     kafka-python==2.0.2 \
+    "lz4>=4.0,<5.0" \
     loguru==0.7.3 \
     underthesea==6.8.4 \
     regex==2024.11.6 \

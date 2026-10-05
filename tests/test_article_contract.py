@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import jsonschema
+from kafka.errors import KafkaTimeoutError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,3 +38,17 @@ def test_producer_event_matches_shared_contract_and_preserves_input():
     assert topic == "news.tech"
     assert payload["crawled_time"] == source["crawl_time"]
     assert payload["event_id"] == factory.return_value.send.call_args.kwargs["key"]
+
+
+def test_producer_counts_failed_delivery():
+    with patch("kafka_utils.producer.KafkaProducer") as factory:
+        factory.return_value.send.return_value.get.side_effect = KafkaTimeoutError("timeout")
+        producer = ArticleProducer()
+        assert not producer.send_article({
+            "url": "https://example.org/news/2", "title": "Tin",
+            "source": "example", "category": "tech",
+        })
+        assert producer.failed == 1
+        assert producer.published == 0
+        assert factory.call_args.kwargs["compression_type"] == "lz4"
+        assert factory.call_args.kwargs["acks"] == "all"
