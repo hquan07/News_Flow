@@ -207,7 +207,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-admin123}
-      MINIO_PROMETHEUS_AUTH_TYPE: public
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data

@@ -20,8 +20,9 @@ exposes `/metrics` and `/metrics/data`; the latter returns 503 if ClickHouse
 cannot answer its bounded operational query.
 
 Prometheus scrapes node exporter, cAdvisor, FastAPI, two PostgreSQL exporters,
-MongoDB exporter, Kafka exporter, ClickHouse's native endpoint, and MinIO's
-cluster endpoint. Grafana provisions Prometheus as its default data source.
+MongoDB exporter, Kafka exporter, and ClickHouse's native endpoint. MinIO
+scraping is deferred until authenticated access is configured; do not enable
+anonymous MinIO metrics on a published service port. Grafana provisions Prometheus as its default data source.
 The stack uses pinned image tags. Prometheus retains 15 days of metrics.
 
 ## Alert policy
@@ -72,10 +73,9 @@ are not included yet; configure them before treating all data as protected.
   forecasts after a cleanup, ingestion burst, or mount change.
 - MongoDB's standalone server backup is not an atomic cross-collection
   snapshot. Use a replica set and oplog aware backup for a production RPO.
-- The Docker Compose MinIO metrics endpoint is configured as public for
-  Prometheus scraping. Because MinIO port 9000 is also published by this
-  Compose file, restrict that port at the host firewall or place it behind
-  an authenticated proxy before deploying outside a trusted environment.
+- MinIO metrics are not yet scraped. Its API port 9000 is published by this
+  Compose file. Configure an authenticated Prometheus scrape before enabling
+  MinIO alerting; do not expose anonymous metrics on that port.
 - Redis is not deployed here, so Redis alerts do not apply. Container restart
   count, Spark job progress, Airflow task failure metrics, and ClickHouse/MinIO
   restore coverage still need dedicated instrumentation.

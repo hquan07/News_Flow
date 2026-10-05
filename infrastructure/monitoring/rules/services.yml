@@ -19,12 +19,6 @@ groups:
         labels: {severity: critical, component: streaming}
         annotations:
           summary: "Kafka metrics target is unavailable"
-      - alert: MinioMetricsTargetDown
-        expr: up{job="minio"} == 0
-        for: 3m
-        labels: {severity: critical, component: data-platform}
-        annotations:
-          summary: "MinIO metrics target is unavailable"
       - alert: APIErrorRateWarning
         expr: sum(rate(newspulse_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(newspulse_http_requests_total[5m])), 0.001) > 0.01 and on() sum(increase(newspulse_http_requests_total[5m])) >= 20
         for: 5m
