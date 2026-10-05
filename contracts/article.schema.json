@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://newspulse.local/contracts/article-v1",
+  "title": "NewsPulse article event v1",
+  "type": "object",
+  "required": ["schema_version", "event_type", "event_id", "url", "title", "content", "source", "category", "crawled_time"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_type": {"const": "article"},
+    "event_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+    "url": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "content": {"type": "string"},
+    "source": {"type": "string", "minLength": 1},
+    "category": {"type": "string", "minLength": 1},
+    "author": {"type": ["string", "null"]},
+    "publish_time": {"type": ["string", "null"]},
+    "crawled_time": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": true
+}

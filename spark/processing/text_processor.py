@@ -66,7 +66,7 @@ def apply_text_cleaning(df: DataFrame) -> DataFrame:
             )
         )
         .withColumn("publish_hour", F.hour(F.col("publish_timestamp")))
-        .withColumn("crawled_timestamp", F.to_timestamp(F.col("crawl_time")))
+        .withColumn("crawled_timestamp", F.to_timestamp(F.col("crawled_time")))
         .withColumn(
             "crawl_latency_minutes",
             F.when(

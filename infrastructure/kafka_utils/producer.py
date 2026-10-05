@@ -8,7 +8,7 @@ from typing import Optional
 
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
-from pydantic import BaseModel, HttpUrl, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from kafka_utils import get_topic
 
@@ -16,14 +16,17 @@ logger = logging.getLogger(__name__)
 KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "newspulse.dlq")
 
 class ArticleSchema(BaseModel):
-    url: str
-    title: str = Field(..., min_length=0)
-    content: str = Field(..., min_length=0)
+    schema_version: int = 1
+    event_type: str = "article"
+    event_id: str
+    url: str = Field(..., min_length=1)
+    title: str = Field(..., min_length=1)
+    content: str = ""
     author: Optional[str] = None
     publish_time: Optional[str] = None
-    crawled_time: Optional[str] = None
-    source: str
-    category: str
+    crawled_time: str = Field(..., min_length=1)
+    source: str = Field(..., min_length=1)
+    category: str = Field(..., min_length=1)
 
     model_config = {
         "extra": "allow"
@@ -71,19 +74,19 @@ class ArticleProducer:
 
     def send_article(self, article: dict) -> bool:
         try:
+            article = dict(article)
             # Data Quality Guard: Validate trước khi gửi
-            if "crawl_time" not in article and "crawled_time" not in article:
-                article["crawled_time"] = datetime.now(timezone.utc).isoformat()
-            
-            # Đổi key crawl_time thành crawled_time cho khớp schema (nếu có)
             if "crawl_time" in article:
                 article["crawled_time"] = article.pop("crawl_time")
+            if not article.get("crawled_time"):
+                article["crawled_time"] = datetime.now(timezone.utc).isoformat()
+            article["event_id"] = self._make_key(str(article.get("url", "")))
 
             # Validate bằng Pydantic (Đảm bảo chuẩn Schema)
             valid_article = ArticleSchema(**article)
             
             topic = get_topic(valid_article.category)
-            key = self._make_key(valid_article.url)
+            key = valid_article.event_id
 
             future = self._producer.send(topic, key=key, value=valid_article.model_dump())
             record_metadata = future.get(timeout=10)

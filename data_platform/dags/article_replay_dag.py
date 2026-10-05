@@ -1,21 +1,12 @@
 """Replay one warehouse article through Kafka and downstream NLP."""
 
-import json
 import os
 from datetime import datetime, timedelta
 
 import clickhouse_connect
 from airflow import DAG
 from airflow.operators.python import PythonOperator, get_current_context
-from kafka import KafkaProducer
-
-
-TOPICS = {
-    "sports": "news.sports", "tech": "news.tech", "economy": "news.economy",
-    "politics": "news.politics", "entertainment": "news.entertainment",
-    "health": "news.health", "education": "news.education", "world": "news.world",
-    "law": "news.law",
-}
+from kafka_utils.producer import ArticleProducer
 
 
 def replay_article():
@@ -40,16 +31,9 @@ def replay_article():
     article = rows[0]
     article["crawled_time"] = article.pop("crawled_at", None)
     article["replay"] = {"original_article_id": article_id, "replayed_at": datetime.utcnow().isoformat()}
-    producer = KafkaProducer(
-        bootstrap_servers=os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"),
-        value_serializer=lambda value: json.dumps(value, ensure_ascii=False, default=str).encode(),
-        key_serializer=lambda value: value.encode(), acks="all", retries=3,
-    )
-    try:
-        producer.send(TOPICS.get(str(article.get("category", "")).lower(), "news.general"), key=article_id, value=article).get(timeout=15)
-        producer.flush()
-    finally:
-        producer.close()
+    with ArticleProducer(os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")) as producer:
+        if not producer.send_article(article):
+            raise RuntimeError(f"Could not replay article {article_id}")
 
 
 with DAG(

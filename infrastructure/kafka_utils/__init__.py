@@ -20,6 +20,7 @@ CATEGORY_TOPIC_MAP: dict[str, str] = {
     "số hóa": f"{PREFIX}.tech",
     "so-hoa": f"{PREFIX}.tech",
     "technology": f"{PREFIX}.tech",
+    "tech": f"{PREFIX}.tech",
 
     "kinh doanh": f"{PREFIX}.economy",
     "kinh-doanh": f"{PREFIX}.economy",

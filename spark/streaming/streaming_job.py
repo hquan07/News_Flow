@@ -46,10 +46,10 @@ def _raw_article_output(batch_df: DataFrame) -> DataFrame:
     )
     publish_time = F.coalesce(
         parsed_publish_time,
-        F.to_timestamp(F.col("crawl_time")),
+        F.to_timestamp(F.col("crawled_time")),
         F.current_timestamp(),
     )
-    crawled_at = F.coalesce(F.to_timestamp(F.col("crawl_time")), F.current_timestamp())
+    crawled_at = F.coalesce(F.to_timestamp(F.col("crawled_time")), F.current_timestamp())
 
     return (
         batch_df.select(
@@ -69,9 +69,9 @@ def _raw_article_output(batch_df: DataFrame) -> DataFrame:
             F.lit(0).cast("int").alias("keyword_count"),
             F.hour(publish_time).cast("short").alias("publish_hour"),
             F.when(
-                parsed_publish_time.isNotNull() & F.to_timestamp(F.col("crawl_time")).isNotNull(),
+                parsed_publish_time.isNotNull() & F.to_timestamp(F.col("crawled_time")).isNotNull(),
                 (
-                    F.unix_timestamp(F.to_timestamp(F.col("crawl_time")))
+                    F.unix_timestamp(F.to_timestamp(F.col("crawled_time")))
                     - F.unix_timestamp(parsed_publish_time)
                 )
                 / 60,

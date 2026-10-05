@@ -13,6 +13,9 @@ from config.spark_config import (
 )
 
 ARTICLE_SCHEMA = StructType([
+    StructField("schema_version", StringType(), True),
+    StructField("event_type", StringType(), True),
+    StructField("event_id", StringType(), True),
     StructField("url", StringType(), False),
     StructField("title", StringType(), False),
     StructField("content", StringType(), True),
@@ -21,6 +24,7 @@ ARTICLE_SCHEMA = StructType([
     StructField("source", StringType(), True),
     StructField("author", StringType(), True),
     StructField("publish_time", StringType(), True),
+    StructField("crawled_time", StringType(), True),
     StructField("crawl_time", StringType(), True),
     StructField("description", StringType(), True),
     StructField("tags", ArrayType(StringType()), True),
@@ -76,6 +80,8 @@ def create_kafka_stream(
             "kafka_timestamp", "raw_payload", "parse_error", "article.*",
         )
         .withColumn("url_hash", md5_hash_udf(F.col("url")))
+        .withColumn("crawled_time", F.coalesce(F.col("crawled_time"), F.col("crawl_time")))
+        .drop("crawl_time")
         .drop("raw_html")
     )
 
@@ -158,5 +164,7 @@ def create_kafka_batch(spark: SparkSession) -> DataFrame:
         .select("kafka_topic", "kafka_timestamp", "article.*")
         .filter(F.col("url").isNotNull() & F.col("title").isNotNull())
         .withColumn("url_hash", md5_hash_udf(F.col("url")))
+        .withColumn("crawled_time", F.coalesce(F.col("crawled_time"), F.col("crawl_time")))
+        .drop("crawl_time")
         .drop("raw_html")
     )
