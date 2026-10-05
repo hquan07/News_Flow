@@ -35,3 +35,5 @@ data_platform/warehouse/articles_dump.json
 
 # Local recovery archives
 backups/
+
+docs/
