@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { Camera, Fingerprint, Mail, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
 import type { CachedUser } from "@/lib/auth-storage";
+import Modal from "@/components/ui/Modal";
 
 type Props = {
   user: CachedUser;
@@ -42,6 +44,7 @@ async function prepareAvatar(file: File): Promise<string> {
 
 export default function AccountAvatar({ user, onChange, onLogout }: Props) {
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -52,6 +55,10 @@ export default function AccountAvatar({ user, onChange, onLogout }: Props) {
   const displayName = typeof user.full_name === "string" && user.full_name.trim()
     ? user.full_name
     : user.email;
+  const accountId = typeof user.id === "string" && user.id ? user.id : "Chưa có thông tin";
+  const permissions = Array.isArray(user.permissions)
+    ? user.permissions.filter((permission): permission is string => typeof permission === "string")
+    : [];
 
   useEffect(() => {
     if (!open) return;
@@ -118,12 +125,74 @@ export default function AccountAvatar({ user, onChange, onLogout }: Props) {
         <span>{user.email}</span>
         <span className="role-badge">{user.role ?? "user"}</span>
       </div>
+      <button
+        type="button"
+        role="menuitem"
+        className="account-avatar-profile"
+        onClick={() => {
+          setError(null);
+          setOpen(false);
+          setProfileOpen(true);
+        }}
+      >
+        <UserRound size={16} /> Hồ sơ cá nhân
+      </button>
       <button type="button" role="menuitem" disabled={busy} onClick={() => inputRef.current?.click()}>Tải ảnh đại diện lên</button>
       {avatar && <button type="button" role="menuitem" disabled={busy} onClick={removeAvatar}>Xóa ảnh đại diện</button>}
       {onLogout && <button type="button" role="menuitem" className="account-avatar-logout" onClick={onLogout}>Đăng xuất</button>}
       {busy && <div className="account-avatar-status" role="status">Đang lưu ảnh…</div>}
       {error && <div className="account-avatar-error" role="alert">{error}</div>}
     </div>}
+
+    <Modal
+      open={profileOpen}
+      onClose={() => setProfileOpen(false)}
+      title="Hồ sơ cá nhân"
+      ariaLabelledBy="profile-modal-title"
+      className="profile-modal"
+    >
+      <section className="profile-summary">
+        <div className="profile-avatar" aria-hidden="true">
+          {avatar ? <Image src={avatar} alt="" width={72} height={72} unoptimized /> : user.email.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <h3>{displayName}</h3>
+          <p>{user.email}</p>
+          <span className="role-badge">{user.role ?? "user"}</span>
+        </div>
+      </section>
+
+      <section className="profile-details" aria-label="Thông tin tài khoản">
+        <h3>Thông tin tài khoản</h3>
+        <dl>
+          <div><dt><UserRound size={16} /> Họ và tên</dt><dd>{displayName}</dd></div>
+          <div><dt><Mail size={16} /> Email</dt><dd>{user.email}</dd></div>
+          <div><dt><ShieldCheck size={16} /> Vai trò</dt><dd className="profile-role">{user.role ?? "user"}</dd></div>
+          <div><dt><Fingerprint size={16} /> Mã tài khoản</dt><dd className="profile-account-id">{accountId}</dd></div>
+        </dl>
+      </section>
+
+      <section className="profile-permissions" aria-label="Quyền truy cập">
+        <h3>Quyền truy cập <span>{permissions.length}</span></h3>
+        {permissions.length > 0 ? (
+          <div className="profile-permission-list">
+            {permissions.map((permission) => <span key={permission}>{permission}</span>)}
+          </div>
+        ) : <p>Chưa có quyền truy cập bổ sung.</p>}
+      </section>
+
+      <div className="profile-actions">
+        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
+          <Camera size={16} /> Đổi ảnh đại diện
+        </button>
+        {avatar && <button type="button" className="profile-remove-avatar" disabled={busy} onClick={() => void removeAvatar()}>
+          <Trash2 size={16} /> Xóa ảnh
+        </button>}
+      </div>
+      {busy && <div className="account-avatar-status" role="status">Đang lưu ảnh…</div>}
+      {error && <div className="account-avatar-error" role="alert">{error}</div>}
+    </Modal>
+
     <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Chọn ảnh đại diện" className="account-avatar-input" onChange={(event) => { void chooseFile(event.target.files?.[0]); }} />
   </div>;
 }
