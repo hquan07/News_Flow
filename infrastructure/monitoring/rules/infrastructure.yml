@@ -1,0 +1,57 @@
+groups:
+  - name: host-resources
+    rules:
+      - alert: HostCPUWarning
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 70
+        for: 10m
+        labels: {severity: warning, component: infrastructure}
+        annotations:
+          summary: "Host CPU above 70% for 10 minutes"
+      - alert: HostCPUCritical
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 90
+        for: 5m
+        labels: {severity: critical, component: infrastructure}
+        annotations:
+          summary: "Host CPU above 90% for 5 minutes"
+      - alert: HostMemoryWarning
+        expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 75
+        for: 10m
+        labels: {severity: warning, component: infrastructure}
+        annotations:
+          summary: "Host memory above 75% for 10 minutes"
+      - alert: HostMemoryCritical
+        expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 90
+        for: 5m
+        labels: {severity: critical, component: infrastructure}
+        annotations:
+          summary: "Host memory above 90% for 5 minutes"
+      - alert: HostDiskWarning
+        expr: 100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}) > 70
+        for: 10m
+        labels: {severity: warning, component: infrastructure}
+        annotations:
+          summary: "Host root filesystem above 70%"
+      - alert: HostDiskCritical
+        expr: 100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}) > 85
+        for: 5m
+        labels: {severity: critical, component: infrastructure}
+        annotations:
+          summary: "Host root filesystem above 85%"
+      - alert: HostDiskEmergency
+        expr: 100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}) > 95
+        for: 1m
+        labels: {severity: emergency, component: infrastructure}
+        annotations:
+          summary: "Host root filesystem above 95%"
+      - alert: HostNetworkErrors
+        expr: sum by (instance) (rate(node_network_receive_errs_total{device!~"lo|veth.*"}[5m]) + rate(node_network_transmit_errs_total{device!~"lo|veth.*"}[5m])) > 1
+        for: 10m
+        labels: {severity: warning, component: infrastructure}
+        annotations:
+          summary: "Host network errors exceed one per second"
+      - alert: ContainerMemoryNearLimit
+        expr: 100 * sum by (name) (container_memory_working_set_bytes{name!=""}) / sum by (name) (container_spec_memory_limit_bytes{name!=""} > 0) > 90
+        for: 5m
+        labels: {severity: critical, component: infrastructure}
+        annotations:
+          summary: "Container memory is above 90% of its limit"

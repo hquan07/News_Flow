@@ -687,6 +687,31 @@ services:
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
 
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.12.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+)($$|/)
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:0.55.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    command:
+      - --docker_only=true
+
 
 volumes:
   zookeeper-data:
