@@ -12,7 +12,7 @@ DOWNLOAD_DELAY = float(os.getenv("CRAWL_RATE_LIMIT", 0.5))
 RANDOMIZE_DOWNLOAD_DELAY = True
 DOWNLOAD_TIMEOUT = 30
 CONCURRENT_ITEMS = int(os.getenv("CRAWL_CONCURRENT_ITEMS", 100))
-RSS_MAX_AGE_HOURS = float(os.getenv("RSS_MAX_AGE_HOURS", 6))
+RSS_MAX_AGE_HOURS = float(os.getenv("RSS_MAX_AGE_HOURS", 1))
 PERSISTENT_DEDUP_ENABLED = os.getenv("PERSISTENT_DEDUP_ENABLED", "true").lower() == "true"
 
 # User Agent
@@ -22,6 +22,7 @@ USER_AGENT = os.getenv("USER_AGENT", "NewsPulse/1.0 (+https://github.com/newspul
 ITEM_PIPELINES = {
     "newspulse_crawler.pipelines.DedupPipeline": 100,
     "newspulse_crawler.pipelines.CleanTextPipeline": 200,
+    "newspulse_crawler.pipelines.FreshnessPipeline": 225,
     "newspulse_crawler.pipelines.MinIOPipeline": 250,
     "newspulse_crawler.pipelines.KafkaPipeline": 300,
     # Mongo is the completion marker used by persistent URL deduplication.
@@ -49,6 +50,7 @@ HTTPCACHE_ENABLED = True
 HTTPCACHE_EXPIRATION_SECS = 300
 HTTPCACHE_POLICY = "scrapy.extensions.httpcache.RFC2616Policy"
 HTTPCACHE_STORAGE = "scrapy.extensions.httpcache.FilesystemCacheStorage"
+HTTPCACHE_DIR = os.getenv("HTTPCACHE_DIR", "/tmp/newspulse-httpcache")
 
 # Retry
 RETRY_ENABLED = True

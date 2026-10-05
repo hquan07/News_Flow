@@ -65,6 +65,11 @@ class BaseNewsSpider(scrapy.Spider):
 
     def _is_fresh_rss_item(self, published_at: str | None) -> bool:
         """Skip stale RSS entries while retaining entries with unknown dates."""
+        return self._is_fresh_published_at(published_at, "rss_items/stale_skipped")
+
+    def _is_fresh_published_at(
+        self, published_at: str | None, stat_key: str
+    ) -> bool:
         if not published_at:
             return True
 
@@ -80,11 +85,11 @@ class BaseNewsSpider(scrapy.Spider):
         if published.tzinfo is None:
             published = published.replace(tzinfo=ZoneInfo("Asia/Ho_Chi_Minh"))
 
-        max_age_hours = self.crawler.settings.getfloat("RSS_MAX_AGE_HOURS", 6.0)
+        max_age_hours = self.crawler.settings.getfloat("RSS_MAX_AGE_HOURS", 1.0)
         age_seconds = (datetime.now(timezone.utc) - published.astimezone(timezone.utc)).total_seconds()
         is_fresh = age_seconds <= max_age_hours * 3600
         if not is_fresh:
-            self.crawler.stats.inc_value("rss_items/stale_skipped")
+            self.crawler.stats.inc_value(stat_key)
         return is_fresh
 
     def _build_item(

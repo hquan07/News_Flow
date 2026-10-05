@@ -139,14 +139,15 @@ def inject_mock_social_posts(
 
 @router.get("/metrics/latency")
 def get_crawl_latency(user: dict = Depends(require_permission("system.read"))):
-    """Lấy độ trễ trung bình khi cào dữ liệu (từ bài báo xuất bản đến lúc cào)."""
+    """Return operational crawl latency for articles published in the last hour."""
     query = """
         SELECT
             source,
             sum(crawl_latency_minutes) AS latency_sum,
             count() AS latency_count
         FROM newspulse.raw_articles FINAL
-        WHERE isFinite(crawl_latency_minutes)
+        WHERE publish_time >= now() - INTERVAL 60 MINUTE
+          AND isFinite(crawl_latency_minutes)
           AND crawl_latency_minutes >= 0
         GROUP BY source
         ORDER BY latency_sum / latency_count DESC
@@ -157,6 +158,8 @@ def get_crawl_latency(user: dict = Depends(require_permission("system.read"))):
             "sources": [],
             "avg_latency": [],
             "overall_average": 0,
+            "sample_count": 0,
+            "window_minutes": 60,
             "unit": "minutes",
             "sla_target": 5,
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -179,6 +182,8 @@ def get_crawl_latency(user: dict = Depends(require_permission("system.read"))):
         "sources": [row["source"] for row in df],
         "avg_latency": latencies,
         "overall_average": round(total_latency / total_samples, 2) if total_samples else 0,
+        "sample_count": total_samples,
+        "window_minutes": 60,
         "unit": "minutes",
         "sla_target": 5,
         "generated_at": datetime.now(timezone.utc).isoformat(),

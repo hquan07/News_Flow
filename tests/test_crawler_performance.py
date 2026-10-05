@@ -4,11 +4,14 @@ from pathlib import Path
 from types import SimpleNamespace
 import sys
 
+import pytest
 from scrapy import Request
+from scrapy.exceptions import DropItem
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "crawlers"))
 
 from newspulse_crawler.middlewares import ExistingUrlFilterMiddleware
+from newspulse_crawler.pipelines import FreshnessPipeline
 from newspulse_crawler.spiders.vnexpress import VnExpressSpider
 from newspulse_crawler import setting
 
@@ -75,3 +78,20 @@ def test_mongo_marks_completion_only_after_kafka_publish():
     assert pipelines["newspulse_crawler.pipelines.KafkaPipeline"] < pipelines[
         "newspulse_crawler.pipelines.MongoPipeline"
     ]
+
+
+def test_freshness_pipeline_drops_stale_article_after_page_parse():
+    spider = _spider(max_age_hours=1)
+    stale = format_datetime(datetime.now(timezone.utc) - timedelta(hours=2))
+
+    with pytest.raises(DropItem):
+        FreshnessPipeline().process_item(
+            {"url": "https://example.com/stale.html", "publish_time": stale},
+            spider,
+        )
+
+    assert spider.crawler.stats.values["items/stale_dropped"] == 1
+
+
+def test_http_cache_uses_writable_runtime_directory():
+    assert setting.HTTPCACHE_DIR.startswith("/tmp/")

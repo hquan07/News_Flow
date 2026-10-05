@@ -17,7 +17,7 @@ interface VolumeGroup {
 }
 
 interface AdminViewProps {
-  adminLatency: { sources: string[]; avg_latency: number[]; overall_average: number; sla_target: number; generated_at?: string } | null;
+  adminLatency: { sources: string[]; avg_latency: number[]; overall_average: number; sample_count?: number; window_minutes?: number; sla_target: number; generated_at?: string } | null;
   adminClickbait: { news: VolumeGroup; social: VolumeGroup; generated_at?: string } | null;
   adminUsers: { total_users: number; standard_users: number; admin_users: number; generated_at?: string } | null;
   adminHealth: { status: string; services: Record<string, { status: string; latency_ms?: number }>; generated_at?: string } | null;
@@ -93,7 +93,9 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
   const healthDetails = Object.entries(adminHealth?.services ?? {}).map(([name, service]) => `${name}: ${service.status}${service.latency_ms ? ` (${service.latency_ms} ms)` : ""}`).join(" · ");
   const generatedAt = adminLatency?.generated_at ?? adminClickbait?.generated_at ?? updatedAt;
   const latency = Number(adminLatency?.overall_average ?? 0);
-  const latencyTone = latency > Number(adminLatency?.sla_target ?? 5) ? "warning" : "default";
+  const latencySamples = Number(adminLatency?.sample_count ?? 0);
+  const hasLatencySamples = latencySamples > 0;
+  const latencyTone = hasLatencySamples && latency > Number(adminLatency?.sla_target ?? 5) ? "warning" : "default";
   const coverage = Number(adminOperations?.nlp_coverage_pct ?? 0);
   const coverageTone = coverage >= 95 ? "success" : coverage >= 70 ? "warning" : "danger";
   const freshness = adminOperations?.freshness_minutes;
@@ -135,7 +137,7 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
         { label: "All warehouse articles", value: Number(adminOperations?.total_articles ?? 0).toLocaleString() },
         { label: "Latest ingest", value: adminOperations?.latest_loaded_at ? formatDateTime(adminOperations.latest_loaded_at) : "Unavailable" },
       ]} />} />
-      <MetricCard {...interactiveMetric("latency")} label="Average crawl latency" value={`${latency.toFixed(1)} min`} hint={`SLA target ≤ ${adminLatency?.sla_target ?? 5} min`} loading={adminLatency === null} tone={latencyTone} details={<DetailList rows={topRows(latencyRows, "source", "latency", " min")} emptyMessage="No crawl latency samples" />} />
+      <MetricCard {...interactiveMetric("latency")} label="Average crawl latency" value={hasLatencySamples ? `${latency.toFixed(1)} min` : "No data"} hint={`${latencySamples.toLocaleString()} samples · last ${adminLatency?.window_minutes ?? 60} min · SLA ≤ ${adminLatency?.sla_target ?? 5} min`} loading={adminLatency === null} tone={latencyTone} details={<DetailList rows={topRows(latencyRows, "source", "latency", " min")} emptyMessage="No articles published in the current latency window" />} />
       <MetricCard {...interactiveMetric("nlp")} label="NLP coverage" value={formatPercent(coverage)} hint={`${formatCompactNumber(adminOperations?.nlp_linked_articles ?? 0)} of ${formatCompactNumber(adminOperations?.total_articles ?? 0)} articles`} loading={adminOperations === null} tone={coverageTone} details={<DetailList rows={[
         { label: "NLP enriched", value: Number(adminOperations?.nlp_linked_articles ?? 0).toLocaleString() },
         { label: "Pending NLP", value: Math.max(Number(adminOperations?.total_articles ?? 0) - Number(adminOperations?.nlp_linked_articles ?? 0), 0).toLocaleString() },
@@ -158,7 +160,7 @@ export default function AdminView({ adminLatency, adminClickbait, adminUsers, ad
     </section>
 
     <div className="charts-grid">
-      <ChartCard wide title={<><Activity size={20} /> Crawl Latency by Source</>} description="Which sources exceed the crawl-latency service target?" timeRange="Current aggregate" unit="Minutes" total={latencyRows.length} updatedAt={generatedAt}>
+      <ChartCard wide title={<><Activity size={20} /> Crawl Latency by Source</>} description="Which sources exceed the crawl-latency service target?" timeRange={`Articles published in the last ${adminLatency?.window_minutes ?? 60} minutes`} unit="Minutes" total={latencyRows.length} updatedAt={generatedAt}>
         {adminLatency === null ? <ChartSkeleton /> : latencyRows.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={latencyRows} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.1)" /><XAxis dataKey="source" stroke="#94a3b8" fontSize={11} interval="preserveStartEnd" /><YAxis stroke="#94a3b8" fontSize={11} unit="m" allowDecimals={false} /><Tooltip cursor={false} formatter={(value) => [<ColoredTooltipValue key="value" color={latencyColor(Number(value), adminLatency.sla_target ?? 5)}>{Number(value).toFixed(2)} minutes</ColoredTooltipValue>, "Average latency"]} contentStyle={DARK_TOOLTIP_CONTENT_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE} labelStyle={DARK_TOOLTIP_ITEM_STYLE} /><ReferenceLine y={adminLatency.sla_target ?? 5} stroke="#f59e0b" strokeDasharray="5 5" label={{ value: `SLA ${adminLatency.sla_target ?? 5}m`, fill: "#fbbf24", fontSize: 11 }} /><Bar dataKey="latency" name="Average latency">{latencyRows.map((row) => <Cell key={row.source} fill={latencyColor(Number(row.latency), adminLatency.sla_target ?? 5)} />)}</Bar></BarChart></ResponsiveContainer> : <EmptyState message="No latency data" />}
       </ChartCard>
 

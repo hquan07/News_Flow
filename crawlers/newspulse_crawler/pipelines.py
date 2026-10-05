@@ -46,6 +46,24 @@ class CleanTextPipeline:
         return item
 
 
+class FreshnessPipeline:
+    """Drop stale news after parsing the article's authoritative publish time."""
+
+    SOCIAL_SPIDERS = {"voz_forum", "youtube_comments", "reddit_vn"}
+
+    def process_item(self, item, spider):
+        if spider.name in self.SOCIAL_SPIDERS:
+            return item
+
+        adapter = ItemAdapter(item)
+        is_fresh = getattr(spider, "_is_fresh_published_at", None)
+        if is_fresh and not is_fresh(
+            adapter.get("publish_time"), "items/stale_dropped"
+        ):
+            raise DropItem(f"Stale article: {adapter.get('url', 'unknown')}")
+        return item
+
+
 class MinIOPipeline:
     def __init__(self, endpoint, access_key, secret_key, bucket_name):
         self.endpoint = endpoint
