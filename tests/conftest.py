@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-secret-key-with-at-least-32-chars")
 
 from api.main import app
+from api.middleware import rate_limiter
 from api.security import create_access_token
 
 
@@ -57,6 +58,7 @@ async def async_client():
 
 @pytest.fixture(autouse=True)
 def mock_data_services(monkeypatch):
+    rate_limiter.reset()
     def fake_articles(
         page=1,
         page_size=20,

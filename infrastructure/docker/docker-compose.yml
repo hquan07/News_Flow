@@ -663,6 +663,16 @@ services:
     ports:
       - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
 
+  alertmanager-config:
+    image: python:3.11-alpine
+    profiles: [monitoring]
+    env_file: ../../.env
+    command: ["python", "/scripts/render_alertmanager.py"]
+    volumes:
+      - ../monitoring/render_alertmanager.py:/scripts/render_alertmanager.py:ro
+      - alertmanager-config:/generated
+    restart: "no"
+
   alertmanager:
     image: prom/alertmanager:v0.28.1
     profiles: [monitoring]
@@ -671,8 +681,11 @@ services:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
     volumes:
-      - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-config:/etc/alertmanager:ro
       - alertmanager-data:/alertmanager
+    depends_on:
+      alertmanager-config:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
 
@@ -685,6 +698,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
       - ../monitoring/grafana/datasources.yml:/etc/grafana/provisioning/datasources/newspulse.yml:ro
+      - ../monitoring/grafana/dashboard-provider.yml:/etc/grafana/provisioning/dashboards/newspulse.yml:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
@@ -838,6 +853,7 @@ volumes:
   qdrant-data:
   prometheus-data:
   alertmanager-data:
+  alertmanager-config:
   grafana-data:
   backup-metrics:
   postgres-backups:

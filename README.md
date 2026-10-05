@@ -17,7 +17,7 @@ A real-time news analysis platform that collects and processes articles from Vie
 - **REST API** powered by FastAPI serving analytics endpoints and Server-Sent Events (SSE).
 - **Custom Dashboard** built with **Next.js 16**, React, Recharts, and TailwindCSS for real-time visualization — tracking trends, source comparisons, entity networks, volume spikes, and system alerts.
 - **Nginx Reverse Proxy** — unified entrypoint for frontend and backend API.
-- **Monitoring** — Docker healthchecks and Python-based monitoring scripts.
+- **Monitoring** — Docker healthchecks, Prometheus/Grafana/Alertmanager, resource and data alerts, and backup verification. See [monitoring runbook](docs/MONITORING.md).
 - **Alert Operations** — drill-downs, clustering, per-admin pin/acknowledge state, interaction trends, freshness indicators, and operator telemetry. See the [Alert Operations Runbook](docs/ALERT_OPERATIONS_RUNBOOK.md).
 - **Release Readiness** — admin-visible alert workflow health and a repeatable [Release Checklist](docs/RELEASE_CHECKLIST.md).
 - **100% Containerized** — a single `docker-compose up -d --build` brings up the entire infrastructure in Standalone Mode.

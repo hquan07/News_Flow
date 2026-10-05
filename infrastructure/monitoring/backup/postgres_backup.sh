@@ -37,13 +37,13 @@ publish_metrics() {
 
 restore_test() {
     verify_db="${PGDATABASE}_restore_probe_$(date -u +%s)_$$"
-    createdb "${verify_db}" || return 1
+    createdb --maintenance-db=postgres "${verify_db}" || return 1
     if pg_restore --exit-on-error --no-owner --no-acl -d "${verify_db}" "$1"; then
         table_count="$(psql -d "${verify_db}" -Atqc "SELECT count(*) FROM pg_catalog.pg_class WHERE relkind IN ('r', 'p') AND relnamespace NOT IN (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname LIKE 'pg_%' OR nspname = 'information_schema')")"
     else
         table_count=0
     fi
-    dropdb "${verify_db}" || return 1
+    dropdb --maintenance-db=postgres "${verify_db}" || return 1
     [ "${table_count}" -gt 0 ]
 }
 

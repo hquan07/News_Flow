@@ -1,0 +1,58 @@
+{
+  "title": "NewsPulse Operations",
+  "uid": "newspulse-ops",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-24h", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "title": "Host CPU %", "type": "timeseries",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))", "legendFormat": "{{instance}}"}]
+    },
+    {
+      "id": 2, "title": "Host memory %", "type": "timeseries",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{instance}}"}]
+    },
+    {
+      "id": 3, "title": "Filesystem used %", "type": "timeseries",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "100 * (1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|devtmpfs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|devtmpfs\"})", "legendFormat": "{{mountpoint}}"}]
+    },
+    {
+      "id": 4, "title": "API p95 seconds", "type": "timeseries",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(newspulse_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95"}]
+    },
+    {
+      "id": 5, "title": "Kafka consumer lag", "type": "timeseries",
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by (consumergroup) (kafka_consumergroup_lag)", "legendFormat": "{{consumergroup}}"}]
+    },
+    {
+      "id": 6, "title": "Warehouse freshness (minutes)", "type": "timeseries",
+      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "(time() - newspulse_warehouse_last_article_timestamp_seconds) / 60", "legendFormat": "minutes"}]
+    },
+    {
+      "id": 7, "title": "Backup age (hours)", "type": "timeseries",
+      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "(time() - newspulse_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "{{dataset}}"}]
+    },
+    {
+      "id": 8, "title": "Firing alerts", "type": "timeseries",
+      "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by (severity) (ALERTS{alertstate=\"firing\"})", "legendFormat": "{{severity}}"}]
+    }
+  ]
+}
