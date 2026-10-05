@@ -105,6 +105,7 @@ def create_dead_letter_writer(df: DataFrame, checkpoint_location: str):
     return (
         payload.writeStream
         .format("kafka")
+        .queryName("dlq_" + checkpoint_location.rsplit("/", 1)[-1].replace("-", "_"))
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("topic", KAFKA_DLQ_TOPIC)
         .option("checkpointLocation", checkpoint_location)

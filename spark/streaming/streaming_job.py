@@ -28,6 +28,7 @@ from spark.streaming.nlp_writers import (
     write_keywords_to_clickhouse,
     write_sentiment_to_clickhouse,
 )
+from spark.streaming.progress_metrics import start_progress_monitor
 from spark.streaming.sink_writers import create_dead_letter_writer, write_to_clickhouse_batch
 from spark.utils.singleton_lock import acquire_singleton_lock, validate_unique_checkpoints
 from spark.utils.spark_session import create_spark_session
@@ -193,6 +194,7 @@ def main() -> None:
     queries = []
     try:
         spark = create_spark_session(app_name="NewsPulse-Streaming", is_streaming=True)
+        progress_server = start_progress_monitor(spark)
         logger.info("SparkSession created successfully")
 
         # Fast path: new Kafka messages reach raw_articles without waiting for NLP.
@@ -211,6 +213,7 @@ def main() -> None:
             _valid_records(raw_input)
             .writeStream.foreachBatch(_write_raw_batch)
             .outputMode("append")
+            .queryName("news_raw")
             .trigger(processingTime=RAW_STREAMING_TRIGGER_INTERVAL)
             .option("checkpointLocation", CHECKPOINT_PATHS["news_raw"])
             .start()
@@ -252,6 +255,7 @@ def main() -> None:
             queries.append(
                 enriched_stream.writeStream.foreachBatch(_write_nlp_batch)
                 .outputMode("append")
+                .queryName("news_nlp")
                 .trigger(processingTime=NLP_STREAMING_TRIGGER_INTERVAL)
                 .option("checkpointLocation", CHECKPOINT_PATHS["news_nlp"])
                 .start()
@@ -284,6 +288,7 @@ def main() -> None:
         queries.append(
             social_enriched.writeStream.foreachBatch(_write_social_batch)
             .outputMode("append")
+            .queryName("social")
             .trigger(processingTime=SOCIAL_STREAMING_TRIGGER_INTERVAL)
             .option("checkpointLocation", CHECKPOINT_PATHS["social"])
             .start()
@@ -304,6 +309,9 @@ def main() -> None:
         logger.info("=" * 60)
         spark.streams.awaitAnyTermination()
     finally:
+        if "progress_server" in locals():
+            progress_server.shutdown()
+            progress_server.server_close()
         if spark is not None:
             try:
                 spark.stop()
