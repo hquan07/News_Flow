@@ -721,8 +721,6 @@ services:
     image: ghcr.io/google/cadvisor:0.55.1
     profiles: [monitoring]
     restart: unless-stopped
-    devices:
-      - /dev/kmsg:/dev/kmsg
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
