@@ -81,55 +81,25 @@ def check_data_freshness(**kwargs):
 
 
 def check_kafka_lag(**kwargs):
-    from kafka import KafkaAdminClient, KafkaConsumer
+    import re
+    from urllib.request import urlopen
 
     LAG_THRESHOLD = 1000
-
-    try:
-        consumer = KafkaConsumer(
-            bootstrap_servers="kafka:9092",
-            group_id="newspulse-spark",
+    with urlopen("http://spark-streaming:9189/metrics", timeout=10) as response:
+        metrics = response.read().decode()
+    lag_report = {
+        query: float(value)
+        for query, value in re.findall(
+            r'^newspulse_spark_kafka_lag\{query="([^"]+)"\}\s+([0-9.]+)$',
+            metrics, re.MULTILINE,
         )
-
-        admin = KafkaAdminClient(bootstrap_servers="kafka:9092")
-        topics = [t for t in admin.list_topics() if not t.startswith("__")]
-
-        lag_report = {}
-        total_lag = 0
-
-        for topic in topics:
-            partitions = consumer.partitions_for_topic(topic)
-            if not partitions:
-                continue
-
-            from kafka import TopicPartition
-
-            for p in partitions:
-                tp = TopicPartition(topic, p)
-                consumer.assign([tp])
-                consumer.seek_to_end(tp)
-                end_offset = consumer.position(tp)
-
-                committed = consumer.committed(tp)
-                if committed is not None:
-                    lag = end_offset - committed
-                    lag_report[f"{topic}:{p}"] = lag
-                    total_lag += lag
-
-        consumer.close()
-        admin.close()
-
-        kwargs["ti"].xcom_push(key="kafka_lag", value=lag_report)
-        kwargs["ti"].xcom_push(key="total_lag", value=total_lag)
-
-        if total_lag > LAG_THRESHOLD:
-            raise RuntimeError(
-                f"Kafka consumer lag too high: {total_lag} messages total.\n"
-                f"Detail: {json.dumps(lag_report, indent=2)}"
-            )
-
-    except ImportError:
-        raise RuntimeError("kafka-python not installed")
+    }
+    if not lag_report:
+        raise RuntimeError("Spark Kafka lag is unavailable; inspect streaming query progress")
+    kwargs["ti"].xcom_push(key="kafka_lag", value=lag_report)
+    kwargs["ti"].xcom_push(key="max_lag", value=max(lag_report.values()))
+    if max(lag_report.values()) > LAG_THRESHOLD:
+        raise RuntimeError(f"Spark Kafka lag too high: {json.dumps(lag_report)}")
 
 
 # DAG Definition

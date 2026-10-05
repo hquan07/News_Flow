@@ -45,3 +45,9 @@ tokens remain in ClickHouse's finite history; it is not permanent exactly-once
 delivery. Retain Spark checkpoints and keep `CLICKHOUSE_SINK_PARTITIONS` stable
 until all in-flight batches have completed. Raw articles also store the Kafka
 topic, partition, offset, and stable event ID for replay investigation.
+
+With the monitoring profile enabled, Prometheus scrapes the Spark driver at
+`spark-streaming:9189/metrics`. Alert rules cover query availability, reported
+Kafka lag, malformed-record rate, broker count, partition leadership and
+replication, and host disk use. Spark's checkpoint offsets are the relevant
+source of lag for these queries; Kafka consumer-group lag is not used.

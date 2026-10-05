@@ -122,7 +122,7 @@ def build_config(environ: dict[str, str], directory: Path) -> dict:
                 ("HostMemoryWarning", "HostMemoryCritical", ["instance"]),
                 ("APIErrorRateWarning", "APIErrorRateCritical", []),
                 ("APILatencyP95Warning", "APILatencyP95Critical", []),
-                ("KafkaConsumerLagWarning", "KafkaConsumerLagCritical", ["consumergroup"]),
+                ("SparkKafkaLagWarning", "SparkKafkaLagCritical", ["query"]),
                 ("DiskPredicted90PercentWithin14Days", "DiskPredicted90PercentWithin5Days", ["instance", "mountpoint"]),
             )
         ],

@@ -19,6 +19,30 @@ groups:
         labels: {severity: critical, component: streaming}
         annotations:
           summary: "Kafka metrics target is unavailable"
+      - alert: SparkMetricsTargetDown
+        expr: up{job="spark-streaming"} == 0
+        for: 3m
+        labels: {severity: critical, component: streaming}
+        annotations:
+          summary: "Spark streaming metrics target is unavailable"
+      - alert: KafkaBrokerUnavailable
+        expr: kafka_brokers < 1
+        for: 1m
+        labels: {severity: critical, component: streaming}
+        annotations:
+          summary: "No Kafka broker is reachable"
+      - alert: KafkaPartitionUnderReplicated
+        expr: kafka_topic_partition_under_replicated_partition > 0
+        for: 5m
+        labels: {severity: critical, component: streaming}
+        annotations:
+          summary: "Kafka partition {{ $labels.topic }}:{{ $labels.partition }} is under replicated"
+      - alert: KafkaPartitionOffline
+        expr: kafka_topic_partition_leader < 0
+        for: 1m
+        labels: {severity: critical, component: streaming}
+        annotations:
+          summary: "Kafka partition {{ $labels.topic }}:{{ $labels.partition }} has no leader"
       - alert: APIErrorRateWarning
         expr: sum(rate(newspulse_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(newspulse_http_requests_total[5m])), 0.001) > 0.01 and on() sum(increase(newspulse_http_requests_total[5m])) >= 20
         for: 5m
@@ -43,18 +67,42 @@ groups:
         labels: {severity: critical, component: api}
         annotations:
           summary: "API p95 response start exceeds one second"
-      - alert: KafkaConsumerLagWarning
-        expr: sum by (consumergroup) (kafka_consumergroup_lag{consumergroup!=""}) > 1000
+      - alert: SparkKafkaLagWarning
+        expr: newspulse_spark_kafka_lag > 1000
         for: 10m
         labels: {severity: warning, component: streaming}
         annotations:
-          summary: "Kafka consumer group {{ $labels.consumergroup }} exceeds 1000 messages of lag"
-      - alert: KafkaConsumerLagCritical
-        expr: sum by (consumergroup) (kafka_consumergroup_lag{consumergroup!=""}) > 10000
+          summary: "Spark query {{ $labels.query }} exceeds 1000 messages of Kafka lag"
+      - alert: SparkKafkaLagCritical
+        expr: newspulse_spark_kafka_lag > 10000
         for: 5m
         labels: {severity: critical, component: streaming}
         annotations:
-          summary: "Kafka consumer group {{ $labels.consumergroup }} exceeds 10000 messages of lag"
+          summary: "Spark query {{ $labels.query }} exceeds 10000 messages of Kafka lag"
+      - alert: SparkQueryStopped
+        expr: newspulse_spark_query_active == 0
+        for: 3m
+        labels: {severity: critical, component: streaming}
+        annotations:
+          summary: "Spark query {{ $labels.query }} stopped"
+      - alert: SparkRawQueryMissing
+        expr: absent(newspulse_spark_query_active{query="news_raw"})
+        for: 10m
+        labels: {severity: critical, component: streaming}
+        annotations:
+          summary: "The raw article Spark query did not start"
+      - alert: SparkDLQSpike
+        expr: sum(increase(newspulse_spark_total_input_rows{query=~"dlq_.*"}[5m])) > 5
+        for: 1m
+        labels: {severity: warning, component: streaming}
+        annotations:
+          summary: "More than five malformed records entered the DLQ in five minutes"
+      - alert: KafkaDiskUsageHigh
+        expr: 100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}) > 80
+        for: 10m
+        labels: {severity: warning, component: streaming}
+        annotations:
+          summary: "Host disk containing the local Kafka volume is above 80%"
       - alert: WarehouseDataStale
         expr: time() - newspulse_warehouse_last_article_timestamp_seconds > 7200
         for: 10m

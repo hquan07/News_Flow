@@ -25,7 +25,7 @@ exposes `/metrics` and `/metrics/data`; the latter returns 503 if ClickHouse
 cannot answer its bounded operational query.
 
 Prometheus scrapes node exporter, cAdvisor, FastAPI, two PostgreSQL exporters,
-MongoDB exporter, Kafka exporter, and ClickHouse's native endpoint. MinIO
+MongoDB exporter, Kafka exporter, Spark query progress, and ClickHouse's native endpoint. MinIO
 scraping is deferred until authenticated access is configured; do not enable
 anonymous MinIO metrics on a published service port. Grafana provisions Prometheus as its default data source.
 The stack uses pinned image tags. Prometheus retains 15 days of metrics.
@@ -69,10 +69,15 @@ are not included yet; configure them before treating all data as protected.
 
 ## Coverage notes
 
-- Kafka exporter reports lag only for consumer groups with committed offsets.
-  Spark Structured Streaming uses checkpoint offsets and may not appear as a
-  stable consumer group. `WarehouseDataStale` detects a stalled downstream
-  result, but it does not identify the exact Kafka partition at fault.
+- Spark exposes query input rates, processed rates, batch durations, the last
+  progress time, DLQ counts, and Kafka lag inferred from each query's reported
+  latest and completed offsets. The lag metric is absent if Spark cannot
+  report both offsets; the Airflow health check flags this as unavailable.
+  Kafka exporter consumer group lag does not represent Spark's checkpointed
+  queries. `WarehouseDataStale` separately detects a stalled downstream result.
+- Kafka exporter exposes broker count, partition leadership, replication, and
+  partition offsets. It does not expose broker byte throughput or retention
+  cleanup details; add broker JMX metrics when those are operationally needed.
 - Disk forecasts use 24 hours of history at a 15 second scrape interval. They
   need more than 5,000 samples and assume approximately linear growth. Review
   forecasts after a cleanup, ingestion burst, or mount change.
@@ -82,7 +87,7 @@ are not included yet; configure them before treating all data as protected.
   Compose file. Configure an authenticated Prometheus scrape before enabling
   MinIO alerting; do not expose anonymous metrics on that port.
 - Redis is not deployed here, so Redis alerts do not apply. Container restart
-  count, Spark job progress, Airflow task failure metrics, and ClickHouse/MinIO
+  count, Airflow task failure metrics, and ClickHouse/MinIO
   restore coverage still need dedicated instrumentation.
 
 ## Checks before production
