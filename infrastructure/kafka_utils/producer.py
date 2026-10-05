@@ -62,6 +62,9 @@ class ArticleProducer:
                 article["crawled_time"] = article.pop("crawl_time")
             if not article.get("crawled_time"):
                 article["crawled_time"] = datetime.now(timezone.utc).isoformat()
+            for field in ("crawled_time", "publish_time"):
+                if isinstance(article.get(field), datetime):
+                    article[field] = article[field].isoformat()
             article["event_id"] = self._make_key(str(article.get("url", "")))
 
             # Validate bằng Pydantic (Đảm bảo chuẩn Schema)

@@ -1,5 +1,6 @@
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -64,3 +65,20 @@ def test_producer_rejects_unsupported_schema_version_to_dlq():
         assert producer.failed == 1
         assert producer.dead_lettered == 1
         assert factory.return_value.send.call_args.args[0] == "newspulse.dlq"
+
+
+def test_producer_accepts_replay_datetimes():
+    with patch("kafka_utils.producer.KafkaProducer") as factory:
+        factory.return_value.send.return_value.get.return_value = MagicMock(
+            topic="news.tech", partition=0, offset=1
+        )
+        producer = ArticleProducer()
+        assert producer.send_article({
+            "url": "https://example.org/news/4", "title": "Tin",
+            "source": "example", "category": "tech",
+            "publish_time": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "crawled_time": datetime(2026, 1, 2, tzinfo=timezone.utc),
+        })
+        payload = factory.return_value.send.call_args.kwargs["value"]
+        assert payload["publish_time"] == "2026-01-01T00:00:00+00:00"
+        assert payload["crawled_time"] == "2026-01-02T00:00:00+00:00"

@@ -31,11 +31,11 @@ def get_host_ip():
         return "172.17.0.1"
 
 def run_backfill():
-    MONGO_URI = os.getenv("MONGO_BACKFILL_URI", "mongodb://admin:Huyquan1607@localhost:27017/")
+    MONGO_URI = os.getenv("MONGO_BACKFILL_URI", "mongodb://localhost:27017/")
     MONGO_DB = os.getenv("MONGO_BACKFILL_DB", "newspulse")
     MONGO_COLLECTION = os.getenv("MONGO_BACKFILL_COL", "articles_raw_vi")
 
-    logger.info(f"Connecting to MongoDB at {MONGO_URI}, DB: {MONGO_DB}, Col: {MONGO_COLLECTION}")
+    logger.info("Connecting to MongoDB, DB: %s, Col: %s", MONGO_DB, MONGO_COLLECTION)
     
     try:
         mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
@@ -55,7 +55,9 @@ def run_backfill():
         return
 
     # Use localhost:29092 for Kafka which is exposed to host
-    producer = ArticleProducer(bootstrap_servers="localhost:29092")
+    producer = ArticleProducer(
+        bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
+    )
     
     
     success_count = 0

@@ -6,8 +6,10 @@ locally. Do not paste live values into issues, commits, or logs. Run
 `python3 scripts/check_committed_secrets.py` before pushing changes.
 
 Existing local credentials must be rotated at their issuers. Rotate the Groq
-API key, Telegram bot token, YouTube/Google API key, and Grafana administrator
-password if their current values have been shared. For each provider, issue a
+API key, Telegram bot token, YouTube/Google API key, MongoDB password, and
+Grafana administrator password if their current values have been shared. An
+old MongoDB URI was present in tracked backfill utilities, so its password
+must be treated as exposed in Git history. For each provider, issue a
 replacement, update the local secret, restart only the service that uses it,
 verify its health, then revoke the old credential at the provider. Restart
 Alertmanager after rotating the Telegram token because its rendered secret is

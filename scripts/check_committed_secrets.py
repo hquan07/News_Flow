@@ -9,6 +9,7 @@ PATTERNS = {
     "Groq API key": re.compile(r"gsk_[A-Za-z0-9]{20,}"),
     "Telegram bot token": re.compile(r"\b[0-9]{8,}:[A-Za-z0-9_-]{25,}\b"),
     "Google API key": re.compile(r"AIza[0-9A-Za-z_-]{20,}"),
+    "MongoDB URI with password": re.compile(r"mongodb(?:\+srv)?://[^\s/@:]+:[^\s/@]+@"),
 }
 TEXT_SUFFIXES = {".py", ".sh", ".yml", ".yaml", ".json", ".md", ".toml", ".txt", ".sql", ".ts", ".tsx"}
 
