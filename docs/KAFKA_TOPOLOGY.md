@@ -51,3 +51,12 @@ With the monitoring profile enabled, Prometheus scrapes the Spark driver at
 Kafka lag, malformed-record rate, broker count, partition leadership and
 replication, and host disk use. Spark's checkpoint offsets are the relevant
 source of lag for these queries; Kafka consumer-group lag is not used.
+
+For a cold backup or restart, stop the Airflow scheduler and Spark streaming
+after active crawl tasks finish. Keep the Kafka, ZooKeeper, Spark checkpoint,
+and ClickHouse volumes together as one recovery point. Start ZooKeeper, wait
+for Kafka health, run `kafka-init` to completion, and run `clickhouse-init`
+after ClickHouse is healthy. Start the Spark master and worker before Spark
+streaming. The Compose dependencies now require `kafka-init` for Spark
+streaming and the Airflow scheduler, and `clickhouse-init` for Spark streaming.
+Do not remove checkpoint or broker volumes when a service is unhealthy.
