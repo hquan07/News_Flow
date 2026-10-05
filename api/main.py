@@ -1,5 +1,6 @@
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
@@ -25,6 +26,7 @@ from api.middleware import (
 from api.logging_config import configure_logging
 from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
+from api.services.http_metrics import HttpMetricsMiddleware, metrics_payload
 from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events, insights, briefings, operations, retention, workspaces
 from api.security import require_permission
 
@@ -81,6 +83,7 @@ app.add_middleware(
 )
 app.add_middleware(RequestSafetyMiddleware)
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(HttpMetricsMiddleware)
 
 
 @app.exception_handler(DependencyUnavailableError)
@@ -154,6 +157,12 @@ async def readiness_check():
         },
         status_code=200 if result["status"] == "healthy" else 503,
     )
+
+
+@app.get("/metrics", include_in_schema=False)
+async def prometheus_metrics():
+    payload, content_type = metrics_payload()
+    return Response(content=payload, media_type=content_type)
 
 
 @app.get("/", tags=["Root"])

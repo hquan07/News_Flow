@@ -70,3 +70,15 @@ async def test_readiness_returns_503_when_dependency_is_down(async_client: Async
     response = await async_client.get("/health/ready")
     assert response.status_code == 503
     assert response.json()["status"] == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_prometheus_metrics_use_route_labels_without_scrape_self_count(async_client: AsyncClient):
+    await async_client.get("/health/live")
+    first = await async_client.get("/metrics")
+    second = await async_client.get("/metrics")
+
+    assert first.status_code == 200
+    assert 'newspulse_http_requests_total{method="GET",route="/health/live",status="200"}' in first.text
+    assert "newspulse_http_request_duration_seconds_bucket" in first.text
+    assert 'route="/metrics"' not in second.text

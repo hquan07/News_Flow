@@ -10,3 +10,4 @@ PyJWT==2.8.0
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 email-validator
+prometheus-client==0.23.1
