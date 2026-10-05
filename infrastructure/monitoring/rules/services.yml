@@ -1,0 +1,57 @@
+groups:
+  - name: service-health
+    rules:
+      - alert: MetricsTargetDown
+        expr: up{job=~"api|warehouse-data|postgres|mongodb|kafka|clickhouse|minio|node|cadvisor"} == 0
+        for: 3m
+        labels: {severity: critical, component: infrastructure}
+        annotations:
+          summary: "Metrics target {{ $labels.job }} is unavailable"
+      - alert: APIErrorRateWarning
+        expr: sum(rate(newspulse_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(newspulse_http_requests_total[5m])), 0.001) > 0.01 and on() sum(increase(newspulse_http_requests_total[5m])) >= 20
+        for: 5m
+        labels: {severity: warning, component: api}
+        annotations:
+          summary: "API 5xx rate is above 1%"
+      - alert: APIErrorRateCritical
+        expr: sum(rate(newspulse_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(newspulse_http_requests_total[5m])), 0.001) > 0.05 and on() sum(increase(newspulse_http_requests_total[5m])) >= 20
+        for: 5m
+        labels: {severity: critical, component: api}
+        annotations:
+          summary: "API 5xx rate is above 5%"
+      - alert: APILatencyP95Warning
+        expr: histogram_quantile(0.95, sum by (le) (rate(newspulse_http_request_duration_seconds_bucket[5m]))) > 0.5 and on() sum(increase(newspulse_http_requests_total[5m])) >= 20
+        for: 10m
+        labels: {severity: warning, component: api}
+        annotations:
+          summary: "API p95 response start exceeds 500 ms"
+      - alert: APILatencyP95Critical
+        expr: histogram_quantile(0.95, sum by (le) (rate(newspulse_http_request_duration_seconds_bucket[5m]))) > 1 and on() sum(increase(newspulse_http_requests_total[5m])) >= 20
+        for: 5m
+        labels: {severity: critical, component: api}
+        annotations:
+          summary: "API p95 response start exceeds one second"
+      - alert: KafkaConsumerLagWarning
+        expr: sum by (consumergroup) (kafka_consumergroup_lag{consumergroup!=""}) > 1000
+        for: 10m
+        labels: {severity: warning, component: streaming}
+        annotations:
+          summary: "Kafka consumer group {{ $labels.consumergroup }} exceeds 1000 messages of lag"
+      - alert: KafkaConsumerLagCritical
+        expr: sum by (consumergroup) (kafka_consumergroup_lag{consumergroup!=""}) > 10000
+        for: 5m
+        labels: {severity: critical, component: streaming}
+        annotations:
+          summary: "Kafka consumer group {{ $labels.consumergroup }} exceeds 10000 messages of lag"
+      - alert: WarehouseDataStale
+        expr: time() - newspulse_warehouse_last_article_timestamp_seconds > 7200
+        for: 10m
+        labels: {severity: critical, component: data-platform}
+        annotations:
+          summary: "No new article has reached ClickHouse for over two hours"
+      - alert: WarehouseVolumeDrop
+        expr: newspulse_warehouse_articles_24h < 0.5 * newspulse_warehouse_articles_previous_24h and on() newspulse_warehouse_articles_previous_24h >= 100
+        for: 30m
+        labels: {severity: warning, component: data-platform}
+        annotations:
+          summary: "Article volume in 24 hours dropped by over 50%"

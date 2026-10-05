@@ -82,3 +82,14 @@ async def test_prometheus_metrics_use_route_labels_without_scrape_self_count(asy
     assert 'newspulse_http_requests_total{method="GET",route="/health/live",status="200"}' in first.text
     assert "newspulse_http_request_duration_seconds_bucket" in first.text
     assert 'route="/metrics"' not in second.text
+
+
+@pytest.mark.asyncio
+async def test_data_metrics_report_unavailable_warehouse(async_client: AsyncClient, monkeypatch):
+    async def unavailable():
+        raise TimeoutError("warehouse timed out")
+
+    monkeypatch.setattr("api.main.warehouse_metrics_payload", unavailable)
+    response = await async_client.get("/metrics/data")
+
+    assert response.status_code == 503

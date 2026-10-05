@@ -27,6 +27,7 @@ from api.logging_config import configure_logging
 from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
 from api.services.http_metrics import HttpMetricsMiddleware, metrics_payload
+from api.services.data_metrics import warehouse_metrics_payload
 from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events, insights, briefings, operations, retention, workspaces
 from api.security import require_permission
 
@@ -163,6 +164,15 @@ async def readiness_check():
 async def prometheus_metrics():
     payload, content_type = metrics_payload()
     return Response(content=payload, media_type=content_type)
+
+
+@app.get("/metrics/data", include_in_schema=False)
+async def prometheus_data_metrics():
+    try:
+        payload = await warehouse_metrics_payload()
+    except Exception:
+        return Response(status_code=503, content="Warehouse metrics unavailable\n")
+    return Response(content=payload, media_type="text/plain; version=0.0.4")
 
 
 @app.get("/", tags=["Root"])
