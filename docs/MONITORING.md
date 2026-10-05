@@ -9,12 +9,17 @@ Alertmanager. Empty notification credentials leave alerts visible in Grafana
 and Alertmanager without sending messages.
 
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups config --quiet
-docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups up -d
+docker compose --env-file .env -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups config --quiet
+docker compose --env-file .env -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups up -d
 ```
 
 Prometheus: `http://localhost:9090/targets`; Grafana: `http://localhost:3001`;
 Alertmanager: `http://localhost:9093`. These UI ports bind to loopback only.
+Run Compose from the repository root with `--env-file .env`: the Compose file
+lives in a subdirectory, so otherwise interpolation can silently use defaults
+(including Grafana's `admin` password). On a pre-existing Grafana data volume,
+changing the environment variable alone does not reset the admin account;
+reset its password explicitly before exposing the UI.
 Check every target is `UP`, then inspect `/alerts` in Prometheus. The API also
 exposes `/metrics` and `/metrics/data`; the latter returns 503 if ClickHouse
 cannot answer its bounded operational query.
@@ -83,8 +88,8 @@ are not included yet; configure them before treating all data as protected.
 ## Checks before production
 
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups config --quiet
-docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups ps
+docker compose --env-file .env -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups config --quiet
+docker compose --env-file .env -f infrastructure/docker/docker-compose.yml --profile monitoring --profile backups ps
 ```
 
 Review the Prometheus target list and a sample alert in Alertmanager. Confirm a
