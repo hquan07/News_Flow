@@ -105,6 +105,7 @@ services:
         condition: service_healthy
     volumes:
       - ../kafka_utils/init_topics.sh:/etc/kafka/init_topics.sh:ro
+      - ../kafka_utils/topics.tsv:/etc/kafka/topics.tsv:ro
     command: ["bash", "/etc/kafka/init_topics.sh"]
 
   # ==================== STORAGE ====================

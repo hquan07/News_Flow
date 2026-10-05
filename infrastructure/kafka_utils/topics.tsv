@@ -1,0 +1,13 @@
+# topic partitions retention_ms
+news.general 3 604800000
+news.sports 3 604800000
+news.tech 3 604800000
+news.economy 3 604800000
+news.politics 3 604800000
+news.entertainment 3 604800000
+news.health 3 604800000
+news.education 3 604800000
+news.world 3 604800000
+news.law 3 604800000
+social_posts 3 604800000
+newspulse.dlq 3 1209600000
