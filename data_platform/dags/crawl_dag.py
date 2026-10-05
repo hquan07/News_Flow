@@ -18,6 +18,9 @@ SPIDERS = [
     "vnexpress", "tuoitre", "thanhnien", "tienphong", "dantri", "laodong",
     "voz_forum", "reddit_vn", "youtube_comments"
 ]
+DEFAULT_RATE_LIMIT_SECONDS = float(
+    os.environ.get("DEFAULT_CRAWL_RATE_LIMIT_SECONDS", "0.5")
+)
 
 SCRAPY_CMD = (
     "cd /opt/airflow/crawlers && "
@@ -43,7 +46,8 @@ def source_is_enabled(spider: str) -> bool:
         database = client[os.environ.get("MONGO_DB", "newspulse")]
         override = database.source_settings.find_one({"spider_name": spider}) or {}
         context["ti"].xcom_push(
-            key="rate_limit_seconds", value=float(override.get("rate_limit_seconds", 2.0))
+            key="rate_limit_seconds",
+            value=float(override.get("rate_limit_seconds", DEFAULT_RATE_LIMIT_SECONDS)),
         )
         return override.get("enabled", True)
     finally:
@@ -52,8 +56,8 @@ def source_is_enabled(spider: str) -> bool:
 with DAG(
     dag_id="newspulse_crawl",
     default_args=default_args,
-    description="Crawl Vietnamese news sources every 30 minutes",
-    schedule="*/30 * * * *",
+    description="Crawl Vietnamese news sources every 10 minutes",
+    schedule="*/10 * * * *",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     max_active_runs=1,
@@ -71,7 +75,7 @@ with DAG(
             task_id=f"crawl_{spider}",
             bash_command=(
                 SCRAPY_CMD.format(spider=spider)
-                + f' -s DOWNLOAD_DELAY="{{{{ ti.xcom_pull(task_ids=\'source_enabled_{spider}\', key=\'rate_limit_seconds\') or 2 }}}}"'
+                + f' -s DOWNLOAD_DELAY="{{{{ ti.xcom_pull(task_ids=\'source_enabled_{spider}\', key=\'rate_limit_seconds\') or 0.5 }}}}"'
             ),
         )
         enabled >> tasks[spider]

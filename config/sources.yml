@@ -4,21 +4,21 @@ sources:
     domain: vnexpress.net
     base_url: https://vnexpress.net
     rss_base: https://vnexpress.net/rss
-    rate_limit: 2  # seconds between requests
+    rate_limit: 0.5  # seconds between requests
     enabled: true
 
   tuoitre:
     domain: tuoitre.vn
     base_url: https://tuoitre.vn
     rss_base: https://tuoitre.vn/rss
-    rate_limit: 2
+    rate_limit: 0.5
     enabled: true
 
   thanhnien:
     domain: thanhnien.vn
     base_url: https://thanhnien.vn
     rss_base: https://thanhnien.vn/rss
-    rate_limit: 2
+    rate_limit: 0.5
     enabled: true
 
 # Category mapping (Vietnamese slug → canonical name)

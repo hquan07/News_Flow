@@ -37,16 +37,17 @@ def _airflow_auth() -> tuple[str, str]:
     return username, password
 
 # Map spider name -> readable info
+CRAWL_SCHEDULE = "*/10 * * * *"
 SPIDER_REGISTRY = {
-    "vnexpress":        {"type": "news",   "label": "VnExpress",        "schedule": "*/30 * * * *"},
-    "tuoitre":          {"type": "news",   "label": "Tuổi Trẻ",         "schedule": "*/30 * * * *"},
-    "thanhnien":        {"type": "news",   "label": "Thanh Niên",       "schedule": "*/30 * * * *"},
-    "tienphong":        {"type": "news",   "label": "Tiền Phong",       "schedule": "*/30 * * * *"},
-    "dantri":           {"type": "news",   "label": "Dân Trí",          "schedule": "*/30 * * * *"},
-    "laodong":          {"type": "news",   "label": "Lao Động",         "schedule": "*/30 * * * *"},
-    "voz_forum":        {"type": "social", "label": "Voz Forum",        "schedule": "*/30 * * * *"},
-    "reddit_vn":        {"type": "social", "label": "Reddit Vietnam",   "schedule": "*/30 * * * *"},
-    "youtube_comments": {"type": "social", "label": "YouTube Comments", "schedule": "*/30 * * * *"},
+    "vnexpress":        {"type": "news",   "label": "VnExpress",        "schedule": CRAWL_SCHEDULE},
+    "tuoitre":          {"type": "news",   "label": "Tuổi Trẻ",         "schedule": CRAWL_SCHEDULE},
+    "thanhnien":        {"type": "news",   "label": "Thanh Niên",       "schedule": CRAWL_SCHEDULE},
+    "tienphong":        {"type": "news",   "label": "Tiền Phong",       "schedule": CRAWL_SCHEDULE},
+    "dantri":           {"type": "news",   "label": "Dân Trí",          "schedule": CRAWL_SCHEDULE},
+    "laodong":          {"type": "news",   "label": "Lao Động",         "schedule": CRAWL_SCHEDULE},
+    "voz_forum":        {"type": "social", "label": "Voz Forum",        "schedule": CRAWL_SCHEDULE},
+    "reddit_vn":        {"type": "social", "label": "Reddit Vietnam",   "schedule": CRAWL_SCHEDULE},
+    "youtube_comments": {"type": "social", "label": "YouTube Comments", "schedule": CRAWL_SCHEDULE},
 }
 
 
@@ -138,7 +139,7 @@ async def list_crawlers(user: dict = Depends(require_permission("crawler.read"))
             "duration_sec": round(ti.get("duration", 0) or 0, 1),
             "try_number": ti.get("try_number", 0),
             "enabled": overrides.get(spider_name, {}).get("enabled", True),
-            "rate_limit_seconds": overrides.get(spider_name, {}).get("rate_limit_seconds", 2.0),
+            "rate_limit_seconds": overrides.get(spider_name, {}).get("rate_limit_seconds", 0.5),
         })
 
     # Get article counts per source from ClickHouse

@@ -53,7 +53,7 @@ class VnExpressSpider(BaseNewsSpider):
             pub_date = item.xpath("pubDate/text()").get()
             description = item.xpath("description/text()").get("")
 
-            if link and self._is_article_url(link):
+            if link and self._is_article_url(link) and self._is_fresh_rss_item(pub_date):
                 yield scrapy.Request(
                     url=link,
                     callback=self.parse_article,

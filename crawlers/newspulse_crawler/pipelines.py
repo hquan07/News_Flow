@@ -8,6 +8,7 @@ from itemadapter import ItemAdapter
 from pymongo import MongoClient, ASCENDING
 from pymongo.errors import AutoReconnect, NetworkTimeout
 from scrapy.exceptions import DropItem
+from twisted.internet.threads import deferToThread
 
 logger = logging.getLogger(__name__)
 
@@ -78,19 +79,25 @@ class MinIOPipeline:
         adapter = ItemAdapter(item)
         raw_html = adapter.get("raw_html")
         url = adapter.get("url")
-        if raw_html and url:
-            url_hash = hashlib.md5(url.encode()).hexdigest()
-            object_name = f"{spider.name}/{url_hash}.html"
-            try:
-                self.s3_client.put_object(
-                    Bucket=self.bucket_name,
-                    Key=object_name,
-                    Body=raw_html.encode("utf-8"),
-                    ContentType="text/html",
-                )
-            except Exception as e:
-                logger.error("Failed to upload to MinIO: %s", e)
-        return item
+        if not raw_html or not url:
+            return item
+
+        deferred = deferToThread(self._upload, raw_html, url, spider.name)
+        deferred.addCallback(lambda _result: item)
+        return deferred
+
+    def _upload(self, raw_html: str, url: str, spider_name: str) -> None:
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        object_name = f"{spider_name}/{url_hash}.html"
+        try:
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=object_name,
+                Body=raw_html.encode("utf-8"),
+                ContentType="text/html",
+            )
+        except Exception as exc:
+            logger.error("Failed to upload to MinIO: %s", exc)
 
 
 class MongoPipeline:
@@ -130,6 +137,11 @@ class MongoPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
         doc = adapter.asdict()
+        deferred = deferToThread(self._persist, doc)
+        deferred.addCallback(lambda _result: item)
+        return deferred
+
+    def _persist(self, doc: dict) -> None:
         for attempt in range(1, 4):
             try:
                 result = self.collection.update_one(
@@ -138,13 +150,12 @@ class MongoPipeline:
                     upsert=True,
                 )
                 if result.upserted_id is None:
-                    logger.debug("Article already persisted; allowing Kafka retry: %s", doc["url"])
+                    logger.debug("Article already persisted: %s", doc["url"])
                 break
             except (AutoReconnect, NetworkTimeout):
                 if attempt == 3:
                     raise
                 time.sleep(0.25 * (2 ** (attempt - 1)))
-        return item
 
 
 class KafkaPipeline:
@@ -168,6 +179,10 @@ class KafkaPipeline:
         adapter = ItemAdapter(item)
         article = adapter.asdict()
         article.pop("raw_html", None)
+        deferred = deferToThread(self._publish, article)
+        deferred.addCallback(lambda _result: item)
+        return deferred
+
+    def _publish(self, article: dict) -> None:
         if not self.producer.send_article(article):
             raise DropItem(f"Kafka publish failed: {article.get('url', 'unknown')}")
-        return item

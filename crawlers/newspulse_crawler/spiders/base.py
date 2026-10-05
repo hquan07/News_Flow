@@ -1,7 +1,10 @@
 import logging
 from abc import abstractmethod
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Iterator
+from zoneinfo import ZoneInfo
+
 import scrapy
 from scrapy.http import Response
 
@@ -59,6 +62,30 @@ class BaseNewsSpider(scrapy.Spider):
         if not url:
             return False
         return url.endswith(".html") or url.endswith(".htm") or "-" in url.split("/")[-1]
+
+    def _is_fresh_rss_item(self, published_at: str | None) -> bool:
+        """Skip stale RSS entries while retaining entries with unknown dates."""
+        if not published_at:
+            return True
+
+        try:
+            published = parsedate_to_datetime(published_at)
+        except (TypeError, ValueError, OverflowError):
+            try:
+                published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                logger.warning("Could not parse RSS publish time %r; keeping item", published_at)
+                return True
+
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=ZoneInfo("Asia/Ho_Chi_Minh"))
+
+        max_age_hours = self.crawler.settings.getfloat("RSS_MAX_AGE_HOURS", 6.0)
+        age_seconds = (datetime.now(timezone.utc) - published.astimezone(timezone.utc)).total_seconds()
+        is_fresh = age_seconds <= max_age_hours * 3600
+        if not is_fresh:
+            self.crawler.stats.inc_value("rss_items/stale_skipped")
+        return is_fresh
 
     def _build_item(
             self,
