@@ -19,3 +19,11 @@ processing time, broker disk use, and per-topic traffic before changing the
 three-partition baseline. Increase a hot topic only when the processing backlog
 grows persistently and workers have spare capacity. Retune Spark parallelism
 after any change.
+
+Spark Structured Streaming resumes from its checkpoint; `startingOffsets`
+only applies to a new checkpoint. The raw query starts at `latest` by default,
+whereas NLP and social start at `earliest`. Do not remove or rename checkpoints
+without a replay plan. `KAFKA_FAIL_ON_DATA_LOSS=true` stops the stream when
+required offsets have expired; investigate and backfill before restarting.
+The article parser accepts unversioned legacy messages during transition,
+while unknown non-null versions go to `newspulse.dlq`.

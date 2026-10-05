@@ -3,7 +3,7 @@ import hashlib
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "newspulse.dlq")
 
 class ArticleSchema(BaseModel):
-    schema_version: int = 1
-    event_type: str = "article"
+    schema_version: Literal[1] = 1
+    event_type: Literal["article"] = "article"
     event_id: str
     url: str = Field(..., min_length=1)
     title: str = Field(..., min_length=1)

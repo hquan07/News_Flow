@@ -94,6 +94,12 @@ def create_dead_letter_writer(df: DataFrame, checkpoint_location: str):
             F.col("kafka_partition").alias("original_partition"),
             F.col("kafka_offset").alias("original_offset"),
             F.col("kafka_timestamp").alias("original_timestamp"),
+            (
+                F.col("schema_version") if "schema_version" in df.columns else F.lit(None)
+            ).alias("schema_version"),
+            (
+                F.col("event_type") if "event_type" in df.columns else F.lit(None)
+            ).alias("event_type"),
         )).alias("value"),
     )
     return (

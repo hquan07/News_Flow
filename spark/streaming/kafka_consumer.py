@@ -1,10 +1,11 @@
 import hashlib
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, ArrayType
+from pyspark.sql.types import StructType, StructField, StringType, ArrayType, IntegerType
 
 from config.spark_config import (
     KAFKA_BOOTSTRAP_SERVERS,
+    KAFKA_FAIL_ON_DATA_LOSS,
     KAFKA_TOPICS,
     NLP_MAX_OFFSETS_PER_TRIGGER,
     NLP_STARTING_OFFSETS,
@@ -13,7 +14,7 @@ from config.spark_config import (
 )
 
 ARTICLE_SCHEMA = StructType([
-    StructField("schema_version", StringType(), True),
+    StructField("schema_version", IntegerType(), True),
     StructField("event_type", StringType(), True),
     StructField("event_id", StringType(), True),
     StructField("url", StringType(), False),
@@ -51,7 +52,7 @@ def create_kafka_stream(
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("subscribe", ",".join(KAFKA_TOPICS))
         .option("startingOffsets", starting_offsets)
-        .option("failOnDataLoss", "false")
+        .option("failOnDataLoss", str(KAFKA_FAIL_ON_DATA_LOSS).lower())
         .option("maxOffsetsPerTrigger", max_offsets_per_trigger)
         .load()
     )
@@ -70,7 +71,34 @@ def create_kafka_stream(
             "parse_error",
             F.when(F.col("article").isNull(), F.lit("invalid_json"))
             .when(F.col("article.url").isNull(), F.lit("missing_url"))
-            .when(F.col("article.title").isNull(), F.lit("missing_title")),
+            .when(F.col("article.title").isNull(), F.lit("missing_title"))
+            .when(
+                F.get_json_object(F.col("raw_payload"), "$.schema_version").isNotNull()
+                & F.col("article.schema_version").isNull(),
+                F.lit("unsupported_schema_version"),
+            )
+            # Missing version is legacy v0 while old Kafka records remain retained.
+            .when(
+                F.col("article.schema_version").isNotNull()
+                & (F.col("article.schema_version") != 1),
+                F.lit("unsupported_schema_version"),
+            )
+            .when(
+                (F.col("article.schema_version") == 1)
+                & (
+                    F.col("article.event_type").isNull()
+                    | (F.col("article.event_type") != "article")
+                ),
+                F.lit("invalid_event_type"),
+            )
+            .when(
+                (F.col("article.schema_version") == 1)
+                & (
+                    F.col("article.event_id").isNull()
+                    | (F.length(F.col("article.event_id")) == 0)
+                ),
+                F.lit("missing_event_id"),
+            ),
         )
     )
     return (
@@ -114,7 +142,7 @@ def create_social_kafka_stream(
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("subscribe", "social_posts")
         .option("startingOffsets", starting_offsets)
-        .option("failOnDataLoss", "false")
+        .option("failOnDataLoss", str(KAFKA_FAIL_ON_DATA_LOSS).lower())
         .option("maxOffsetsPerTrigger", max_offsets_per_trigger)
         .load()
     )

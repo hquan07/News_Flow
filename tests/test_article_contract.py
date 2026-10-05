@@ -52,3 +52,15 @@ def test_producer_counts_failed_delivery():
         assert producer.published == 0
         assert factory.call_args.kwargs["compression_type"] == "lz4"
         assert factory.call_args.kwargs["acks"] == "all"
+
+
+def test_producer_rejects_unsupported_schema_version_to_dlq():
+    with patch("kafka_utils.producer.KafkaProducer") as factory:
+        producer = ArticleProducer()
+        assert not producer.send_article({
+            "schema_version": 2, "url": "https://example.org/news/3",
+            "title": "Tin", "source": "example", "category": "tech",
+        })
+        assert producer.failed == 1
+        assert producer.dead_lettered == 1
+        assert factory.return_value.send.call_args.args[0] == "newspulse.dlq"

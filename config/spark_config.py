@@ -16,8 +16,10 @@ KAFKA_TOPICS = [
     "news.law",
 ]
 
-KAFKA_CONSUMER_GROUP = "newspulse-spark-streaming"
 KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "newspulse.dlq")
+KAFKA_FAIL_ON_DATA_LOSS = os.getenv("KAFKA_FAIL_ON_DATA_LOSS", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
 
 # Keep raw ingestion responsive while bounding the CPU-heavy NLP backlog.
 RAW_MAX_OFFSETS_PER_TRIGGER = max(int(os.getenv("RAW_MAX_OFFSETS_PER_TRIGGER", "500")), 1)
