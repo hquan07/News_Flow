@@ -178,9 +178,11 @@ docker exec $(docker compose ps -q postgres) \
 # 11. TROUBLESHOOTING
 
 # Kafka crash (InconsistentClusterIdException):
-docker compose rm -f kafka
-docker volume rm news_flow_kafka-data news_flow_zookeeper-data
-docker compose up -d zookeeper && sleep 10 && docker compose up -d kafka
+# Do not delete either volume: doing so discards Kafka messages and offsets.
+docker compose logs --tail=200 kafka zookeeper
+docker compose ps kafka zookeeper
+# Restore a consistent pair of Kafka/ZooKeeper volumes from backup if the
+# cluster ID mismatch is confirmed; then restart both services.
 
 # Metabase migration lock:
 docker compose rm -f metabase

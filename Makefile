@@ -1,4 +1,7 @@
-.PHONY: up down restart logs crawl topics status clean
+.PHONY: up down restart logs crawl topics status clean check-secrets
+
+check-secrets:
+	python3 scripts/check_committed_secrets.py
 
 # Start all services
 up:

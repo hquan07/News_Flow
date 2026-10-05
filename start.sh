@@ -225,17 +225,8 @@ phase1() {
 
     $COMPOSE up -d kafka
     if ! wait_healthy kafka 90; then
-        warn "Kafka failed — likely Cluster ID mismatch. Auto-fixing..."
-        $COMPOSE rm -f -s kafka 2>/dev/null || true
-        docker volume rm "$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]' | tr ' ' '_')_kafka-data" 2>/dev/null || true
-        # Also reset zookeeper to get matching cluster ID
-        $COMPOSE rm -f -s zookeeper 2>/dev/null || true
-        docker volume rm "$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]' | tr ' ' '_')_zookeeper-data" 2>/dev/null || true
-        log "Restarting Zookeeper + Kafka with fresh volumes..."
-        $COMPOSE up -d zookeeper
-        wait_healthy zookeeper 60
-        $COMPOSE up -d kafka
-        wait_healthy kafka 90 || fail "Kafka failed even after volume reset"
+        warn "Kafka is unhealthy. Keeping Kafka and ZooKeeper volumes intact."
+        fail "Inspect 'docker compose logs kafka zookeeper' and recover from backup if needed."
     fi
 
     $COMPOSE up -d mongo
