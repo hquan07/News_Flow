@@ -38,6 +38,9 @@ async def test_author_analytics_returns_ranked_authors(
                     "avg_sentiment": 0.25,
                 }
             ],
+            "source_breakdown": [],
+            "publication_trend": [],
+            "category_breakdown": [],
             "time_range": time_range,
             "source": source,
         }

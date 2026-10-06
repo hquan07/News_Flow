@@ -92,6 +92,93 @@ def get_author_analytics(
         )
     )
 
+    source_sql = f"""
+        SELECT
+            source,
+            count() AS total_articles,
+            countIf({named_author}) AS authored_articles,
+            uniqExactIf(lowerUTF8(trimBoth(author)), {named_author}) AS author_count
+        FROM newspulse.raw_articles FINAL
+        WHERE {scope_where}
+        GROUP BY source
+        ORDER BY total_articles DESC, source ASC
+    """
+    source_rows = execute_clickhouse(
+        lambda client: list(
+            client.query(source_sql, parameters=params).named_results()
+        )
+    )
+    source_breakdown = []
+    for row in source_rows:
+        source_total = int(row.get("total_articles", 0))
+        source_authored = int(row.get("authored_articles", 0))
+        source_breakdown.append({
+            "source": row.get("source", ""),
+            "total_articles": source_total,
+            "authored_articles": source_authored,
+            "missing_articles": max(source_total - source_authored, 0),
+            "author_count": int(row.get("author_count", 0)),
+            "coverage_pct": round(
+                source_authored / source_total * 100, 1
+            ) if source_total else 0.0,
+        })
+
+    top_authors = authors[:5]
+    publication_trend = []
+    category_breakdown = []
+    if top_authors:
+        top_author_conditions = []
+        detail_params = dict(params)
+        for index, row in enumerate(top_authors):
+            author_key = f"author_{index}"
+            source_key = f"author_source_{index}"
+            detail_params[author_key] = str(row.get("author", "")).lower()
+            detail_params[source_key] = row.get("source", "")
+            top_author_conditions.append(
+                "(lowerUTF8(trimBoth(author)) = "
+                f"{{{author_key}:String}} AND source = {{{source_key}:String}})"
+            )
+        author_scope = " OR ".join(top_author_conditions)
+        period_expression = (
+            "toStartOfMonth(publish_time)"
+            if time_range == "all"
+            else "toDate(publish_time)"
+        )
+
+        trend_sql = f"""
+            SELECT
+                toString({period_expression}) AS period,
+                trimBoth(author) AS author,
+                source,
+                count() AS article_count
+            FROM newspulse.raw_articles FINAL
+            WHERE {scope_where} AND {named_author} AND ({author_scope})
+            GROUP BY period, author, source
+            ORDER BY period ASC, article_count DESC
+        """
+        publication_trend = execute_clickhouse(
+            lambda client: list(
+                client.query(trend_sql, parameters=detail_params).named_results()
+            )
+        )
+
+        category_sql = f"""
+            SELECT
+                trimBoth(author) AS author,
+                source,
+                category,
+                count() AS article_count
+            FROM newspulse.raw_articles FINAL
+            WHERE {scope_where} AND {named_author} AND ({author_scope})
+            GROUP BY author, source, category
+            ORDER BY author ASC, article_count DESC, category ASC
+        """
+        category_breakdown = execute_clickhouse(
+            lambda client: list(
+                client.query(category_sql, parameters=detail_params).named_results()
+            )
+        )
+
     total_articles = int(summary.get("total_articles", 0))
     authored_articles = int(summary.get("authored_articles", 0))
     unattributed_articles = max(total_articles - authored_articles, 0)
@@ -107,6 +194,9 @@ def get_author_analytics(
             ) if total_articles else 0.0,
         },
         "authors": authors,
+        "source_breakdown": source_breakdown,
+        "publication_trend": publication_trend,
+        "category_breakdown": category_breakdown,
         "time_range": time_range,
         "source": source,
     }
