@@ -28,7 +28,7 @@ from api.services.health import dependency_health
 from api.services.alert_metrics import alert_metrics, alert_metrics_flush_loop
 from api.services.http_metrics import HttpMetricsMiddleware, metrics_payload
 from api.services.data_metrics import warehouse_metrics_payload
-from api.routers import articles, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events, insights, briefings, operations, retention, workspaces
+from api.routers import articles, authors, overview, trending, sources, alerts, entities, stream, sentiment, social, auth, recommendations, admin, crawler_admin, public, user_admin, chat, chat_actions, intelligence, events, insights, briefings, operations, retention, workspaces
 from api.security import require_permission
 
 settings = get_settings()
@@ -108,6 +108,7 @@ async def dependency_unavailable_handler(
 prefix = settings.API_V1_PREFIX
 dashboard_access = [Depends(require_permission("dashboard.read"))]
 app.include_router(articles.router, prefix=prefix, dependencies=dashboard_access)
+app.include_router(authors.router, prefix=prefix, dependencies=dashboard_access)
 app.include_router(overview.router, prefix=prefix, dependencies=dashboard_access)
 app.include_router(trending.router, prefix=prefix, dependencies=dashboard_access)
 app.include_router(sources.router, prefix=prefix, dependencies=dashboard_access)

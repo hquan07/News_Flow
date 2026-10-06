@@ -63,6 +63,7 @@ def mock_data_services(monkeypatch):
         page=1,
         page_size=20,
         q=None,
+        author=None,
         source=None,
         category=None,
         date_from=None,
@@ -75,6 +76,8 @@ def mock_data_services(monkeypatch):
         rows = ARTICLES
         if q:
             rows = [row for row in rows if q.lower() in row["title"].lower()]
+        if author:
+            rows = [row for row in rows if row["author"].casefold() == author.casefold()]
         if source:
             rows = [row for row in rows if row["source"] == source]
         if category:

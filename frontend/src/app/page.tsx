@@ -42,6 +42,9 @@ import EntitiesView from "@/components/views/EntitiesView";
 import SentimentView from "@/components/views/SentimentView";
 import OverviewSocialView from "@/components/views/OverviewSocialView";
 import OverviewNewsView from "@/components/views/OverviewNewsView";
+import AuthorsView, {
+  type AuthorAnalytics,
+} from "@/components/views/AuthorsView";
 import ArchitectureView from "@/components/views/ArchitectureView";
 import CrawlerManagementView from "@/components/views/CrawlerManagementView";
 import UserManagementView from "@/components/views/UserManagementView";
@@ -101,6 +104,7 @@ async function safeFetch(url: string): Promise<any> {
 
 const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
   overview: true,
+  authors: true,
   sentiment: true,
   debates: true,
   influencers: true,
@@ -139,6 +143,8 @@ export default function Home() {
     useState<LiveSocialAlerts | null>(null);
   const [socialInfluencers, setSocialInfluencers] =
     useState<SocialInfluencer[] | null>(null);
+  const [authorAnalytics, setAuthorAnalytics] =
+    useState<AuthorAnalytics | null>(null);
   const [liveSocialPosts, setLiveSocialPosts] = useState<LiveSocialPost[]>([]);
 
   const [adminLatency, setAdminLatency] = useState<any>(null);
@@ -413,6 +419,17 @@ export default function Home() {
     setSocialInfluencers(result.influencers || []);
   }, [dashboardMode, selectedSource]);
 
+  const fetchAuthors = useCallback(async () => {
+    if (dashboardMode !== "news") return;
+    const sourceParam = selectedSource
+      ? `&source=${encodeURIComponent(selectedSource)}`
+      : "";
+    const result = await safeFetch(
+      `${API_BASE}/authors?time_range=all&limit=50${sourceParam}`,
+    );
+    setAuthorAnalytics(result);
+  }, [dashboardMode, selectedSource]);
+
   const fetchLiveSocialFeed = useCallback(async () => {
     if (dashboardMode !== "social") return;
     const result = await safeFetch(`${API_BASE}/social/feed?limit=50`);
@@ -485,6 +502,7 @@ export default function Home() {
         page_size: "20",
       });
       if (articleSearchQuery) params.set("q", articleSearchQuery);
+      if (articleFilters.author) params.set("author", articleFilters.author);
       if (articleFilters.source) params.set("source", articleFilters.source);
       if (articleFilters.category) params.set("category", articleFilters.category);
       if (articleFilters.dateFrom) params.set("date_from", articleFilters.dateFrom);
@@ -544,6 +562,7 @@ export default function Home() {
     setEntityTypeDist(null);
     setEntitySentiment(null);
     setSocialInfluencers(null);
+    setAuthorAnalytics(null);
   }, [selectedSource, activeTab]);
 
   // Tab-aware polling
@@ -562,6 +581,7 @@ export default function Home() {
         else if (activeTab === "foryou") await fetchForYou();
         else if (activeTab === "debates") await fetchDebates();
         else if (activeTab === "influencers") await fetchInfluencers();
+        else if (activeTab === "authors") await fetchAuthors();
         else if (activeTab === "live_social") await fetchLiveSocialFeed();
         else if (activeTab === "admin_dashboard") await fetchAdmin();
         if (!cancelled) {
@@ -599,6 +619,7 @@ export default function Home() {
     fetchForYou,
     fetchDebates,
     fetchInfluencers,
+    fetchAuthors,
     fetchLiveSocialFeed,
     fetchAdmin,
     isInitialized,
@@ -766,6 +787,7 @@ export default function Home() {
   const navigationItems: DashboardNavigationItem[] = dashboardMode === "news"
     ? [
         { id: "overview", label: "Overview", icon: <Activity size={18} /> },
+        { id: "authors", label: "Authors", icon: <Users size={18} /> },
         { id: "sentiment", label: "Sentiment", icon: <ThumbsUp size={18} /> },
         { id: "entities", label: "Entities & NLP", icon: <Hash size={18} /> },
         { id: "network", label: "Network", icon: <Share2 size={18} /> },
@@ -1122,6 +1144,24 @@ export default function Home() {
               sentimentSources={sentimentSources}
               sentimentCoverage={sentimentCoverage}
               updatedAt={dataUpdatedAt}
+            />
+          )}
+
+          {activeTab === "authors" && dashboardMode === "news" && (
+            <AuthorsView
+              data={authorAnalytics}
+              onViewArticles={(author, source) => {
+                setArticleAlertFilter(null);
+                setArticleSearchInput("");
+                setArticleSearchQuery("");
+                setArticleFilters({
+                  ...EMPTY_ARTICLE_FILTERS,
+                  author,
+                  source,
+                });
+                setPage(1);
+                setActiveTab("articles");
+              }}
             />
           )}
 

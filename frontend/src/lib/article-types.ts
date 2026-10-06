@@ -1,4 +1,5 @@
 export interface ArticleFilters {
+  author: string;
   source: string;
   category: string;
   dateFrom: string;
@@ -9,6 +10,7 @@ export interface ArticleFilters {
 }
 
 export const EMPTY_ARTICLE_FILTERS: ArticleFilters = {
+  author: "",
   source: "",
   category: "",
   dateFrom: "",

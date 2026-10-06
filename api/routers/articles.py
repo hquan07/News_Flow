@@ -12,6 +12,7 @@ def list_articles(
         page: int = Query(default=1, ge=1),
         page_size: int = Query(default=20, ge=1, le=100),
         q: Optional[str] = Query(default=None, description="Search in title"),
+        author: Optional[str] = Query(default=None, description="Exact author name"),
         source: Optional[str] = Query(default=None),
         category: Optional[str] = Query(default=None),
         date_from: Optional[date] = Query(default=None),
@@ -26,7 +27,7 @@ def list_articles(
         ),
 ):
     return get_articles(
-        page=page, page_size=page_size, q=q, source=source,
+        page=page, page_size=page_size, q=q, author=author, source=source,
         category=category, date_from=date_from, date_to=date_to,
         published_from=published_from, published_to=published_to,
         entity=entity, keyword=keyword, sentiment=sentiment,

@@ -34,6 +34,19 @@ async def test_list_articles_with_search(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_list_articles_with_author_filter(async_client: AsyncClient):
+    response = await async_client.get(
+        "/api/v1/articles",
+        params={"author": "Test Author"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["data"][0]["author"] == "Test Author"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("sentiment", ["positive", "neutral", "negative"])
 async def test_list_articles_with_sentiment_filter(async_client: AsyncClient, sentiment: str):
     response = await async_client.get("/api/v1/articles", params={"sentiment": sentiment})

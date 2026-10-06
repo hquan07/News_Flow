@@ -35,6 +35,7 @@ type Article = {
   title: string;
   url: string;
   source: string;
+  author?: string;
   category?: string;
   publish_date?: string;
   sentiment_score: number | null;
@@ -186,6 +187,15 @@ export default function ArticlesView({
           </div>
           <div className="article-filter-grid">
             <label>
+              <span>Author</span>
+              <input
+                type="search"
+                value={filters.author}
+                placeholder="Exact author name"
+                onChange={(event) => updateFilter("author", event.target.value)}
+              />
+            </label>
+            <label>
               <span>Source</span>
               <select
                 value={filters.source}
@@ -283,6 +293,7 @@ export default function ArticlesView({
             <tr>
               <th>Title</th>
               <th>Source</th>
+              <th>Author</th>
               <th>Category</th>
               <th>Published</th>
               <th>Sentiment</th>
@@ -307,6 +318,7 @@ export default function ArticlesView({
                     {a.source}
                   </span>
                 </td>
+                <td>{a.author || "—"}</td>
                 <td>{a.category || "-"}</td>
                 <td>{a.publish_date ? timeAgo(a.publish_date) : "-"}</td>
                 <td>

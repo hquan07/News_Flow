@@ -21,6 +21,7 @@ _LATEST_SENTIMENT_JOIN = """
 
 def _build_article_filters(
         q=None,
+        author=None,
         source=None,
         category=None,
         date_from=None,
@@ -37,6 +38,9 @@ def _build_article_filters(
     if q:
         conditions.append("title ILIKE {q:String}")
         params["q"] = f"%{q}%"
+    if author:
+        conditions.append("lowerUTF8(trimBoth(author)) = lowerUTF8(trimBoth({author:String}))")
+        params["author"] = author
     if source:
         conditions.append("source = {source:String}")
         params["source"] = source
@@ -88,6 +92,7 @@ def get_articles(
         page: int = 1,
         page_size: int = 20,
         q: Optional[str] = None,
+        author: Optional[str] = None,
         source: Optional[str] = None,
         category: Optional[str] = None,
         date_from: Optional[date] = None,
@@ -99,7 +104,7 @@ def get_articles(
         sentiment: Optional[str] = None,
 ) -> dict:
     where_clause, params = _build_article_filters(
-        q=q,
+        q=q, author=author,
         source=source,
         category=category,
         date_from=date_from,
