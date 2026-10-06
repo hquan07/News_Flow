@@ -2832,7 +2832,7 @@ h1 {
 }
 
 .author-active-period {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.3rem;
   color: var(--text-muted);

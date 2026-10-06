@@ -449,7 +449,12 @@ export default function AuthorsView({ data, onViewArticles }: {
                       <td><span className={`tag ${author.source.toLowerCase()}`}>{sourceLabel(author.source)}</span></td>
                       <td>{Number(author.article_count).toLocaleString()}</td>
                       <td className="author-category">{author.top_category || "—"}</td>
-                      <td className="author-active-period"><CalendarDays size={13} /> {formatDateTime(author.first_published_at)} – {formatDateTime(author.last_published_at)}</td>
+                      <td>
+                        <span className="author-active-period">
+                          <CalendarDays size={13} />
+                          {formatDateTime(author.first_published_at)} – {formatDateTime(author.last_published_at)}
+                        </span>
+                      </td>
                       <td><span className={`author-sentiment ${sentiment.className}`}>{sentiment.label}</span></td>
                       <td>{Number(author.analyzed_count).toLocaleString()} / {Number(author.article_count).toLocaleString()}</td>
                       <td><button type="button" className="author-articles-button print-hide" onClick={() => onViewArticles(author.author, author.source)}>View articles <ArrowRight size={14} /></button></td>
