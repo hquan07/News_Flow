@@ -55,5 +55,8 @@
   {"id":"articles-bai-ve","message":"Bài về AI trong 7 ngày qua","role":"user","expected_tool":"search_articles","expected_time_range":"7d"},
   {"id":"articles-de-cap","message":"Những tin đề cập đến VinFast","role":"user","expected_tool":"search_articles"},
   {"id":"articles-xem-bai","message":"Xem bài mới hôm nay","role":"user","expected_tool":"search_articles","expected_time_range":"today"},
-  {"id":"articles-week-topic","message":"Đọc tin về lãi suất từ VnExpress tuần qua","role":"user","expected_tool":"search_articles","expected_time_range":"7d","expected_source":"vnexpress"}
+  {"id":"articles-week-topic","message":"Đọc tin về lãi suất từ VnExpress tuần qua","role":"user","expected_tool":"search_articles","expected_time_range":"7d","expected_source":"vnexpress"},
+  {"id":"source-categories-en","message":"so sánh các category giữa Thanh Niên và Tuổi Trẻ","role":"user","expected_tool":"compare_source_categories","expected_time_range":"7d","expected_compare_sources":["thanhnien","tuoitre"]},
+  {"id":"source-categories-vi","message":"So sánh danh mục giữa VnExpress và Dân Trí trong 30 ngày qua","role":"analyst","expected_tool":"compare_source_categories","expected_time_range":"30d","expected_compare_sources":["vnexpress","dantri"]},
+  {"id":"source-categories-missing-source","message":"So sánh chuyên mục giữa các báo","role":"user","expected_tool":"clarify_scope","needs_clarification":true}
 ]

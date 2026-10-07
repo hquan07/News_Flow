@@ -28,6 +28,7 @@ TOOL_FOR_INTENT = {
     "trending": "get_trending_keywords",
     "sentiment": "get_sentiment_distribution",
     "sources": "compare_sources",
+    "source_categories": "compare_source_categories",
     "entities": "get_entities",
     "alerts": "get_volume_alerts",
     "rag": "search_article_content",

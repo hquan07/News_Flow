@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from api.routers import chat
 from api.security import create_access_token
@@ -91,6 +92,86 @@ async def test_compare_clarification_accepts_two_sources_as_reply(async_client, 
     assert second.json()["tool"] == "compare_sources"
     assert second.json()["context"]["compare_sources"] == ["vnexpress", "tuoitre"]
     assert captured["params"]["source_names"] == ["vnexpress", "tuoitre"]
+
+
+@pytest.mark.asyncio
+async def test_compare_categories_by_two_sources_uses_real_category_counts(async_client, chat_db, monkeypatch):
+    captured = {}
+
+    def fake_query(sql, params):
+        captured.update(sql=sql, params=params)
+        return [
+            {"source": "thanhnien", "category": "general", "article_count": 1537},
+            {"source": "tuoitre", "category": "general", "article_count": 1359},
+            {"source": "thanhnien", "category": "công nghệ", "article_count": 18},
+            {"source": "tuoitre", "category": "thế giới", "article_count": 24},
+        ]
+
+    monkeypatch.setattr(chat_tools, "_query", fake_query)
+    response = await async_client.post(
+        "/api/v1/chat",
+        json={"message": "so sánh các category giữa Thanh Niên và Tuổi Trẻ"},
+        headers=headers(),
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tool"] == "compare_source_categories"
+    assert data["context"]["compare_sources"] == ["thanhnien", "tuoitre"]
+    assert data["context"]["time_range"] == "7d"
+    assert "general: Thanh Niên 1.537; Tuổi Trẻ 1.359" in data["answer"]
+    assert "công nghệ: Thanh Niên 18; Tuổi Trẻ 0" in data["answer"]
+    assert "‘general’" in data["answer"]
+    assert "countDistinct(a.url_hash)" in captured["sql"]
+    assert "7 DAY" in captured["sql"]
+    assert captured["params"] == {"source_names": ["thanhnien", "tuoitre"]}
+
+
+@pytest.mark.asyncio
+async def test_category_comparison_clarifies_missing_or_conflicting_filters(async_client, chat_db, monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: pytest.fail("queried before scope clarification"))
+    for payload in (
+        {"message": "So sánh category giữa các báo"},
+        {"message": "So sánh category giữa Thanh Niên và Tuổi Trẻ", "source": "thanhnien"},
+        {"message": "So sánh category giữa Thanh Niên và Tuổi Trẻ", "category": "thể thao"},
+    ):
+        response = await async_client.post("/api/v1/chat", json=payload, headers=headers())
+        assert response.status_code == 200
+        assert response.json()["tool"] == "clarify_scope"
+
+
+def test_category_comparison_requires_dashboard_permission_before_query(monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: pytest.fail("queried without permission"))
+    with pytest.raises(HTTPException) as error:
+        chat_tools.answer_question(
+            chat_tools.ChatRequest(message="So sánh danh mục giữa VnExpress và Dân Trí"),
+            {"permissions": []},
+        )
+    assert error.value.status_code == 403
+
+
+def test_category_comparison_followup_keeps_selected_sources():
+    plan = chat_tools.plan_question(
+        chat_tools.ChatRequest(message="Còn so sánh category?"),
+        {"intent": "sources", "time_range": "7d", "compare_sources": ["vnexpress", "tuoitre"],
+         "source": None, "category": None, "query": None, "clarification": False},
+    )
+    assert plan.intent == "source_categories"
+    assert plan.compare_sources == ["vnexpress", "tuoitre"]
+    assert plan.clarification is None
+
+
+def test_category_comparison_does_not_present_truncated_counts(monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: [
+        {"source": "vnexpress", "category": f"category-{index}", "article_count": 1}
+        for index in range(101)
+    ])
+    result = chat_tools.answer_question(
+        chat_tools.ChatRequest(message="So sánh category giữa VnExpress và Dân Trí"),
+        {"permissions": ["dashboard.read"]},
+    )
+    assert result.tool == "compare_source_categories"
+    assert "quá nhiều nhóm" in result.answer
+    assert "category-0" not in result.answer
 
 
 @pytest.mark.asyncio

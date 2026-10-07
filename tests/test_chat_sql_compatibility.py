@@ -14,6 +14,7 @@ from api.services import chat_tools, rag_retrieval
     "Từ khóa nào thịnh hành hôm nay?",
     "Sentiment hôm nay",
     "So sánh nguồn VnExpress và Tuổi Trẻ",
+    "So sánh category giữa Thanh Niên và Tuổi Trẻ",
     "Thực thể nào xuất hiện nhiều trong 7 ngày qua?",
     "Thực thể nào liên quan đến VinFast?",
 ])
