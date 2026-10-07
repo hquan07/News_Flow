@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from api.models.chat import (
+    ChatEvidence,
     ChatRequest,
     ChatResponse,
     ChatFeedback,
@@ -23,7 +24,8 @@ from api.models.chat import (
     ProjectUpdate,
 )
 from api.security import require_permission
-from api.services import chat_guard, chat_metrics, chat_store, chat_tools, intelligence_store
+from api.exceptions import DependencyUnavailableError
+from api.services import chat_generation, chat_guard, chat_metrics, chat_store, chat_tools, intelligence_store
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -38,7 +40,7 @@ async def _record_metric(tool: str, outcome: str, started: float, source_count: 
 
 
 async def _run_tool(
-    payload: ChatRequest, actor: dict, previous_context: dict | None
+    payload: ChatRequest, actor: dict, previous_context: dict | None,
 ) -> chat_tools.ToolResult:
     try:
         return await asyncio.to_thread(
@@ -49,7 +51,7 @@ async def _run_tool(
         raise HTTPException(status_code=500, detail="Chat data query failed") from exc
 
 
-async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
+async def _answer(payload: ChatRequest, actor: dict, *, generate: bool = True) -> ChatResponse:
     started = monotonic()
     owner_id = actor["sub"]
     previous_context = None
@@ -72,9 +74,30 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
                 None,
             )
             previous_context = last_answer.get("context") if last_answer else None
+            if previous_context is None and chat_tools._asks_chart(payload.message):
+                # Older unsupported chart replies have no context. Skip only
+                # consecutive chart retries, not unrelated questions.
+                for message in reversed(conversation["messages"]):
+                    if message["role"] == "user":
+                        if not chat_tools._asks_chart(message["content"]):
+                            break
+                    elif message.get("context"):
+                        previous_context = message["context"]
+                        break
 
         await chat_guard.check_rate_limit(owner_id)
         result = await _run_tool(payload, actor, previous_context)
+        if generate and chat_generation.can_generate(result):
+            try:
+                answer = await chat_generation.generate_grounded_answer(
+                    payload.message, result.answer, result.sources
+                )
+            except DependencyUnavailableError:
+                logger.warning("Grounded generation unavailable; returning extractive answer")
+            else:
+                if answer:
+                    result.answer = answer
+                    result.evidence = chat_generation.generated_evidence(len(result.sources))
         tool = result.tool or "none"
         if payload.conversation_id:
             conversation_id = payload.conversation_id
@@ -95,6 +118,7 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
             queried_at=result.queried_at,
             chart=result.chart,
             context=result.context,
+            evidence=result.evidence,
         )
         response = ChatResponse(
             conversation_id=conversation_id,
@@ -106,6 +130,7 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
             time_range=result.time_range,
             chart=result.chart,
             context=result.context,
+            evidence=result.evidence,
         )
     except HTTPException as exc:
         outcome = "rate_limited" if exc.status_code == 429 else "denied" if exc.status_code in (401, 403, 404) else "errors"
@@ -131,13 +156,32 @@ async def stream_chat(
     payload: ChatRequest,
     actor: dict = Depends(require_permission("chat.use")),
 ):
-    result = await _answer(payload, actor)
+    result = await _answer(payload, actor, generate=False)
 
     async def events():
-        for offset in range(0, len(result.answer), 200):
-            chunk = result.answer[offset:offset + 200]
-            yield f"event: delta\ndata: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
-        metadata = result.model_dump(mode="json", exclude={"answer"})
+        stream_result = result
+        chunks = []
+        if chat_generation.can_generate(stream_result):
+            try:
+                async for chunk in chat_generation.stream_grounded_answer(
+                    payload.message, stream_result.answer, stream_result.sources
+                ):
+                    chunks.append(chunk)
+                    yield f"event: delta\ndata: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
+            except DependencyUnavailableError:
+                logger.warning("Grounded stream unavailable; returning extractive answer")
+        if chunks:
+            answer = "".join(chunks).strip()[:16000]
+            evidence_data = chat_generation.generated_evidence(len(stream_result.sources))
+            await chat_store.update_assistant_answer(
+                actor["sub"], stream_result.conversation_id, stream_result.message_id or "", answer, evidence_data
+            )
+            stream_result = stream_result.model_copy(update={
+                "answer": answer, "evidence": ChatEvidence.model_validate(evidence_data),
+            })
+        else:
+            yield f"event: delta\ndata: {json.dumps({'text': stream_result.answer}, ensure_ascii=False)}\n\n"
+        metadata = stream_result.model_dump(mode="json", exclude={"answer"})
         yield f"event: done\ndata: {json.dumps(metadata, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={

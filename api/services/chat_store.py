@@ -64,6 +64,7 @@ def _serialize_message(document: dict) -> dict:
         "queried_at": document.get("queried_at"),
         "chart": document.get("chart"),
         "context": document.get("context"),
+        "evidence": document.get("evidence"),
         "feedback": document.get("feedback"),
     }
 
@@ -292,6 +293,7 @@ async def append_message(
     queried_at: datetime | None = None,
     chart: dict | None = None,
     context: dict | None = None,
+    evidence: dict | None = None,
 ) -> dict:
     if role not in ("user", "assistant") or not content.strip() or len(content) > 16000:
         raise ValueError("Invalid chat message")
@@ -315,6 +317,7 @@ async def append_message(
         "queried_at": queried_at,
         "chart": chart,
         "context": context,
+        "evidence": evidence,
     }
     result = await db.chat_messages.insert_one(document)
     document["_id"] = result.inserted_id
@@ -334,6 +337,20 @@ async def delete_conversation(owner_id: str, conversation_id: str) -> None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     await db.chat_messages.delete_many({"conversation_id": oid, "owner_id": owner_id})
     await _audit("chat.conversation_deleted", owner_id, oid)
+
+
+async def update_assistant_answer(
+    owner_id: str, conversation_id: str, message_id: str, content: str, evidence: dict,
+) -> None:
+    oid = _conversation_id(conversation_id)
+    if not ObjectId.is_valid(message_id) or not content.strip() or len(content) > 16000:
+        raise HTTPException(status_code=404, detail="Assistant message not found")
+    updated = await get_mongo_db().chat_messages.update_one(
+        {"_id": ObjectId(message_id), "conversation_id": oid, "owner_id": owner_id, "role": "assistant"},
+        {"$set": {"content": content, "evidence": evidence}},
+    )
+    if updated.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Assistant message not found")
 
 
 async def set_message_feedback(owner_id: str, conversation_id: str, message_id: str, reason: str) -> dict:

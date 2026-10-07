@@ -15,7 +15,7 @@ def test_citation_summary_preserves_excerpts_and_citation_numbers():
     ])
     assert "verified excerpt [1]" in result
     assert "another excerpt [2]" in result
-    assert "giữ nguyên nội dung nguồn" in result
+    assert "chưa phải bản tóm tắt do AI tạo" in result
 
 
 def test_event_briefing_contains_timeline_and_citations(monkeypatch):

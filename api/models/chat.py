@@ -55,8 +55,9 @@ class ChatMessage(BaseModel):
     sources: list["ChatSource"] = Field(default_factory=list)
     tool: str | None = None
     queried_at: datetime | None = None
-    chart: "ChatChart | None" = None
+    chart: "ChatChart | ChatGroupedChart | None" = None
     context: "ChatContext | None" = None
+    evidence: "ChatEvidence | None" = None
     feedback: "ChatFeedback | None" = None
 
 
@@ -88,6 +89,24 @@ class ChatChart(BaseModel):
     points: list[ChatChartPoint] = Field(default_factory=list)
 
 
+class ChatGroupedChartPoint(BaseModel):
+    label: str
+    values: dict[str, float]
+
+
+class ChatGroupedChartSeries(BaseModel):
+    key: str
+    label: str
+
+
+class ChatGroupedChart(BaseModel):
+    type: Literal["grouped_bar"] = "grouped_bar"
+    title: str
+    unit: str
+    series: list[ChatGroupedChartSeries]
+    points: list[ChatGroupedChartPoint] = Field(default_factory=list)
+
+
 class ChatContext(BaseModel):
     intent: str
     time_range: Literal["today", "7d", "30d", "all"] | None = None
@@ -98,6 +117,14 @@ class ChatContext(BaseModel):
     clarification: bool = False
     event_id: str | None = None
     watchlist_id: str | None = None
+
+
+class ChatEvidence(BaseModel):
+    answer_kind: Literal["warehouse_facts", "article_excerpts", "generated_summary", "system"]
+    result_status: Literal["ok", "no_results", "degraded"]
+    method: Literal["structured_query", "keyword", "hybrid", "grounded_generation", "none"]
+    source_count: int = Field(default=0, ge=0)
+    note: str
 
 
 class ChatRequest(BaseModel):
@@ -129,8 +156,9 @@ class ChatResponse(BaseModel):
     sources: list[ChatSource] = Field(default_factory=list)
     queried_at: datetime | None = None
     time_range: str | None = None
-    chart: ChatChart | None = None
+    chart: ChatChart | ChatGroupedChart | None = None
     context: ChatContext | None = None
+    evidence: ChatEvidence | None = None
 
 
 class ConversationDetail(Conversation):

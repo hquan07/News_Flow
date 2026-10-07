@@ -127,7 +127,21 @@ def test_rag_disabled_returns_cited_keyword_results(monkeypatch):
     assert "ORDER BY (a.title ILIKE {phrase:String}) DESC" in queries[0][0]
 
 
-def test_keyword_candidates_require_all_terms_when_phrase_has_no_hits(monkeypatch):
+def test_rag_answer_exposes_degraded_evidence(monkeypatch):
+    monkeypatch.setattr(rag_retrieval, "get_settings", lambda: SimpleNamespace(RAG_ENABLED=False))
+    monkeypatch.setattr(rag_retrieval, "_query", lambda *_args: [])
+    result = chat_tools.answer_question(
+        ChatRequest(message="Tóm tắt nội dung về lãi suất"),
+        {"permissions": ["dashboard.read"]},
+    )
+    assert result.evidence == {
+        "answer_kind": "article_excerpts", "result_status": "no_results", "method": "keyword",
+        "source_count": 0, "note": "Không tìm thấy bài phù hợp trong phạm vi đã chọn.",
+    }
+
+
+def test_keyword_candidates_rank_partial_matches_when_phrase_has_no_hits(monkeypatch):
+    monkeypatch.setattr(rag_retrieval, "get_settings", lambda: SimpleNamespace(RAG_CANDIDATE_LIMIT=20))
     queries = []
 
     def fake_query(sql, params):
@@ -140,8 +154,10 @@ def test_keyword_candidates_require_all_terms_when_phrase_has_no_hits(monkeypatc
     )
     assert ids == ["separate-terms"]
     assert len(queries) == 2
-    assert "(a.title ILIKE {term0:String} OR a.content ILIKE {term0:String}) AND " in queries[1][0]
+    assert "(a.title ILIKE {term0:String} OR a.content ILIKE {term0:String}) OR " in queries[1][0]
     assert "(a.title ILIKE {term1:String} OR a.content ILIKE {term1:String})" in queries[1][0]
+    assert "toUInt8((a.title ILIKE {term0:String}" in queries[1][0]
+    assert "LIMIT 20" in queries[1][0]
 
 
 def test_keyword_only_result_keeps_clickhouse_filters(monkeypatch):

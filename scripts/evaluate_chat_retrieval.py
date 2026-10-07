@@ -74,17 +74,29 @@ def evaluate(cases: list[dict], *, with_vector: bool = False) -> dict:
                 "ndcg_at_5": round(scores["ndcg"], 4),
                 "latency_ms": round(checked_ms + (keyword_ms if mode != "vector" else 0) + (vector_ms if mode != "keyword" else 0), 2),
             })
+    mode_summary = {
+        mode: {
+            "mean_recall_at_5": round(sum(row["recall_at_5"] for row in rows) / len(rows), 4),
+            "mean_ndcg_at_5": round(sum(row["ndcg_at_5"] for row in rows) / len(rows), 4),
+            "p95_latency_ms": sorted(row["latency_ms"] for row in rows)[math.ceil(0.95 * len(rows)) - 1],
+            "case_results": rows,
+        }
+        for mode, rows in measurements.items()
+    }
+    comparison = None
+    if with_vector:
+        best_single = max(("keyword", "vector"), key=lambda mode: mode_summary[mode]["mean_ndcg_at_5"])
+        hybrid_gain = mode_summary["hybrid"]["mean_ndcg_at_5"] - mode_summary[best_single]["mean_ndcg_at_5"]
+        comparison = {
+            "best_single_mode": best_single,
+            "hybrid_ndcg_gain": round(hybrid_gain, 4),
+            "hybrid_beats_best_single": hybrid_gain > 0,
+            "recommended_mode": "hybrid" if hybrid_gain > 0 else best_single,
+        }
     return {
         "cases": len(cases), "evaluated_at": datetime.now(timezone.utc).isoformat(),
-        "modes": {
-            mode: {
-                "mean_recall_at_5": round(sum(row["recall_at_5"] for row in rows) / len(rows), 4),
-                "mean_ndcg_at_5": round(sum(row["ndcg_at_5"] for row in rows) / len(rows), 4),
-                "p95_latency_ms": sorted(row["latency_ms"] for row in rows)[math.ceil(0.95 * len(rows)) - 1],
-                "case_results": rows,
-            }
-            for mode, rows in measurements.items()
-        },
+        "modes": mode_summary,
+        "comparison": comparison,
     }
 
 
@@ -92,9 +104,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", type=Path, required=True)
     parser.add_argument("--with-vector", action="store_true", help="Requires running embedding and Qdrant services")
+    parser.add_argument(
+        "--require-hybrid-gain", action="store_true",
+        help="Exit nonzero unless hybrid nDCG@5 beats both keyword and vector",
+    )
     args = parser.parse_args()
     cases = validate_cases(json.loads(args.cases.read_text(encoding="utf-8")))
-    print(json.dumps(evaluate(cases, with_vector=args.with_vector), ensure_ascii=False, indent=2))
+    if args.require_hybrid_gain and not args.with_vector:
+        parser.error("--require-hybrid-gain requires --with-vector")
+    result = evaluate(cases, with_vector=args.with_vector)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if args.require_hybrid_gain and not result["comparison"]["hybrid_beats_best_single"]:
+        return 2
     return 0
 
 

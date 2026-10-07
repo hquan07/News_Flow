@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Pencil, ShieldCheck, SquarePen, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { API_BASE, apiFetch } from "@/lib/api";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { API_BASE, ApiError, apiFetch, apiSse } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
 import ColoredTooltipValue, { DARK_TOOLTIP_CONTENT_STYLE, DARK_TOOLTIP_ITEM_STYLE } from "../ui/ColoredTooltipValue";
 
@@ -19,6 +19,12 @@ type ChatChart = {
   title: string;
   unit: string;
   points: { label: string; value: number }[];
+} | {
+  type: "grouped_bar";
+  title: string;
+  unit: string;
+  series: { key: string; label: string }[];
+  points: { label: string; values: Record<string, number> }[];
 };
 type ChatScope = {
   intent: string;
@@ -31,6 +37,13 @@ type ChatScope = {
   event_id?: string | null;
   watchlist_id?: string | null;
 };
+type ChatEvidence = {
+  answer_kind: "warehouse_facts" | "article_excerpts" | "generated_summary" | "system";
+  result_status: "ok" | "no_results" | "degraded";
+  method: "structured_query" | "keyword" | "hybrid" | "grounded_generation" | "none";
+  source_count: number;
+  note: string;
+};
 type ChatMessage = {
   id?: string;
   role: "user" | "assistant";
@@ -39,7 +52,9 @@ type ChatMessage = {
   chart?: ChatChart | null;
   queried_at?: string | null;
   context?: ChatScope | null;
+  evidence?: ChatEvidence | null;
   feedback?: { reason: FeedbackReason } | null;
+  streaming?: boolean;
 };
 type FeedbackReason = "helpful" | "wrong_source" | "wrong_number";
 type Conversation = { id: string; title: string; project_id: string | null };
@@ -52,7 +67,9 @@ type ChatResponse = {
   chart: ChatChart | null;
   queried_at: string | null;
   context: ChatScope | null;
+  evidence: ChatEvidence | null;
 };
+type ChatStreamDone = Omit<ChatResponse, "answer">;
 type ActionType = "acknowledge_alert" | "trigger_crawler" | "generate_report";
 type ActionPreview = {
   action_id: string;
@@ -77,6 +94,53 @@ const suggestions = [
 const timeRangeLabels: Record<NonNullable<ChatScope["time_range"]>, string> = {
   today: "24 giờ qua", "7d": "7 ngày qua", "30d": "30 ngày qua", all: "Toàn bộ thời gian",
 };
+
+const comparisonColors = ["#60a5fa", "#fb923c"];
+
+function ChatChartDisplay({ chart }: { chart: ChatChart }) {
+  return (
+    <div className="chat-chart" role="img" aria-label={`${chart.title}; đơn vị ${chart.unit}`}>
+      <h3>{chart.title}</h3>
+      {chart.type === "grouped_bar" ? (
+        <ResponsiveContainer width="100%" height={Math.max(260, chart.points.length * 44 + 54)}>
+          <BarChart data={chart.points.map((point) => ({ label: point.label, ...point.values }))}
+            layout="vertical" margin={{ top: 8, right: 18, left: 0, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+            <XAxis type="number" allowDecimals={false} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <YAxis type="category" dataKey="label" width={110} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <Tooltip cursor={{ fill: "rgba(96, 165, 250, 0.08)" }}
+              contentStyle={{ ...DARK_TOOLTIP_CONTENT_STYLE, borderRadius: 8 }}
+              labelStyle={DARK_TOOLTIP_ITEM_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE}
+              formatter={(value, name, item) => [
+                <ColoredTooltipValue key="value" color={String(item.color)}>{Number(value).toLocaleString("vi-VN")} {chart.unit}</ColoredTooltipValue>,
+                name,
+              ]} />
+            <Legend wrapperStyle={{ color: "#cbd5e1", fontSize: 12 }} />
+            {chart.series.map((series, index) => (
+              <Bar key={series.key} dataKey={series.key} name={series.label} fill={comparisonColors[index % comparisonColors.length]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={chart.points} margin={{ top: 8, right: 12, left: 0, bottom: 40 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+            <XAxis dataKey="label" angle={-25} textAnchor="end" interval={0} height={56} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <Tooltip cursor={{ fill: "rgba(96, 165, 250, 0.1)" }}
+              contentStyle={{ ...DARK_TOOLTIP_CONTENT_STYLE, borderRadius: 8 }}
+              labelStyle={DARK_TOOLTIP_ITEM_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE}
+              formatter={(value) => [
+                <ColoredTooltipValue key="value" color="#60a5fa">{Number(value).toLocaleString("vi-VN")}</ColoredTooltipValue>,
+                chart.unit,
+              ]} />
+            <Bar dataKey="value" fill="#60a5fa" name={chart.unit} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
 
 export default function ChatView({ open, onClose, intelligenceScope, onClearScope }: {
   open: boolean;
@@ -317,8 +381,16 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
     if (!text || loading || historyLoading || deletingId) return;
     setLoading(true);
     setError(null);
+    const previousMessages = messages;
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: text },
+      { role: "assistant", content: "", streaming: true },
+    ]);
+    setQuestion("");
     try {
-      const response = await apiFetch<ChatResponse>(`${API_BASE}/chat`, {
+      let completed: ChatStreamDone | null = null;
+      await apiSse(`${API_BASE}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -330,13 +402,25 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
           ...(intelligenceScope?.event_id ? { event_id: intelligenceScope.event_id } : {}),
           ...(intelligenceScope?.watchlist_id ? { watchlist_id: intelligenceScope.watchlist_id } : {}),
         }),
+      }, (event, payload) => {
+        if (event === "delta") {
+          const chunk = typeof payload === "object" && payload ? (payload as { text?: unknown }).text : null;
+          if (typeof chunk === "string") {
+            setMessages((current) => current.map((item) => item.streaming
+              ? { ...item, content: item.content + chunk } : item));
+          }
+        } else if (event === "done") {
+          completed = payload as ChatStreamDone;
+          const done = completed;
+          setMessages((current) => current.map((item) => item.streaming ? {
+            ...item, id: done.message_id ?? undefined, streaming: false,
+            sources: done.sources, chart: done.chart, queried_at: done.queried_at,
+            context: done.context, evidence: done.evidence,
+          } : item));
+        }
       });
-      setMessages((current) => [
-        ...current,
-        { role: "user", content: text },
-        { id: response.message_id ?? undefined, role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at, context: response.context },
-      ]);
-      setQuestion("");
+      if (!completed) throw new Error("Luồng trả lời kết thúc trước khi nhận trạng thái hoàn tất.");
+      const response = completed as ChatStreamDone;
       if (!activeId) {
         setChatSearch("");
         setActiveId(response.conversation_id);
@@ -347,7 +431,11 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
         setListRevision((current) => current + 1);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không gửi được câu hỏi.");
+      setMessages(previousMessages);
+      setQuestion(text);
+      setError(cause instanceof ApiError && cause.status === 503
+        ? "Dịch vụ dữ liệu đang tạm thời không khả dụng. Đây là lỗi dịch vụ, không phải kết quả ‘không có dữ liệu’. Vui lòng thử lại sau."
+        : cause instanceof Error ? cause.message : "Không gửi được câu hỏi.");
     } finally {
       setLoading(false);
     }
@@ -726,28 +814,17 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
                   Truy vấn lúc {new Date(message.queried_at).toLocaleString("vi-VN")}
                 </small>
               )}
-              {message.chart && message.chart.points.length > 0 && (
-                <div className="chat-chart" role="img" aria-label={`${message.chart.title}; đơn vị ${message.chart.unit}`}>
-                  <h3>{message.chart.title}</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={message.chart.points} margin={{ top: 8, right: 12, left: 0, bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="label" angle={-25} textAnchor="end" interval={0} height={56} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                      <Tooltip
-                        cursor={{ fill: "rgba(96, 165, 250, 0.1)" }}
-                        contentStyle={{ ...DARK_TOOLTIP_CONTENT_STYLE, borderRadius: 8 }}
-                        labelStyle={DARK_TOOLTIP_ITEM_STYLE}
-                        itemStyle={DARK_TOOLTIP_ITEM_STYLE}
-                        formatter={(value) => [
-                          <ColoredTooltipValue key="value" color="#60a5fa">{Number(value).toLocaleString("vi-VN")}</ColoredTooltipValue>,
-                          message.chart?.unit ?? "",
-                        ]}
-                      />
-                      <Bar dataKey="value" fill="#60a5fa" name={message.chart.unit} />
-                    </BarChart>
-                  </ResponsiveContainer>
+              {message.role === "assistant" && message.evidence && (
+                <div className={`chat-evidence ${message.evidence.result_status}`} aria-label="Căn cứ trả lời">
+                  <strong>{message.evidence.answer_kind === "generated_summary" ? "Tổng hợp AI có nguồn"
+                    : message.evidence.answer_kind === "article_excerpts" ? "Trích đoạn bài viết"
+                    : message.evidence.answer_kind === "warehouse_facts" ? "Dữ liệu NewsPulse" : "Hướng dẫn hệ thống"}</strong>
+                  <span>{message.evidence.note}</span>
+                  {message.evidence.source_count > 0 && <small>{message.evidence.source_count} nguồn được dẫn</small>}
                 </div>
+              )}
+              {message.chart && message.chart.points.length > 0 && (
+                <ChatChartDisplay chart={message.chart} />
               )}
               {!!message.sources?.length && (
                 <div className="chat-sources">
@@ -757,7 +834,7 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
                   ))}
                 </div>
               )}
-              {message.role === "assistant" && message.id && (
+              {message.role === "assistant" && message.id && !message.streaming && (
                 <div className="chat-feedback" aria-label="Đánh giá câu trả lời">
                   <span>Phản hồi:</span>
                   {([
@@ -773,7 +850,7 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
             </div>
           ))}
           {historyLoading && <p className="chat-loading">Đang tải hội thoại…</p>}
-          {loading && <p className="chat-loading">Đang truy vấn dữ liệu…</p>}
+          {loading && <p className="chat-loading">Đang tạo câu trả lời…</p>}
         </div>
         {error && <p className="chat-error" role="alert">{error}</p>}
         <form className="chat-form" onSubmit={submit}>

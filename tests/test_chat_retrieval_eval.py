@@ -38,3 +38,23 @@ def test_evaluator_rechecks_current_article_scope(monkeypatch):
     result = evaluate_chat_retrieval.evaluate(cases)
     assert result["modes"]["keyword"]["mean_recall_at_5"] == 1.0
     assert result["modes"]["keyword"]["case_results"][0]["id"] == "case-1"
+
+
+def test_evaluator_reports_whether_hybrid_beats_best_single(monkeypatch):
+    monkeypatch.setattr(rag_retrieval, "_keyword_candidates", lambda *_args: ["relevant-a", "keyword-noise"])
+    monkeypatch.setattr(rag_retrieval.chat_embed_cache, "query_vector", lambda *_args: [0.1])
+    monkeypatch.setattr(rag_retrieval.rag_client, "query_chunks", lambda *_args, **_kwargs: [
+        {"payload": {"article_id": "relevant-b", "text": ""}},
+        {"payload": {"article_id": "vector-noise", "text": ""}},
+    ])
+    monkeypatch.setattr(rag_retrieval, "_current_articles", lambda *_args: {
+        item: {"article_id": item, "content": "body"}
+        for item in ("relevant-a", "relevant-b", "keyword-noise", "vector-noise")
+    })
+    cases = evaluate_chat_retrieval.validate_cases([{
+        "id": "case-1", "query": "AI", "relevant_article_ids": ["relevant-a", "relevant-b"],
+    }])
+    result = evaluate_chat_retrieval.evaluate(cases, with_vector=True)
+    assert result["comparison"]["best_single_mode"] in ("keyword", "vector")
+    assert result["comparison"]["hybrid_beats_best_single"] is True
+    assert result["comparison"]["recommended_mode"] == "hybrid"

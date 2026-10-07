@@ -31,6 +31,7 @@ class ToolResult:
     time_range: str | None = None
     chart: dict | None = None
     context: dict | None = None
+    evidence: dict | None = None
 
 
 @dataclass
@@ -57,23 +58,43 @@ def _intent(message: str) -> str | None:
         return "authors_unspecified"
     if any(word in normalized for word in ("canh bao", "alert", "khung hoang", "bat thuong")):
         return "alerts"
-    if any(word in normalized for word in ("so sanh nguon", "so sanh bao", "nguon nao", "bao nao", "compare sources")):
+    if _asks_source_categories(normalized):
+        return "source_categories"
+    if any(word in normalized for word in (
+        "so sanh nguon", "so sanh bao", "doi chieu nguon", "doi chieu bao",
+        "doi chieu ", "khac nhau giua", "nguon nao", "bao nao", "compare sources",
+    )):
         return "sources"
     if any(word in normalized for word in ("sentiment", "cam xuc", "tich cuc", "tieu cuc")):
         return "sentiment"
     if any(word in normalized for word in ("trending", "xu huong", "thinh hanh", "tu khoa", "chu de nao")):
         return "trending"
-    if any(phrase in normalized for phrase in ("tong so", "bao nhieu", "so luong", "dem ", "count ")) and any(
-        subject in normalized for subject in ("bai", "tin", "article", "news")
-    ):
-        return "article_count"
+    count_cue = re.search(
+        r"\b(?:tong so|tong cong|bao nhieu|so luong|so bai|dem|thong ke so|thong ke luong|count)\b",
+        normalized,
+    )
+    if count_cue:
+        if re.search(r"\b(?:bai dang|binh luan|post|social)\b", normalized):
+            return "social_count"
+        if re.search(r"\b(?:bai|tin|article|news)\b", normalized):
+            return "article_count"
     if any(word in normalized for word in ("tom tat", "noi dung", "noi gi ve", "giai thich ve", "semantic", "tuong tu", "summarize")):
         return "rag"
-    if any(word in normalized for word in ("bai viet", "bai bao", "tin moi", "tim tin", "tim bai", "tom tat", "articles")):
+    if any(word in normalized for word in (
+        "bai viet", "bai bao", "tin moi", "tin tuc", "tim tin", "tim bai",
+        "xem tin", "xem bai", "doc tin", "bai ve", "nhung tin", "articles",
+    )):
         return "articles"
     if any(word in normalized for word in ("entity", "thuc the", "nhan vat", "to chuc nao", "dia danh", "lien quan den")):
         return "entities"
     return None
+
+
+def _asks_source_categories(normalized: str) -> bool:
+    return (
+        any(term in normalized for term in ("category", "categories", "danh muc", "chuyen muc"))
+        and any(term in normalized for term in ("so sanh", "doi chieu", "giua", "theo tung nguon"))
+    )
 
 
 def _event(request: ChatRequest, _time_range: str | None) -> ToolResult:
@@ -119,6 +140,10 @@ def _is_followup(message: str) -> bool:
     return normalized.startswith(("con ", "the ", "vay ", "neu ", "so voi ", "tu nguon ", "nguon "))
 
 
+def _asks_chart(message: str) -> bool:
+    return "bieu do" in _normalized(message)
+
+
 _SOURCE_NAMES = {
     "vnexpress": "vnexpress",
     "tuoi tre": "tuoitre",
@@ -131,6 +156,11 @@ _SOURCE_NAMES = {
     "laodong": "laodong",
     "tien phong": "tienphong",
     "tienphong": "tienphong",
+}
+
+_SOURCE_LABELS = {
+    "vnexpress": "VnExpress", "tuoitre": "Tuổi Trẻ", "thanhnien": "Thanh Niên",
+    "dantri": "Dân Trí", "laodong": "Lao Động", "tienphong": "Tiền Phong",
 }
 
 _SOCIAL_SOURCE_GROUPS = {
@@ -157,10 +187,12 @@ def _mentioned_social_sources(message: str) -> list[str]:
 
 def _mentioned_sources(message: str) -> list[str]:
     normalized = _normalized(message)
-    return list(dict.fromkeys(
-        canonical for alias, canonical in _SOURCE_NAMES.items()
-        if re.search(rf"\b{re.escape(alias)}\b", normalized)
-    ))
+    matches = [
+        (match.start(), canonical)
+        for alias, canonical in _SOURCE_NAMES.items()
+        if (match := re.search(rf"\b{re.escape(alias)}\b", normalized))
+    ]
+    return list(dict.fromkeys(canonical for _, canonical in sorted(matches)))
 
 
 def _chart(title: str, unit: str, rows: list[dict], label_key: str, value_key: str) -> dict | None:
@@ -181,17 +213,21 @@ def _search_term(request: ChatRequest) -> str | None:
     if request.query:
         return request.query.strip() or None
     match = re.search(
-        r"\b(?:về|ve|about|liên quan đến|lien quan den)\s+(.+)",
+        r"\b(?:về|ve|about|liên quan đến|lien quan den|đề cập đến|de cap den|nhắc đến|nhac den)\s+(.+)",
         request.message, re.IGNORECASE,
     )
     if not match:
         return None
     term = match.group(1).strip(" ?.!")
     term = re.sub(
-        r"\s+(?:hôm nay|hom nay|trong\s+\d+\s+(?:ngày|ngay)(?:\s+qua)?)$",
+        r"\s+(?:hôm nay|hom nay|tuần qua|tuan qua|tuần này|tuan nay|tháng qua|thang qua|trong\s+\d+\s+(?:ngày|ngay)(?:\s+qua)?)$",
         "",
         term,
         flags=re.IGNORECASE,
+    )
+    term = re.sub(
+        r"\s+(?:từ|của|from)\s+(?:báo\s+)?(?:vnexpress|tuổi trẻ|tuoitre|thanh niên|thanhnien|dân trí|dantri|lao động|laodong|tiền phong|tienphong)$",
+        "", term, flags=re.IGNORECASE,
     )
     return term[:120] or None
 
@@ -516,6 +552,62 @@ def _sources(request: ChatRequest, time_range: str) -> ToolResult:
     )
 
 
+def _source_categories(request: ChatRequest, time_range: str) -> ToolResult:
+    selected = request.compare_sources or _mentioned_sources(request.message)
+    where = f"a.publish_time >= now() - INTERVAL {_TIME_WINDOWS[time_range]}"
+    rows = _query(
+        "SELECT a.source, a.category, countDistinct(a.url_hash) AS article_count "
+        "FROM newspulse.raw_articles AS a FINAL "
+        f"WHERE {where} AND a.source IN {{source_names:Array(String)}} "
+        "GROUP BY a.source, a.category ORDER BY article_count DESC LIMIT 101",
+        {"source_names": selected},
+    )
+    if not rows:
+        return ToolResult(
+            answer="Chưa có bài báo thuộc hai nguồn này trong khoảng thời gian đã chọn.",
+            tool="compare_source_categories", time_range=time_range,
+        )
+    if len(rows) > 100:
+        return ToolResult(
+            answer="Có quá nhiều nhóm danh mục để so sánh đầy đủ. Hãy chọn khoảng thời gian ngắn hơn.",
+            tool="compare_source_categories", time_range=time_range,
+        )
+    by_category: dict[str, dict[str, int]] = {}
+    for row in rows:
+        category = str(row["category"]).strip() or "(trống)"
+        by_category.setdefault(category, {})[str(row["source"])] = int(row["article_count"])
+    ranked = sorted(by_category, key=lambda category: (-sum(by_category[category].values()), category))
+    lines = [
+        f"- {category}: " + "; ".join(
+            f"{_SOURCE_LABELS.get(source, source)} {by_category[category].get(source, 0):,}".replace(",", ".")
+            for source in selected
+        )
+        for category in ranked[:12]
+    ]
+    answer = (
+        f"Số bài báo theo danh mục của {_SOURCE_LABELS.get(selected[0], selected[0])} và "
+        f"{_SOURCE_LABELS.get(selected[1], selected[1])} trong {_TIME_LABELS[time_range]} "
+        "(đếm bài duy nhất theo nguồn và category):\n" + "\n".join(lines)
+    )
+    if len(ranked) > 12:
+        answer += "\nChỉ hiển thị tối đa 12 danh mục có nhiều bài nhất."
+    if "general" in by_category:
+        answer += "\n‘general’ là nhãn category trong dữ liệu, không phải một chủ đề cụ thể."
+    specific_categories = [category for category in ranked if category != "general"]
+    chart_categories = (specific_categories or ranked)[:10]
+    chart = {
+        "type": "grouped_bar",
+        "title": "So sánh danh mục" + (" (không gồm general)" if specific_categories and "general" in by_category else ""),
+        "unit": "bài báo",
+        "series": [{"key": source, "label": _SOURCE_LABELS.get(source, source)} for source in selected],
+        "points": [
+            {"label": category, "values": {source: by_category[category].get(source, 0) for source in selected}}
+            for category in chart_categories
+        ],
+    }
+    return ToolResult(answer=answer, tool="compare_source_categories", time_range=time_range, chart=chart)
+
+
 def _entity_subject(request: ChatRequest) -> str | None:
     subject = _search_term(request)
     if not subject:
@@ -590,14 +682,55 @@ def _rag(request: ChatRequest, time_range: str) -> ToolResult:
     return ToolResult(answer=citation_summary(answer, sources), tool="search_article_content", sources=sources, time_range=time_range)
 
 
+def _answer_evidence(intent: str | None, result: ToolResult) -> dict:
+    """Describe how an answer was produced without exposing query internals."""
+    if intent is None:
+        return {
+            "answer_kind": "system", "result_status": "ok", "method": "none",
+            "source_count": 0, "note": "Hướng dẫn sử dụng; chưa truy vấn dữ liệu.",
+        }
+    no_results = result.answer.startswith(("Chưa có", "Chưa tìm thấy"))
+    if intent == "rag":
+        degraded = "chỉ tìm theo từ khóa" in result.answer or "đã thử tìm theo từ khóa" in result.answer
+        method = "keyword" if degraded else "hybrid"
+        status = "no_results" if no_results else "degraded" if degraded else "ok"
+        note = (
+            "Không tìm thấy bài phù hợp trong phạm vi đã chọn."
+            if no_results else
+            "Trích đoạn từ bài gốc; tìm từ khóa dự phòng vì tìm ngữ nghĩa chưa khả dụng."
+            if degraded else
+            "Trích đoạn từ bài gốc; kết quả hybrid đã được đối chiếu lại với dữ liệu hiện hành."
+        )
+        return {
+            "answer_kind": "article_excerpts", "result_status": status, "method": method,
+            "source_count": len(result.sources), "note": note,
+        }
+    return {
+        "answer_kind": "warehouse_facts",
+        "result_status": "no_results" if no_results else "ok",
+        "method": "structured_query", "source_count": len(result.sources),
+        "note": (
+            "Không có bản ghi phù hợp trong phạm vi đã chọn."
+            if no_results else "Kết quả được tính trực tiếp từ dữ liệu NewsPulse."
+        ),
+    }
+
+
 def plan_question(request: ChatRequest, previous_context: dict | None = None) -> ChatPlan:
     """Resolve intent and scope without touching a data service."""
     intent = _intent(request.message)
     social_mentioned = _mentioned_social_sources(request.message)
     pending = bool(previous_context and previous_context.get("clarification"))
-    followup = previous_context is not None and (_is_followup(request.message) or pending)
+    followup = previous_context is not None and (
+        _is_followup(request.message) or pending
+        or (previous_context.get("intent") == "source_categories" and _asks_chart(request.message))
+    )
     if followup and intent is None:
         intent = previous_context.get("intent")
+    if followup and previous_context.get("intent") in ("sources", "source_categories") and _asks_source_categories(
+        _normalized(request.message)
+    ):
+        intent = "source_categories"
     if followup and previous_context.get("intent") == "authors_unspecified":
         normalized_reply = _normalized(request.message)
         if "bai dang" in normalized_reply or "binh luan" in normalized_reply or "social" in normalized_reply:
@@ -618,7 +751,7 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
         request = request.model_copy(update={
             "time_range": request.time_range or _time_hint(request.message) or inherited_time,
             "source": request.source or (
-                None if intent == "sources" else
+                None if intent in ("sources", "source_categories") else
                 (social_mentioned[0] if len(social_mentioned) == 1 else
                  mentioned[0] if len(mentioned) == 1 else previous_source)
             ),
@@ -660,23 +793,27 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
             clarification = "Hiện chỉ hỗ trợ đếm toàn bộ dữ liệu social theo nguồn và thời gian, chưa lọc danh mục hoặc chủ đề."
         else:
             request = request.model_copy(update={"source": _social_group(request.source)})
-    elif intent not in ("sources", "alerts") and not request.source:
+    elif intent not in ("sources", "source_categories", "alerts") and not request.source:
         if len(mentioned) == 1:
             request = request.model_copy(update={"source": mentioned[0]})
         elif len(mentioned) > 1 and intent == "article_count":
             clarification = "Bạn muốn đếm gộp hai nguồn hay so sánh từng nguồn? Hãy nêu rõ yêu cầu."
 
-    if intent not in ("sources", "alerts", "social_count", "social_authors") and request.source and mentioned and request.source not in mentioned:
+    if intent not in ("sources", "source_categories", "alerts", "social_count", "social_authors") and request.source and mentioned and request.source not in mentioned:
         clarification = "Nguồn trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại nguồn hoặc sửa câu hỏi."
     explicit_time = _time_hint(request.message)
     if request.time_range and explicit_time and request.time_range != explicit_time:
         clarification = "Khoảng thời gian trong câu hỏi khác bộ lọc đang chọn. Hãy chọn lại khoảng thời gian hoặc sửa câu hỏi."
 
     selected_sources = None
-    if intent == "sources":
+    if intent in ("sources", "source_categories"):
         selected_sources = request.compare_sources or mentioned or None
         if request.source:
             clarification = "Hãy bỏ bộ lọc một nguồn khi muốn so sánh nhiều nguồn."
+        elif intent == "source_categories" and (request.category or request.query or _search_term(request)):
+            clarification = "Hãy bỏ bộ lọc danh mục hoặc chủ đề để so sánh toàn bộ danh mục giữa hai nguồn."
+        elif intent == "source_categories" and (not selected_sources or len(selected_sources) != 2):
+            clarification = "Bạn muốn so sánh danh mục của hai nguồn báo nào? Ví dụ: Thanh Niên và Tuổi Trẻ."
         elif not selected_sources or len(selected_sources) < 2:
             clarification = "Bạn muốn so sánh hai nguồn nào? Ví dụ: So sánh VnExpress và Tuổi Trẻ trong 7 ngày qua."
     elif intent == "article_count" and not clarification:
@@ -708,20 +845,23 @@ def answer_question(
             "clarification": False, "event_id": request.event_id,
             "watchlist_id": request.watchlist_id,
         }
+        result.evidence = _answer_evidence("event", result)
         return result
     plan = plan_question(request, previous_context)
     request, intent, time_range = plan.request, plan.intent, plan.time_range
     if intent == "alerts" and "alerts.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'alerts.read'")
-    if intent in ("articles", "article_count", "social_count", "social_authors", "article_authors", "authors_unspecified", "trending", "sentiment", "sources", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
+    if intent in ("articles", "article_count", "social_count", "social_authors", "article_authors", "authors_unspecified", "trending", "sentiment", "sources", "source_categories", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'dashboard.read'")
     if intent is None:
-        return ToolResult(answer=(
+        result = ToolResult(answer=(
             "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn, "
             "nội dung bài viết và cảnh báo tăng đột biến. Hãy hỏi rõ một trong các nội dung này."
         ))
+        result.evidence = _answer_evidence(intent, result)
+        return result
     if plan.clarification:
-        return ToolResult(
+        result = ToolResult(
             answer=plan.clarification,
             tool="clarify_scope",
             context={
@@ -731,6 +871,11 @@ def answer_question(
                 "clarification": True,
             },
         )
+        result.evidence = {
+            "answer_kind": "system", "result_status": "ok", "method": "none",
+            "source_count": 0, "note": "Câu hỏi làm rõ; chưa truy vấn dữ liệu.",
+        }
+        return result
     result = {
         "articles": _articles,
         "article_count": _article_count,
@@ -740,6 +885,7 @@ def answer_question(
         "trending": _trending,
         "sentiment": _sentiment,
         "sources": _sources,
+        "source_categories": _source_categories,
         "entities": _entities,
         "alerts": _alerts,
         "rag": _rag,
@@ -760,4 +906,5 @@ def answer_question(
         "event_id": request.event_id,
         "watchlist_id": request.watchlist_id,
     }
+    result.evidence = _answer_evidence(intent, result)
     return result
