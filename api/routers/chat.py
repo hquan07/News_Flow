@@ -72,6 +72,16 @@ async def _answer(payload: ChatRequest, actor: dict) -> ChatResponse:
                 None,
             )
             previous_context = last_answer.get("context") if last_answer else None
+            if previous_context is None and chat_tools._asks_chart(payload.message):
+                # Older unsupported chart replies have no context. Skip only
+                # consecutive chart retries, not unrelated questions.
+                for message in reversed(conversation["messages"]):
+                    if message["role"] == "user":
+                        if not chat_tools._asks_chart(message["content"]):
+                            break
+                    elif message.get("context"):
+                        previous_context = message["context"]
+                        break
 
         await chat_guard.check_rate_limit(owner_id)
         result = await _run_tool(payload, actor, previous_context)

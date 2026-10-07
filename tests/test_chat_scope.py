@@ -151,6 +151,69 @@ async def test_compare_categories_by_two_sources_uses_real_category_counts(async
 
 
 @pytest.mark.asyncio
+async def test_chart_retry_recovers_comparison_after_legacy_unsupported_replies(async_client, chat_db, monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: [
+        {"source": "thanhnien", "category": "thể thao", "article_count": 8},
+        {"source": "tuoitre", "category": "thể thao", "article_count": 10},
+    ])
+    first = await async_client.post(
+        "/api/v1/chat",
+        json={"message": "so sánh các category giữa Thanh Niên và Tuổi Trẻ"},
+        headers=headers(),
+    )
+    assert first.status_code == 200
+    conversation_id = first.json()["conversation_id"]
+
+    # Messages persisted before chart support was added: same conversation,
+    # but the two generic assistant replies did not carry a scope context.
+    for _ in range(2):
+        await chat_store.append_message("scope-user", conversation_id, "user", "Có thể tạo biểu đồ so sánh không?")
+        await chat_store.append_message(
+            "scope-user", conversation_id, "assistant",
+            "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn.",
+        )
+
+    retry = await async_client.post(
+        "/api/v1/chat",
+        json={"conversation_id": conversation_id, "message": "Có thể tạo biểu đồ so sánh không?"},
+        headers=headers(),
+    )
+    assert retry.status_code == 200
+    data = retry.json()
+    assert data["tool"] == "compare_source_categories"
+    assert data["context"]["compare_sources"] == ["thanhnien", "tuoitre"]
+    assert data["chart"]["type"] == "grouped_bar"
+    assert data["chart"]["points"] == [
+        {"label": "thể thao", "values": {"thanhnien": 8, "tuoitre": 10}},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_chart_retry_does_not_reuse_scope_past_unrelated_question(async_client, chat_db, monkeypatch):
+    monkeypatch.setattr(chat_tools, "_query", lambda *_args: [
+        {"source": "thanhnien", "category": "thể thao", "article_count": 8},
+        {"source": "tuoitre", "category": "thể thao", "article_count": 10},
+    ])
+    first = await async_client.post(
+        "/api/v1/chat",
+        json={"message": "so sánh các category giữa Thanh Niên và Tuổi Trẻ"},
+        headers=headers(),
+    )
+    conversation_id = first.json()["conversation_id"]
+    await chat_store.append_message("scope-user", conversation_id, "user", "Một câu hỏi khác không hỗ trợ")
+    await chat_store.append_message("scope-user", conversation_id, "assistant", "Hãy hỏi rõ hơn.")
+
+    response = await async_client.post(
+        "/api/v1/chat",
+        json={"conversation_id": conversation_id, "message": "Có thể tạo biểu đồ so sánh không?"},
+        headers=headers(),
+    )
+    assert response.status_code == 200
+    assert response.json()["chart"] is None
+    assert response.json()["tool"] is None
+
+
+@pytest.mark.asyncio
 async def test_category_comparison_clarifies_missing_or_conflicting_filters(async_client, chat_db, monkeypatch):
     monkeypatch.setattr(chat_tools, "_query", lambda *_args: pytest.fail("queried before scope clarification"))
     for payload in (
