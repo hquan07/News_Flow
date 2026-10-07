@@ -31,23 +31,31 @@ def _keyword_candidates(query: str, since: datetime, source: str | None, categor
         where.append("a.category = {category:String}")
         params["category"] = category
     matches = []
+    title_scores = []
     for index, term in enumerate(terms):
         params[f"term{index}"] = f"%{term}%"
         matches.append(f"(a.title ILIKE {{term{index}:String}} OR a.content ILIKE {{term{index}:String}})")
+        title_scores.append(f"(a.title ILIKE {{term{index}:String}})")
+    limit = getattr(get_settings(), "RAG_CANDIDATE_LIMIT", 20)
     base_sql = "SELECT a.url_hash AS article_id FROM newspulse.raw_articles AS a FINAL WHERE "
     if len(terms) > 1:
         phrase_params = {**params, "phrase": f"%{' '.join(terms)}%"}
         phrase_match = "(a.title ILIKE {phrase:String} OR a.content ILIKE {phrase:String})"
         rows = _query(
             base_sql + " AND ".join([*where, phrase_match]) +
-            " ORDER BY (a.title ILIKE {phrase:String}) DESC, a.publish_time DESC LIMIT 12",
+            f" ORDER BY (a.title ILIKE {{phrase:String}}) DESC, a.publish_time DESC LIMIT {limit}",
             phrase_params,
         )
         if rows:
             return [str(row["article_id"]) for row in rows]
+    # A strict all-terms fallback loses useful articles when a natural-language
+    # query contains one noisy word. Keep partial matches but rank articles that
+    # cover more query terms, especially in the title, ahead of weaker matches.
+    match_score = " + ".join(f"toUInt8({match})" for match in matches)
+    title_score = " + ".join(f"toUInt8({match})" for match in title_scores)
     rows = _query(
-        base_sql + " AND ".join([*where, *matches]) +
-        " ORDER BY a.publish_time DESC LIMIT 12",
+        base_sql + " AND ".join(where) + " AND (" + " OR ".join(matches) + ")" +
+        f" ORDER BY ({match_score}) DESC, ({title_score}) DESC, a.publish_time DESC LIMIT {limit}",
         params,
     )
     return [str(row["article_id"]) for row in rows]
@@ -121,7 +129,10 @@ def retrieve(query: str, *, time_range: str, source: str | None, category: str |
     if semantic_enabled:
         try:
             vector = chat_embed_cache.query_vector(query[:2000])
-            vector_hits = rag_client.query_chunks(vector, source=source, category=category, since=since)
+            vector_hits = rag_client.query_chunks(
+                vector, source=source, category=category, since=since,
+                limit=getattr(get_settings(), "RAG_CANDIDATE_LIMIT", 20),
+            )
         except DependencyUnavailableError:
             # Keyword search remains useful when optional embedding/vector services fail.
             degraded = True

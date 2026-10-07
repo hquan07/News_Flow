@@ -71,6 +71,15 @@ printing question text. It does not change `RAG_ENABLED` or choose a winner.
 Keep a held-out set, compare source/date-filtered and empty-result cases, and
 review citation support separately before changing production retrieval.
 
+With vector services enabled, the report also compares hybrid nDCG@5 with the
+better of keyword-only and vector-only retrieval and emits `recommended_mode`.
+Use `--require-hybrid-gain` in a staging rollout gate when hybrid must beat both
+single retrievers; it exits with status 2 when that evidence is absent. Candidate
+depth is controlled by `RAG_CANDIDATE_LIMIT` (default 20). The keyword fallback
+ranks partial matches by query-term coverage and title coverage, which improves
+recall for natural-language questions without weakening source/category/date
+filters or the final ClickHouse revalidation.
+
 ## User feedback
 
 Each assistant message accepts one of `helpful`, `wrong_source`, or
