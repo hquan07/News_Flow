@@ -57,19 +57,30 @@ def _intent(message: str) -> str | None:
         return "authors_unspecified"
     if any(word in normalized for word in ("canh bao", "alert", "khung hoang", "bat thuong")):
         return "alerts"
-    if any(word in normalized for word in ("so sanh nguon", "so sanh bao", "nguon nao", "bao nao", "compare sources")):
+    if any(word in normalized for word in (
+        "so sanh nguon", "so sanh bao", "doi chieu nguon", "doi chieu bao",
+        "doi chieu ", "khac nhau giua", "nguon nao", "bao nao", "compare sources",
+    )):
         return "sources"
     if any(word in normalized for word in ("sentiment", "cam xuc", "tich cuc", "tieu cuc")):
         return "sentiment"
     if any(word in normalized for word in ("trending", "xu huong", "thinh hanh", "tu khoa", "chu de nao")):
         return "trending"
-    if any(phrase in normalized for phrase in ("tong so", "bao nhieu", "so luong", "dem ", "count ")) and any(
-        subject in normalized for subject in ("bai", "tin", "article", "news")
-    ):
-        return "article_count"
+    count_cue = re.search(
+        r"\b(?:tong so|tong cong|bao nhieu|so luong|so bai|dem|thong ke so|thong ke luong|count)\b",
+        normalized,
+    )
+    if count_cue:
+        if re.search(r"\b(?:bai dang|binh luan|post|social)\b", normalized):
+            return "social_count"
+        if re.search(r"\b(?:bai|tin|article|news)\b", normalized):
+            return "article_count"
     if any(word in normalized for word in ("tom tat", "noi dung", "noi gi ve", "giai thich ve", "semantic", "tuong tu", "summarize")):
         return "rag"
-    if any(word in normalized for word in ("bai viet", "bai bao", "tin moi", "tim tin", "tim bai", "tom tat", "articles")):
+    if any(word in normalized for word in (
+        "bai viet", "bai bao", "tin moi", "tin tuc", "tim tin", "tim bai",
+        "xem tin", "xem bai", "doc tin", "bai ve", "nhung tin", "articles",
+    )):
         return "articles"
     if any(word in normalized for word in ("entity", "thuc the", "nhan vat", "to chuc nao", "dia danh", "lien quan den")):
         return "entities"
@@ -181,17 +192,21 @@ def _search_term(request: ChatRequest) -> str | None:
     if request.query:
         return request.query.strip() or None
     match = re.search(
-        r"\b(?:về|ve|about|liên quan đến|lien quan den)\s+(.+)",
+        r"\b(?:về|ve|about|liên quan đến|lien quan den|đề cập đến|de cap den|nhắc đến|nhac den)\s+(.+)",
         request.message, re.IGNORECASE,
     )
     if not match:
         return None
     term = match.group(1).strip(" ?.!")
     term = re.sub(
-        r"\s+(?:hôm nay|hom nay|trong\s+\d+\s+(?:ngày|ngay)(?:\s+qua)?)$",
+        r"\s+(?:hôm nay|hom nay|tuần qua|tuan qua|tuần này|tuan nay|tháng qua|thang qua|trong\s+\d+\s+(?:ngày|ngay)(?:\s+qua)?)$",
         "",
         term,
         flags=re.IGNORECASE,
+    )
+    term = re.sub(
+        r"\s+(?:từ|của|from)\s+(?:báo\s+)?(?:vnexpress|tuổi trẻ|tuoitre|thanh niên|thanhnien|dân trí|dantri|lao động|laodong|tiền phong|tienphong)$",
+        "", term, flags=re.IGNORECASE,
     )
     return term[:120] or None
 

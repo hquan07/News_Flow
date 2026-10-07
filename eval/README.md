@@ -1,6 +1,6 @@
 # Chatbot evaluation
 
-`chatbot_cases.json` contains 45 hand-written Vietnamese regression cases for
+`chatbot_cases.json` contains 57 hand-written Vietnamese regression cases for
 intent, time/source/category scope, clarification, and role permissions. Each
 case has an independent `expected_tool` label. Optional `expected_time_range`,
 `expected_source`, `expected_category`, `expected_compare_sources`,
@@ -11,6 +11,37 @@ with `--live-url` also posts the cases to the actual API. Use staging and test
 accounts: live evaluation creates conversations and can query the configured
 ClickHouse/Qdrant services. It checks API contracts and citation URL shape, not
 the factual correctness of answers or whether a citation supports a claim.
+
+## Live answer checks against real data
+
+Run `.venv/bin/python scripts/evaluate_chat_answers.py` while ClickHouse is
+available. The seven cases in `chat_answer_live_cases.json` use news and social
+sources present in this project's data. The runner calls the read-only chatbot
+tool directly (it does not create conversations), then independently queries
+ClickHouse before and after each count answer. It verifies the number in the
+Vietnamese answer falls between those two snapshots, its tool and source/time
+scope match the label, and returned article citations still match their IDs,
+titles, URLs, sources and publication windows in ClickHouse. It reports case IDs
+and pass/fail checks, not question text or answers. The count bracket tolerates
+new ingestion during an evaluation, but it is not a substitute for a frozen
+snapshot when comparing different implementations.
+
+To add real, consented or anonymized questions, make a private copy of
+`chat_answer_live_cases.json` and run `--cases path/to/private.json`. The source
+must be stated in the question; explicit request filters are not supported by
+this evaluator. Count oracles currently support source/time, not topic/category.
+For an article-search case, a reviewer may add `relevant_article_ids` containing
+verified `raw_articles.url_hash` IDs. `reviewed_relevant_hit` only checks
+whether at least one returned ID is among them; a human must still judge whether
+the cited article supports each claim. A null value and the
+`unreviewed_citation_cases` total make missing human labels explicit. These
+seven cases are a working live-data baseline, **not** a comprehensive factual
+accuracy score or a sample of real user prompts.
+
+When expanding question coverage, review aggregate `tool=none` counts from
+`GET /api/v1/chat/metrics` and the feedback summary, then obtain permission
+before inspecting or adding any actual user wording to a private benchmark.
+Never commit raw chat logs or confidential article content as evaluation data.
 
 To build a meaningful accuracy benchmark, collect 100–300 consenting or
 appropriately anonymized real Vietnamese questions. Remove personal data,

@@ -1,0 +1,9 @@
+[
+  {"id":"articles-vnexpress-all","message":"Tổng số bài báo từ VnExpress","oracle":"article_count","expected_tool":"count_articles","expected_time_range":"all","expected_source":"vnexpress"},
+  {"id":"articles-tuoitre-week","message":"Có bao nhiêu bài báo từ Tuổi Trẻ trong 7 ngày qua?","oracle":"article_count","expected_tool":"count_articles","expected_time_range":"7d","expected_source":"tuoitre"},
+  {"id":"articles-thanhnien-all","message":"Tổng cộng bao nhiêu bài báo từ Thanh Niên?","oracle":"article_count","expected_tool":"count_articles","expected_time_range":"all","expected_source":"thanhnien"},
+  {"id":"social-voz-all","message":"VOZ có tổng cộng bao nhiêu bài đăng?","oracle":"social_count","expected_tool":"count_social_posts","expected_time_range":"all","expected_source":"voz"},
+  {"id":"social-youtube-week","message":"Số lượng bài đăng từ YouTube trong 7 ngày qua?","oracle":"social_count","expected_tool":"count_social_posts","expected_time_range":"7d","expected_source":"youtube"},
+  {"id":"articles-vnexpress-latest","message":"Cho tôi xem tin mới từ VnExpress trong 7 ngày qua","oracle":"article_sources","expected_tool":"search_articles","expected_time_range":"7d","expected_source":"vnexpress","expect_nonempty":true},
+  {"id":"articles-dantri-latest","message":"Đọc tin mới từ Dân Trí trong 30 ngày qua","oracle":"article_sources","expected_tool":"search_articles","expected_time_range":"30d","expected_source":"dantri","expect_nonempty":true}
+]

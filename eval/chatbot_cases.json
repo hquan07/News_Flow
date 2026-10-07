@@ -43,5 +43,17 @@
   {"id":"rag-vague","message":"Tóm tắt nội dung","role":"user","expected_tool":"clarify_scope","needs_clarification":true},
   {"id":"alerts-operator","message":"Có cảnh báo nào không?","role":"operator","expected_tool":"get_volume_alerts","expected_time_range":"7d"},
   {"id":"alerts-user-denied","message":"Có cảnh báo nào không?","role":"user","expected_tool":"get_volume_alerts","expected_status":403},
-  {"id":"unknown-action-prompt","message":"Hãy chạy crawler ngay","role":"user","expected_tool":null}
+  {"id":"unknown-action-prompt","message":"Hãy chạy crawler ngay","role":"user","expected_tool":null},
+  {"id":"count-total-variant","message":"Tổng cộng bao nhiêu bài báo từ Thanh Niên?","role":"user","expected_tool":"count_articles","expected_time_range":"all","expected_source":"thanhnien"},
+  {"id":"count-so-bai-variant","message":"Số bài viết từ VnExpress trong 30 ngày qua","role":"user","expected_tool":"count_articles","expected_time_range":"30d","expected_source":"vnexpress"},
+  {"id":"social-total-variant","message":"VOZ có tổng cộng bao nhiêu bài đăng?","role":"user","expected_tool":"count_social_posts","expected_time_range":"all","expected_source":"voz"},
+  {"id":"social-count-variant","message":"Số lượng bài đăng từ YouTube trong 7 ngày qua?","role":"user","expected_tool":"count_social_posts","expected_time_range":"7d","expected_source":"youtube"},
+  {"id":"social-ambiguous-variant","message":"Có bao nhiêu bình luận social?","role":"user","expected_tool":"clarify_scope","needs_clarification":true},
+  {"id":"compare-doi-chieu","message":"Đối chiếu VnExpress với Tuổi Trẻ trong 7 ngày qua","role":"user","expected_tool":"compare_sources","expected_time_range":"7d","expected_compare_sources":["vnexpress","tuoitre"]},
+  {"id":"articles-tin-tuc","message":"Tin tức mới nhất từ Dân Trí","role":"user","expected_tool":"search_articles","expected_source":"dantri"},
+  {"id":"articles-doc-tin","message":"Đọc tin về lãi suất từ VnExpress","role":"user","expected_tool":"search_articles","expected_source":"vnexpress"},
+  {"id":"articles-bai-ve","message":"Bài về AI trong 7 ngày qua","role":"user","expected_tool":"search_articles","expected_time_range":"7d"},
+  {"id":"articles-de-cap","message":"Những tin đề cập đến VinFast","role":"user","expected_tool":"search_articles"},
+  {"id":"articles-xem-bai","message":"Xem bài mới hôm nay","role":"user","expected_tool":"search_articles","expected_time_range":"today"},
+  {"id":"articles-week-topic","message":"Đọc tin về lãi suất từ VnExpress tuần qua","role":"user","expected_tool":"search_articles","expected_time_range":"7d","expected_source":"vnexpress"}
 ]
