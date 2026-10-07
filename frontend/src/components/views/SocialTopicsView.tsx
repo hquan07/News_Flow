@@ -1,0 +1,76 @@
+"use client";
+
+import { Hash, MessageSquareText } from "lucide-react";
+import ChartSkeleton from "@/components/ui/ChartSkeleton";
+import EmptyState from "@/components/ui/EmptyState";
+import MetricCard from "@/components/ui/MetricCard";
+import { formatCompactNumber, formatSourceName } from "@/lib/formatters";
+import type { SocialTopicsData } from "@/lib/social-types";
+
+function sentimentClass(score: number) {
+  if (score > 0.1) return "positive";
+  if (score < -0.1) return "negative";
+  return "neutral";
+}
+
+export default function SocialTopicsView({ data }: { data: SocialTopicsData | null }) {
+  if (!data) return <div className="social-view-loading"><ChartSkeleton /></div>;
+
+  const { summary } = data;
+  return (
+    <div className="social-analytics-view">
+      <div className="overview-grid social-summary-grid">
+        <MetricCard label="Top hashtags" value={summary.unique_hashtags.toLocaleString()} hint="Distinct tags in the ranked set" />
+        <MetricCard label="Hashtag mentions" value={formatCompactNumber(summary.hashtag_mentions)} hint="Mentions across top hashtags" />
+        <MetricCard label="Tracked topics" value={summary.tracked_topics.toLocaleString()} hint="Ranked conversation clusters" />
+        <MetricCard label="Topic interactions" value={formatCompactNumber(summary.topic_interactions)} hint="Interactions across ranked topics" tone="success" />
+      </div>
+
+      <section className="social-analytics-panel">
+        <header className="social-view-header">
+          <div>
+            <h2><Hash size={21} /> Trending Hashtags</h2>
+            <p>Hashtags ranked by mentions, with engagement as a secondary signal.</p>
+          </div>
+          <span className="live-count">Top {data.hashtags.length}</span>
+        </header>
+        {data.hashtags.length ? (
+          <div className="hashtag-cloud">
+            {data.hashtags.map((item, index) => (
+              <article className={`hashtag-card hashtag-rank-${Math.min(index + 1, 4)}`} key={item.hashtag}>
+                <strong>{item.hashtag}</strong>
+                <span>{formatCompactNumber(item.mentions)} mentions</span>
+                <span>{formatCompactNumber(item.interactions)} interactions</span>
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState message="No hashtags found in the selected content" />}
+      </section>
+
+      <section className="social-analytics-panel">
+        <header className="social-view-header">
+          <div>
+            <h2><MessageSquareText size={21} /> Top Conversations</h2>
+            <p>Recurring titles and discussions ranked by observed interactions.</p>
+          </div>
+        </header>
+        {data.top_topics.length ? (
+          <div className="social-ranked-list">
+            {data.top_topics.map((topic, index) => (
+              <article className="social-ranked-row social-topic-row" key={`${topic.source}-${topic.topic}`}>
+                <span className="social-rank-number">{index + 1}</span>
+                <div className="social-ranked-main">
+                  <div className="social-row-meta"><span className="platform-badge">{formatSourceName(topic.source)}</span></div>
+                  <strong>{topic.topic}</strong>
+                </div>
+                <span className={`sentiment-pill ${sentimentClass(topic.sentiment_score)}`}>{sentimentClass(topic.sentiment_score)}</span>
+                <div className="social-topic-count"><strong>{formatCompactNumber(topic.post_count)}</strong><span>posts</span></div>
+                <div className="social-row-total">{formatCompactNumber(topic.interactions)}</div>
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState message="No conversation topics available" />}
+      </section>
+    </div>
+  );
+}

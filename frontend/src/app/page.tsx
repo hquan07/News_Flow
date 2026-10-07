@@ -60,6 +60,10 @@ import SocialInfluencersView, {
 import LiveSocialFeedView, {
   type LiveSocialPost,
 } from "@/components/views/LiveSocialFeedView";
+import SocialContentPerformanceView from "@/components/views/SocialContentPerformanceView";
+import SocialAudienceView from "@/components/views/SocialAudienceView";
+import SocialTopicsView from "@/components/views/SocialTopicsView";
+import SocialAlertsView from "@/components/views/SocialAlertsView";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
 import {
@@ -71,6 +75,12 @@ import type {
   SocialCrisisAlert,
   ViralPostAlertSummary,
 } from "@/lib/alert-types";
+import type {
+  SocialAlertSignalsData,
+  SocialAudienceData,
+  SocialContentPerformanceData,
+  SocialTopicsData,
+} from "@/lib/social-types";
 
 type FeedEvent = {
   timestamp: string;
@@ -108,6 +118,10 @@ const TAB_FILTER_CAPABILITIES: Record<string, boolean> = {
   sentiment: true,
   debates: true,
   influencers: true,
+  content_performance: true,
+  audience: true,
+  topics: true,
+  social_alerts: true,
 };
 
 export default function Home() {
@@ -146,6 +160,14 @@ export default function Home() {
   const [authorAnalytics, setAuthorAnalytics] =
     useState<AuthorAnalytics | null>(null);
   const [liveSocialPosts, setLiveSocialPosts] = useState<LiveSocialPost[]>([]);
+  const [socialContentPerformance, setSocialContentPerformance] =
+    useState<SocialContentPerformanceData | null>(null);
+  const [socialAudience, setSocialAudience] =
+    useState<SocialAudienceData | null>(null);
+  const [socialTopics, setSocialTopics] =
+    useState<SocialTopicsData | null>(null);
+  const [socialAlertSignals, setSocialAlertSignals] =
+    useState<SocialAlertSignalsData | null>(null);
 
   const [adminLatency, setAdminLatency] = useState<any>(null);
   const [adminClickbait, setAdminClickbait] = useState<any>(null);
@@ -419,6 +441,50 @@ export default function Home() {
     setSocialInfluencers(result.influencers || []);
   }, [dashboardMode, selectedSource]);
 
+  const fetchSocialContentPerformance = useCallback(async () => {
+    if (dashboardMode !== "social") return;
+    const sourceParam = selectedSource
+      ? `&source=${encodeURIComponent(selectedSource)}`
+      : "";
+    const result = await safeFetch(
+      `${API_BASE}/social/content-performance?time_range=all&limit=10${sourceParam}`,
+    );
+    setSocialContentPerformance(result);
+  }, [dashboardMode, selectedSource]);
+
+  const fetchSocialAudience = useCallback(async () => {
+    if (dashboardMode !== "social") return;
+    const sourceParam = selectedSource
+      ? `&source=${encodeURIComponent(selectedSource)}`
+      : "";
+    const result = await safeFetch(
+      `${API_BASE}/social/audience?time_range=all${sourceParam}`,
+    );
+    setSocialAudience(result);
+  }, [dashboardMode, selectedSource]);
+
+  const fetchSocialTopics = useCallback(async () => {
+    if (dashboardMode !== "social") return;
+    const sourceParam = selectedSource
+      ? `&source=${encodeURIComponent(selectedSource)}`
+      : "";
+    const result = await safeFetch(
+      `${API_BASE}/social/topics?time_range=all&limit=20${sourceParam}`,
+    );
+    setSocialTopics(result);
+  }, [dashboardMode, selectedSource]);
+
+  const fetchSocialAlertSignals = useCallback(async () => {
+    if (dashboardMode !== "social") return;
+    const sourceParam = selectedSource
+      ? `?source=${encodeURIComponent(selectedSource)}`
+      : "";
+    const result = await safeFetch(
+      `${API_BASE}/social/alert-signals${sourceParam}`,
+    );
+    setSocialAlertSignals(result);
+  }, [dashboardMode, selectedSource]);
+
   const fetchAuthors = useCallback(async () => {
     if (dashboardMode !== "news") return;
     const sourceParam = selectedSource
@@ -562,6 +628,10 @@ export default function Home() {
     setEntityTypeDist(null);
     setEntitySentiment(null);
     setSocialInfluencers(null);
+    setSocialContentPerformance(null);
+    setSocialAudience(null);
+    setSocialTopics(null);
+    setSocialAlertSignals(null);
     setAuthorAnalytics(null);
   }, [selectedSource, activeTab]);
 
@@ -581,6 +651,10 @@ export default function Home() {
         else if (activeTab === "foryou") await fetchForYou();
         else if (activeTab === "debates") await fetchDebates();
         else if (activeTab === "influencers") await fetchInfluencers();
+        else if (activeTab === "content_performance") await fetchSocialContentPerformance();
+        else if (activeTab === "audience") await fetchSocialAudience();
+        else if (activeTab === "topics") await fetchSocialTopics();
+        else if (activeTab === "social_alerts") await fetchSocialAlertSignals();
         else if (activeTab === "authors") await fetchAuthors();
         else if (activeTab === "live_social") await fetchLiveSocialFeed();
         else if (activeTab === "admin_dashboard") await fetchAdmin();
@@ -619,6 +693,10 @@ export default function Home() {
     fetchForYou,
     fetchDebates,
     fetchInfluencers,
+    fetchSocialContentPerformance,
+    fetchSocialAudience,
+    fetchSocialTopics,
+    fetchSocialAlertSignals,
     fetchAuthors,
     fetchLiveSocialFeed,
     fetchAdmin,
@@ -799,6 +877,10 @@ export default function Home() {
     : dashboardMode === "social"
       ? [
           { id: "overview", label: "Overview", icon: <Activity size={18} /> },
+          { id: "content_performance", label: "Content Performance", icon: <BarChart3 size={18} /> },
+          { id: "audience", label: "Audience", icon: <Users size={18} /> },
+          { id: "topics", label: "Hashtags & Topics", icon: <Hash size={18} /> },
+          { id: "social_alerts", label: "Alerts", icon: <AlertTriangle size={18} /> },
           { id: "sentiment", label: "Sentiment", icon: <ThumbsUp size={18} /> },
           { id: "debates", label: "Top Debates", icon: <MessageSquare size={18} /> },
           { id: "influencers", label: "Top Influencers", icon: <Users size={18} /> },
@@ -1330,6 +1412,28 @@ export default function Home() {
               sentimentCoverage={sentimentCoverage}
               updatedAt={dataUpdatedAt}
             />
+          )}
+
+          {activeTab === "content_performance" && dashboardMode === "social" && (
+            <SocialContentPerformanceView
+              data={socialContentPerformance}
+              updatedAt={dataUpdatedAt}
+            />
+          )}
+
+          {activeTab === "audience" && dashboardMode === "social" && (
+            <SocialAudienceView
+              data={socialAudience}
+              updatedAt={dataUpdatedAt}
+            />
+          )}
+
+          {activeTab === "topics" && dashboardMode === "social" && (
+            <SocialTopicsView data={socialTopics} />
+          )}
+
+          {activeTab === "social_alerts" && dashboardMode === "social" && (
+            <SocialAlertsView data={socialAlertSignals} />
           )}
 
           {activeTab === "debates" && dashboardMode === "social" && (
