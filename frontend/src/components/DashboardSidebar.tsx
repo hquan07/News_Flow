@@ -61,6 +61,7 @@ export default function DashboardSidebar({
             role="tab"
             tabIndex={active ? 0 : -1}
             aria-selected={active}
+            title={item.label}
             className={`dashboard-sidebar-button ${active ? "active" : ""} ${item.featured ? "featured" : ""}`}
             onClick={() => onChange(item.id)}
           >
