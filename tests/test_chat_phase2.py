@@ -258,6 +258,45 @@ async def test_stream_sends_answer_and_metadata(
 
 
 @pytest.mark.asyncio
+async def test_stream_persists_incremental_grounded_answer(
+    async_client: AsyncClient, chat_db, monkeypatch
+):
+    source = {
+        "article_id": "article-1", "title": "AI tại Việt Nam",
+        "url": "https://example.com/ai", "source": "vnexpress",
+        "published_at": datetime(2026, 10, 1, tzinfo=timezone.utc),
+    }
+
+    async def run_tool(_payload, _actor, _previous_context):
+        return chat_tools.ToolResult(
+            answer="Trích đoạn an toàn [1]", tool="search_article_content",
+            sources=[source], evidence={
+                "answer_kind": "article_excerpts", "result_status": "ok",
+                "method": "hybrid", "source_count": 1, "note": "Trích đoạn",
+            },
+        )
+
+    async def grounded(*_args):
+        yield "Câu đầu có căn cứ [1].\n"
+        yield "Câu sau cũng có căn cứ [1].\n"
+
+    monkeypatch.setattr(chat, "_run_tool", run_tool)
+    monkeypatch.setattr(chat.chat_generation, "can_generate", lambda _result: True)
+    monkeypatch.setattr(chat.chat_generation, "stream_grounded_answer", grounded)
+    response = await async_client.post(
+        "/api/v1/chat/stream", json={"message": "Tóm tắt nội dung về AI"},
+        headers=_headers("alice"),
+    )
+    assert response.status_code == 200
+    assert response.text.count("event: delta") == 2
+    assert "Câu đầu có căn cứ [1]." in response.text
+    assert '"answer_kind": "generated_summary"' in response.text
+    assistant = chat_db.chat_messages.documents[-1]
+    assert assistant["content"] == "Câu đầu có căn cứ [1].\nCâu sau cũng có căn cứ [1]."
+    assert assistant["evidence"]["method"] == "grounded_generation"
+
+
+@pytest.mark.asyncio
 async def test_unsupported_question_and_blank_message(
     async_client: AsyncClient, chat_db
 ):

@@ -339,6 +339,20 @@ async def delete_conversation(owner_id: str, conversation_id: str) -> None:
     await _audit("chat.conversation_deleted", owner_id, oid)
 
 
+async def update_assistant_answer(
+    owner_id: str, conversation_id: str, message_id: str, content: str, evidence: dict,
+) -> None:
+    oid = _conversation_id(conversation_id)
+    if not ObjectId.is_valid(message_id) or not content.strip() or len(content) > 16000:
+        raise HTTPException(status_code=404, detail="Assistant message not found")
+    updated = await get_mongo_db().chat_messages.update_one(
+        {"_id": ObjectId(message_id), "conversation_id": oid, "owner_id": owner_id, "role": "assistant"},
+        {"$set": {"content": content, "evidence": evidence}},
+    )
+    if updated.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Assistant message not found")
+
+
 async def set_message_feedback(owner_id: str, conversation_id: str, message_id: str, reason: str) -> dict:
     oid = _conversation_id(conversation_id)
     if not ObjectId.is_valid(message_id):

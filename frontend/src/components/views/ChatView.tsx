@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Pencil, ShieldCheck, SquarePen, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { API_BASE, ApiError, apiFetch } from "@/lib/api";
+import { API_BASE, ApiError, apiFetch, apiSse } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
 import ColoredTooltipValue, { DARK_TOOLTIP_CONTENT_STYLE, DARK_TOOLTIP_ITEM_STYLE } from "../ui/ColoredTooltipValue";
 
@@ -38,9 +38,9 @@ type ChatScope = {
   watchlist_id?: string | null;
 };
 type ChatEvidence = {
-  answer_kind: "warehouse_facts" | "article_excerpts" | "system";
+  answer_kind: "warehouse_facts" | "article_excerpts" | "generated_summary" | "system";
   result_status: "ok" | "no_results" | "degraded";
-  method: "structured_query" | "keyword" | "hybrid" | "none";
+  method: "structured_query" | "keyword" | "hybrid" | "grounded_generation" | "none";
   source_count: number;
   note: string;
 };
@@ -54,6 +54,7 @@ type ChatMessage = {
   context?: ChatScope | null;
   evidence?: ChatEvidence | null;
   feedback?: { reason: FeedbackReason } | null;
+  streaming?: boolean;
 };
 type FeedbackReason = "helpful" | "wrong_source" | "wrong_number";
 type Conversation = { id: string; title: string; project_id: string | null };
@@ -68,6 +69,7 @@ type ChatResponse = {
   context: ChatScope | null;
   evidence: ChatEvidence | null;
 };
+type ChatStreamDone = Omit<ChatResponse, "answer">;
 type ActionType = "acknowledge_alert" | "trigger_crawler" | "generate_report";
 type ActionPreview = {
   action_id: string;
@@ -379,8 +381,16 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
     if (!text || loading || historyLoading || deletingId) return;
     setLoading(true);
     setError(null);
+    const previousMessages = messages;
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: text },
+      { role: "assistant", content: "", streaming: true },
+    ]);
+    setQuestion("");
     try {
-      const response = await apiFetch<ChatResponse>(`${API_BASE}/chat`, {
+      let completed: ChatStreamDone | null = null;
+      await apiSse(`${API_BASE}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -392,13 +402,25 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
           ...(intelligenceScope?.event_id ? { event_id: intelligenceScope.event_id } : {}),
           ...(intelligenceScope?.watchlist_id ? { watchlist_id: intelligenceScope.watchlist_id } : {}),
         }),
+      }, (event, payload) => {
+        if (event === "delta") {
+          const chunk = typeof payload === "object" && payload ? (payload as { text?: unknown }).text : null;
+          if (typeof chunk === "string") {
+            setMessages((current) => current.map((item) => item.streaming
+              ? { ...item, content: item.content + chunk } : item));
+          }
+        } else if (event === "done") {
+          completed = payload as ChatStreamDone;
+          const done = completed;
+          setMessages((current) => current.map((item) => item.streaming ? {
+            ...item, id: done.message_id ?? undefined, streaming: false,
+            sources: done.sources, chart: done.chart, queried_at: done.queried_at,
+            context: done.context, evidence: done.evidence,
+          } : item));
+        }
       });
-      setMessages((current) => [
-        ...current,
-        { role: "user", content: text },
-        { id: response.message_id ?? undefined, role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at, context: response.context, evidence: response.evidence },
-      ]);
-      setQuestion("");
+      if (!completed) throw new Error("Luồng trả lời kết thúc trước khi nhận trạng thái hoàn tất.");
+      const response = completed as ChatStreamDone;
       if (!activeId) {
         setChatSearch("");
         setActiveId(response.conversation_id);
@@ -409,6 +431,8 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
         setListRevision((current) => current + 1);
       }
     } catch (cause) {
+      setMessages(previousMessages);
+      setQuestion(text);
       setError(cause instanceof ApiError && cause.status === 503
         ? "Dịch vụ dữ liệu đang tạm thời không khả dụng. Đây là lỗi dịch vụ, không phải kết quả ‘không có dữ liệu’. Vui lòng thử lại sau."
         : cause instanceof Error ? cause.message : "Không gửi được câu hỏi.");
@@ -792,7 +816,8 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
               )}
               {message.role === "assistant" && message.evidence && (
                 <div className={`chat-evidence ${message.evidence.result_status}`} aria-label="Căn cứ trả lời">
-                  <strong>{message.evidence.answer_kind === "article_excerpts" ? "Trích đoạn bài viết"
+                  <strong>{message.evidence.answer_kind === "generated_summary" ? "Tổng hợp AI có nguồn"
+                    : message.evidence.answer_kind === "article_excerpts" ? "Trích đoạn bài viết"
                     : message.evidence.answer_kind === "warehouse_facts" ? "Dữ liệu NewsPulse" : "Hướng dẫn hệ thống"}</strong>
                   <span>{message.evidence.note}</span>
                   {message.evidence.source_count > 0 && <small>{message.evidence.source_count} nguồn được dẫn</small>}
@@ -809,7 +834,7 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
                   ))}
                 </div>
               )}
-              {message.role === "assistant" && message.id && (
+              {message.role === "assistant" && message.id && !message.streaming && (
                 <div className="chat-feedback" aria-label="Đánh giá câu trả lời">
                   <span>Phản hồi:</span>
                   {([
@@ -825,7 +850,7 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
             </div>
           ))}
           {historyLoading && <p className="chat-loading">Đang tải hội thoại…</p>}
-          {loading && <p className="chat-loading">Đang truy vấn dữ liệu…</p>}
+          {loading && <p className="chat-loading">Đang tạo câu trả lời…</p>}
         </div>
         {error && <p className="chat-error" role="alert">{error}</p>}
         <form className="chat-form" onSubmit={submit}>

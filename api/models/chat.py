@@ -120,9 +120,9 @@ class ChatContext(BaseModel):
 
 
 class ChatEvidence(BaseModel):
-    answer_kind: Literal["warehouse_facts", "article_excerpts", "system"]
+    answer_kind: Literal["warehouse_facts", "article_excerpts", "generated_summary", "system"]
     result_status: Literal["ok", "no_results", "degraded"]
-    method: Literal["structured_query", "keyword", "hybrid", "none"]
+    method: Literal["structured_query", "keyword", "hybrid", "grounded_generation", "none"]
     source_count: int = Field(default=0, ge=0)
     note: str
 

@@ -336,6 +336,8 @@ services:
     stop_grace_period: 40s
     ports:
       - "${API_PORT:-8001}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file: ../../.env
     environment:
       PG_HOST: postgres
@@ -363,6 +365,10 @@ services:
       RAG_ENABLED: ${RAG_ENABLED:-false}
       QDRANT_URL: http://qdrant:6333
       EMBEDDING_URL: http://embeddings:8088
+      CHAT_LLM_ENABLED: ${CHAT_LLM_ENABLED:-false}
+      CHAT_LLM_URL: ${CHAT_LLM_URL:-http://host.docker.internal:11434/v1}
+      CHAT_LLM_MODEL: ${CHAT_LLM_MODEL:-}
+      CHAT_LLM_API_KEY: ${CHAT_LLM_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -79,3 +79,46 @@ export async function apiFetch<T>(
   const response = await fetch(input, { ...init, headers });
   return parseJsonResponse<T>(response);
 }
+
+export async function apiSse(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  onEvent: (event: string, data: unknown) => void,
+): Promise<void> {
+  const headers = new Headers(init.headers);
+  if (typeof window !== "undefined" && !headers.has("Authorization")) {
+    const token = localStorage.getItem("token");
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(input, { ...init, headers });
+  if (!response.ok || !response.body) {
+    await parseJsonResponse<never>(response);
+    throw new ApiError("API stream returned no body.", response.status);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  function dispatch(frame: string) {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split(/\r?\n/)) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+    }
+    if (!dataLines.length) return;
+    const raw = dataLines.join("\n");
+    try { onEvent(event, JSON.parse(raw)); }
+    catch { throw new ApiError("API stream returned an invalid event.", response.status); }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const frames = buffer.split(/\r?\n\r?\n/);
+    buffer = frames.pop() ?? "";
+    frames.forEach(dispatch);
+    if (done) break;
+  }
+  if (buffer.trim()) dispatch(buffer);
+}
