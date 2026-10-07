@@ -240,7 +240,8 @@ async def test_social_author_ranking_uses_unique_posts_and_reports_ties(
     assert "An: 8" in result["answer"]
     assert "Bình: 8" in result["answer"]
     assert "đồng hạng" in result["answer"]
-    assert "duy nhất nhất" not in result["answer"]
+    assert "bài đăng/bình luận duy nhất" not in result["answer"]
+    assert "mỗi post_id chỉ được tính một lần" in result["answer"]
     assert result["chart"]["points"][0] == {"label": "An", "value": 8.0}
     assert "social_sentiment_metrics" in captured["sql"]
     assert "uniqExact(source, post_id)" in captured["sql"]
@@ -287,6 +288,8 @@ async def test_article_author_ranking_does_not_mix_social(async_client, chat_db,
     assert "raw_articles" in captured["sql"]
     assert "social_sentiment_metrics" not in captured["sql"]
     assert "Lan: 4 bài báo" in response.json()["answer"]
+    assert "bài báo duy nhất" not in response.json()["answer"]
+    assert "Số lượng đã loại bỏ các bài báo trùng lặp." in response.json()["answer"]
 
 
 @pytest.mark.asyncio

@@ -336,7 +336,7 @@ def _author_answer(rows: list[dict], *, kind: str, time_range: str, source_label
             answer=f"Chưa có dữ liệu tác giả {data_label} phù hợp trong {_TIME_LABELS[time_range]}.",
             tool=tool, time_range=time_range,
         )
-    unit = "bài đăng/bình luận duy nhất" if kind == "social" else "bài báo duy nhất"
+    unit = "bài đăng/bình luận" if kind == "social" else "bài báo"
     headline_unit = "bài đăng/bình luận" if kind == "social" else "bài báo"
     answer = (
         f"Tác giả có nhiều {headline_unit} nhất từ {source_label} trong {_TIME_LABELS[time_range]} "
@@ -353,7 +353,9 @@ def _author_answer(rows: list[dict], *, kind: str, time_range: str, source_label
         if rows[10]["post_count"] == visible[-1]["post_count"]:
             answer += " Còn tác giả đồng hạng ngoài danh sách."
     if kind == "social":
-        answer += "\nDữ liệu social có thể gồm dữ liệu thử nghiệm; một post_id được tính một lần trong mỗi nguồn."
+        answer += "\nDữ liệu social có thể gồm dữ liệu thử nghiệm; mỗi post_id chỉ được tính một lần trong từng nguồn."
+    else:
+        answer += "\nSố lượng đã loại bỏ các bài báo trùng lặp."
     return ToolResult(
         answer=answer, tool=tool, time_range=time_range,
         chart=_chart("Tác giả theo số bài đăng" if kind == "social" else "Tác giả theo số bài báo", unit, visible, "author", "post_count"),
