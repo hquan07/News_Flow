@@ -7,6 +7,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import MetricCard from "@/components/ui/MetricCard";
 import MetricDetailList from "@/components/ui/MetricDetailList";
 import { formatCompactNumber, formatDateTime, formatPercent, formatSourceName, truncateLabel } from "@/lib/formatters";
+import { deduplicateSocialPosts } from "@/lib/social-posts";
 import type { SocialAlertSignalsData } from "@/lib/social-types";
 
 export default function SocialAlertsView({ data }: { data: SocialAlertSignalsData | null }) {
@@ -20,7 +21,8 @@ export default function SocialAlertsView({ data }: { data: SocialAlertSignalsDat
   });
   const activeRisks = data.source_risks.filter((risk) => risk.active);
   const topRisks = [...data.source_risks].sort((left, right) => right.negative_pct - left.negative_pct).slice(0, 5);
-  const topViralPosts = data.viral_posts.slice(0, 5);
+  const viralPosts = deduplicateSocialPosts(data.viral_posts);
+  const topViralPosts = viralPosts.slice(0, 5);
 
   return (
     <div className="social-analytics-view">
@@ -72,9 +74,9 @@ export default function SocialAlertsView({ data }: { data: SocialAlertSignalsDat
           </div>
           <span className="live-count">Updated {formatDateTime(data.generated_at)}</span>
         </header>
-        {data.viral_posts.length ? (
+        {viralPosts.length ? (
           <div className="social-ranked-list">
-            {data.viral_posts.map((post) => (
+            {viralPosts.map((post) => (
               <article className="social-ranked-row" key={`${post.source}-${post.post_id}`}>
                 <span className="social-rank-number viral"><Flame size={16} /></span>
                 <div className="social-ranked-main">

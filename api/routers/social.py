@@ -16,6 +16,19 @@ def _social_filters(time_range: str, source: Optional[str]):
     where = _resolve_time_range(time_range, "publish_time")
     return _append_filters(where, {}, source=source)
 
+
+def _deduplicate_posts(posts):
+    """Keep the highest-ranked row for each source/post identity."""
+    seen = set()
+    unique_posts = []
+    for post in posts:
+        identity = (str(post.get("source", "")), str(post.get("post_id", "")))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique_posts.append(post)
+    return unique_posts
+
 @router.get("/overview")
 def social_overview(
         time_range: str = Query("7d"),
@@ -118,6 +131,7 @@ def social_content_performance(
         f"ORDER BY interactions DESC, publish_time DESC LIMIT {{limit:UInt32}}",
         {**params, "limit": limit},
     )
+    top_posts = _deduplicate_posts(top_posts)
 
     return {
         "summary": summary,
@@ -275,6 +289,7 @@ def social_alert_signals(
         f"ORDER BY interactions DESC, publish_time DESC LIMIT 20",
         {**params, "interaction_threshold": interaction_threshold},
     )
+    viral_posts = _deduplicate_posts(viral_posts)
     active_source_risks = [row for row in source_risks if row["active"]]
 
     return {

@@ -18,6 +18,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import MetricCard from "@/components/ui/MetricCard";
 import MetricDetailList from "@/components/ui/MetricDetailList";
 import { formatCompactNumber, formatDateTime, formatPercent, formatSourceName } from "@/lib/formatters";
+import { deduplicateSocialPosts } from "@/lib/social-posts";
 import type { SocialContentPerformanceData } from "@/lib/social-types";
 
 export default function SocialContentPerformanceView({
@@ -36,7 +37,8 @@ export default function SocialContentPerformanceView({
     onToggle: () => setActiveMetric((current) => current === metric ? null : metric),
   });
   const topPlatforms = data.platform_performance.slice(0, 5);
-  const topInteractionCount = Math.max(0, ...data.top_posts.map((post) => post.interactions));
+  const topPosts = deduplicateSocialPosts(data.top_posts);
+  const topInteractionCount = Math.max(0, ...topPosts.map((post) => post.interactions));
 
   return (
     <div className="social-analytics-view">
@@ -84,11 +86,11 @@ export default function SocialContentPerformanceView({
             <h2><TrendingUp size={21} /> Top Content</h2>
             <p>Posts ranked by likes and replies, without estimating unavailable reach.</p>
           </div>
-          <span className="live-count">Top {data.top_posts.length}</span>
+          <span className="live-count">Top {topPosts.length}</span>
         </header>
-        {data.top_posts.length ? (
+        {topPosts.length ? (
           <div className="social-ranked-list">
-            {data.top_posts.map((post, index) => (
+            {topPosts.map((post, index) => (
               <article className="social-ranked-row" key={`${post.source}-${post.post_id}`}>
                 <span className="social-rank-number">{index + 1}</span>
                 <div className="social-ranked-main">

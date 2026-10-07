@@ -24,6 +24,10 @@ def test_content_performance_aggregates_and_applies_source(monkeypatch):
             "post_id": "post-1",
             "source": "reddit_vn",
             "interactions": 80,
+        }, {
+            "post_id": "post-1",
+            "source": "reddit_vn",
+            "interactions": 80,
         }],
     ])
 
@@ -36,6 +40,7 @@ def test_content_performance_aggregates_and_applies_source(monkeypatch):
 
     assert payload["summary"]["total_interactions"] == 420
     assert payload["top_posts"][0]["post_id"] == "post-1"
+    assert len(payload["top_posts"]) == 1
     assert all(call[1].get("source") == "reddit_vn" for call in calls)
     assert calls[-1][1]["limit"] == 10
     assert "source = {source:String}" in calls[0][0]
@@ -94,6 +99,11 @@ def test_alert_signals_apply_thresholds(monkeypatch):
             {"source": "youtube", "total_posts": 5, "negative_posts": 2, "negative_pct": 40.0, "interactions": 60},
         ],
         [{
+            "post_id": "viral-1",
+            "source": "reddit_vn",
+            "interactions": 120,
+            "publish_time": datetime(2026, 10, 7, tzinfo=timezone.utc),
+        }, {
             "post_id": "viral-1",
             "source": "reddit_vn",
             "interactions": 120,
