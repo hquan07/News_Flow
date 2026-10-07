@@ -18,7 +18,14 @@ function getErrorDetail(payload: unknown): string | null {
   if (typeof detail === "string") return detail;
 
   const message = (payload as { message?: unknown }).message;
-  return typeof message === "string" ? message : null;
+  if (typeof message === "string") return message;
+
+  const error = (payload as { error?: unknown }).error;
+  if (error && typeof error === "object") {
+    const nestedMessage = (error as { message?: unknown }).message;
+    if (typeof nestedMessage === "string") return nestedMessage;
+  }
+  return null;
 }
 
 export async function parseJsonResponse<T>(response: Response): Promise<T> {

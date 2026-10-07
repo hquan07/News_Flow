@@ -57,6 +57,7 @@ class ChatMessage(BaseModel):
     queried_at: datetime | None = None
     chart: "ChatChart | ChatGroupedChart | None" = None
     context: "ChatContext | None" = None
+    evidence: "ChatEvidence | None" = None
     feedback: "ChatFeedback | None" = None
 
 
@@ -118,6 +119,14 @@ class ChatContext(BaseModel):
     watchlist_id: str | None = None
 
 
+class ChatEvidence(BaseModel):
+    answer_kind: Literal["warehouse_facts", "article_excerpts", "system"]
+    result_status: Literal["ok", "no_results", "degraded"]
+    method: Literal["structured_query", "keyword", "hybrid", "none"]
+    source_count: int = Field(default=0, ge=0)
+    note: str
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     conversation_id: str | None = None
@@ -149,6 +158,7 @@ class ChatResponse(BaseModel):
     time_range: str | None = None
     chart: ChatChart | ChatGroupedChart | None = None
     context: ChatContext | None = None
+    evidence: ChatEvidence | None = None
 
 
 class ConversationDetail(Conversation):

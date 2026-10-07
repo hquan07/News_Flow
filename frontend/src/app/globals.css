@@ -3470,6 +3470,22 @@ h1 {
   margin-top: 0.45rem;
 }
 
+.chat-evidence {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-left: 3px solid #60a5fa;
+  border-radius: 0 6px 6px 0;
+  background: rgba(59, 130, 246, 0.08);
+  color: #cbd5e1;
+  font-size: 0.75rem;
+}
+.chat-evidence strong { color: #bfdbfe; font-size: 0.76rem; }
+.chat-evidence small { color: var(--text-muted); }
+.chat-evidence.degraded { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+.chat-evidence.no_results { border-left-color: #94a3b8; background: rgba(148, 163, 184, 0.07); }
+
 .chat-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.65rem; }
 .chat-scope > span { color: var(--text-muted); font-size: 0.72rem; margin-right: 0.2rem; }
 .chat-scope small {

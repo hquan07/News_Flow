@@ -31,6 +31,7 @@ class ToolResult:
     time_range: str | None = None
     chart: dict | None = None
     context: dict | None = None
+    evidence: dict | None = None
 
 
 @dataclass
@@ -679,6 +680,40 @@ def _rag(request: ChatRequest, time_range: str) -> ToolResult:
     return ToolResult(answer=citation_summary(answer, sources), tool="search_article_content", sources=sources, time_range=time_range)
 
 
+def _answer_evidence(intent: str | None, result: ToolResult) -> dict:
+    """Describe how an answer was produced without exposing query internals."""
+    if intent is None:
+        return {
+            "answer_kind": "system", "result_status": "ok", "method": "none",
+            "source_count": 0, "note": "Hướng dẫn sử dụng; chưa truy vấn dữ liệu.",
+        }
+    no_results = result.answer.startswith(("Chưa có", "Chưa tìm thấy"))
+    if intent == "rag":
+        degraded = "chỉ tìm theo từ khóa" in result.answer or "đã thử tìm theo từ khóa" in result.answer
+        method = "keyword" if degraded else "hybrid"
+        status = "no_results" if no_results else "degraded" if degraded else "ok"
+        note = (
+            "Không tìm thấy bài phù hợp trong phạm vi đã chọn."
+            if no_results else
+            "Trích đoạn từ bài gốc; tìm từ khóa dự phòng vì tìm ngữ nghĩa chưa khả dụng."
+            if degraded else
+            "Trích đoạn từ bài gốc; kết quả hybrid đã được đối chiếu lại với dữ liệu hiện hành."
+        )
+        return {
+            "answer_kind": "article_excerpts", "result_status": status, "method": method,
+            "source_count": len(result.sources), "note": note,
+        }
+    return {
+        "answer_kind": "warehouse_facts",
+        "result_status": "no_results" if no_results else "ok",
+        "method": "structured_query", "source_count": len(result.sources),
+        "note": (
+            "Không có bản ghi phù hợp trong phạm vi đã chọn."
+            if no_results else "Kết quả được tính trực tiếp từ dữ liệu NewsPulse."
+        ),
+    }
+
+
 def plan_question(request: ChatRequest, previous_context: dict | None = None) -> ChatPlan:
     """Resolve intent and scope without touching a data service."""
     intent = _intent(request.message)
@@ -808,6 +843,7 @@ def answer_question(
             "clarification": False, "event_id": request.event_id,
             "watchlist_id": request.watchlist_id,
         }
+        result.evidence = _answer_evidence("event", result)
         return result
     plan = plan_question(request, previous_context)
     request, intent, time_range = plan.request, plan.intent, plan.time_range
@@ -816,12 +852,14 @@ def answer_question(
     if intent in ("articles", "article_count", "social_count", "social_authors", "article_authors", "authors_unspecified", "trending", "sentiment", "sources", "source_categories", "entities", "rag") and "dashboard.read" not in actor["permissions"]:
         raise HTTPException(status_code=403, detail="Forbidden: Missing permission 'dashboard.read'")
     if intent is None:
-        return ToolResult(answer=(
+        result = ToolResult(answer=(
             "Mình hỗ trợ tìm bài viết, từ khóa, cảm xúc, thực thể, so sánh nguồn, "
             "nội dung bài viết và cảnh báo tăng đột biến. Hãy hỏi rõ một trong các nội dung này."
         ))
+        result.evidence = _answer_evidence(intent, result)
+        return result
     if plan.clarification:
-        return ToolResult(
+        result = ToolResult(
             answer=plan.clarification,
             tool="clarify_scope",
             context={
@@ -831,6 +869,11 @@ def answer_question(
                 "clarification": True,
             },
         )
+        result.evidence = {
+            "answer_kind": "system", "result_status": "ok", "method": "none",
+            "source_count": 0, "note": "Câu hỏi làm rõ; chưa truy vấn dữ liệu.",
+        }
+        return result
     result = {
         "articles": _articles,
         "article_count": _article_count,
@@ -861,4 +904,5 @@ def answer_question(
         "event_id": request.event_id,
         "watchlist_id": request.watchlist_id,
     }
+    result.evidence = _answer_evidence(intent, result)
     return result

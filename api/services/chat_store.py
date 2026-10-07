@@ -64,6 +64,7 @@ def _serialize_message(document: dict) -> dict:
         "queried_at": document.get("queried_at"),
         "chart": document.get("chart"),
         "context": document.get("context"),
+        "evidence": document.get("evidence"),
         "feedback": document.get("feedback"),
     }
 
@@ -292,6 +293,7 @@ async def append_message(
     queried_at: datetime | None = None,
     chart: dict | None = None,
     context: dict | None = None,
+    evidence: dict | None = None,
 ) -> dict:
     if role not in ("user", "assistant") or not content.strip() or len(content) > 16000:
         raise ValueError("Invalid chat message")
@@ -315,6 +317,7 @@ async def append_message(
         "queried_at": queried_at,
         "chart": chart,
         "context": context,
+        "evidence": evidence,
     }
     result = await db.chat_messages.insert_one(document)
     document["_id"] = result.inserted_id

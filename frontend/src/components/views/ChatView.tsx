@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Pencil, ShieldCheck, SquarePen, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { API_BASE, apiFetch } from "@/lib/api";
+import { API_BASE, ApiError, apiFetch } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
 import ColoredTooltipValue, { DARK_TOOLTIP_CONTENT_STYLE, DARK_TOOLTIP_ITEM_STYLE } from "../ui/ColoredTooltipValue";
 
@@ -37,6 +37,13 @@ type ChatScope = {
   event_id?: string | null;
   watchlist_id?: string | null;
 };
+type ChatEvidence = {
+  answer_kind: "warehouse_facts" | "article_excerpts" | "system";
+  result_status: "ok" | "no_results" | "degraded";
+  method: "structured_query" | "keyword" | "hybrid" | "none";
+  source_count: number;
+  note: string;
+};
 type ChatMessage = {
   id?: string;
   role: "user" | "assistant";
@@ -45,6 +52,7 @@ type ChatMessage = {
   chart?: ChatChart | null;
   queried_at?: string | null;
   context?: ChatScope | null;
+  evidence?: ChatEvidence | null;
   feedback?: { reason: FeedbackReason } | null;
 };
 type FeedbackReason = "helpful" | "wrong_source" | "wrong_number";
@@ -58,6 +66,7 @@ type ChatResponse = {
   chart: ChatChart | null;
   queried_at: string | null;
   context: ChatScope | null;
+  evidence: ChatEvidence | null;
 };
 type ActionType = "acknowledge_alert" | "trigger_crawler" | "generate_report";
 type ActionPreview = {
@@ -387,7 +396,7 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
       setMessages((current) => [
         ...current,
         { role: "user", content: text },
-        { id: response.message_id ?? undefined, role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at, context: response.context },
+        { id: response.message_id ?? undefined, role: "assistant", content: response.answer, sources: response.sources, chart: response.chart, queried_at: response.queried_at, context: response.context, evidence: response.evidence },
       ]);
       setQuestion("");
       if (!activeId) {
@@ -400,7 +409,9 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
         setListRevision((current) => current + 1);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không gửi được câu hỏi.");
+      setError(cause instanceof ApiError && cause.status === 503
+        ? "Dịch vụ dữ liệu đang tạm thời không khả dụng. Đây là lỗi dịch vụ, không phải kết quả ‘không có dữ liệu’. Vui lòng thử lại sau."
+        : cause instanceof Error ? cause.message : "Không gửi được câu hỏi.");
     } finally {
       setLoading(false);
     }
@@ -778,6 +789,14 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
                 <small className="chat-query-time">
                   Truy vấn lúc {new Date(message.queried_at).toLocaleString("vi-VN")}
                 </small>
+              )}
+              {message.role === "assistant" && message.evidence && (
+                <div className={`chat-evidence ${message.evidence.result_status}`} aria-label="Căn cứ trả lời">
+                  <strong>{message.evidence.answer_kind === "article_excerpts" ? "Trích đoạn bài viết"
+                    : message.evidence.answer_kind === "warehouse_facts" ? "Dữ liệu NewsPulse" : "Hướng dẫn hệ thống"}</strong>
+                  <span>{message.evidence.note}</span>
+                  {message.evidence.source_count > 0 && <small>{message.evidence.source_count} nguồn được dẫn</small>}
+                </div>
               )}
               {message.chart && message.chart.points.length > 0 && (
                 <ChatChartDisplay chart={message.chart} />

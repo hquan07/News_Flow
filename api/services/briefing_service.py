@@ -22,7 +22,7 @@ def citation_summary(answer: str, sources: list[dict]) -> str:
     if not excerpts:
         return answer
     prefix = f"{degraded}\n" if degraded else ""
-    return prefix + "Tóm tắt trích xuất từ các bài đã đối chiếu:\n" + "\n".join(excerpts[:5]) + "\nMỗi ý giữ nguyên nội dung nguồn; số trong ngoặc vuông khớp danh sách trích dẫn."
+    return prefix + "Các trích đoạn từ bài viết đã đối chiếu:\n" + "\n".join(excerpts[:5]) + "\nĐây là trích đoạn gốc, chưa phải bản tóm tắt do AI tạo; số trong ngoặc vuông khớp danh sách nguồn."
 
 
 def event_briefing(event_id: str) -> dict:

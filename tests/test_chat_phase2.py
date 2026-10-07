@@ -81,6 +81,9 @@ async def test_article_answer_has_real_sources_and_persisted_metadata(
     )
     assert detail.status_code == 200
     assert detail.json()["messages"][1]["sources"][0]["article_id"] == "article-1"
+    assert data["evidence"]["answer_kind"] == "warehouse_facts"
+    assert data["evidence"]["result_status"] == "ok"
+    assert detail.json()["messages"][1]["evidence"] == data["evidence"]
 
 
 @pytest.mark.asyncio
