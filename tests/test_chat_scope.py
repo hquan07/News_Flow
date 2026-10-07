@@ -121,9 +121,33 @@ async def test_compare_categories_by_two_sources_uses_real_category_counts(async
     assert "general: Thanh Niên 1.537; Tuổi Trẻ 1.359" in data["answer"]
     assert "công nghệ: Thanh Niên 18; Tuổi Trẻ 0" in data["answer"]
     assert "‘general’" in data["answer"]
+    assert data["chart"]["type"] == "grouped_bar"
+    assert data["chart"]["series"] == [
+        {"key": "thanhnien", "label": "Thanh Niên"},
+        {"key": "tuoitre", "label": "Tuổi Trẻ"},
+    ]
+    assert data["chart"]["points"] == [
+        {"label": "thế giới", "values": {"thanhnien": 0, "tuoitre": 24}},
+        {"label": "công nghệ", "values": {"thanhnien": 18, "tuoitre": 0}},
+    ]
     assert "countDistinct(a.url_hash)" in captured["sql"]
     assert "7 DAY" in captured["sql"]
     assert captured["params"] == {"source_names": ["thanhnien", "tuoitre"]}
+
+    followup = await async_client.post(
+        "/api/v1/chat",
+        json={"conversation_id": data["conversation_id"], "message": "có thể tạo biểu đồ so sánh không"},
+        headers=headers(),
+    )
+    assert followup.status_code == 200
+    followup_data = followup.json()
+    assert followup_data["tool"] == "compare_source_categories"
+    assert followup_data["context"]["compare_sources"] == ["thanhnien", "tuoitre"]
+    assert followup_data["context"]["time_range"] == "7d"
+    assert followup_data["chart"]["type"] == "grouped_bar"
+    detail = await async_client.get(f"/api/v1/chat/conversations/{data['conversation_id']}", headers=headers())
+    assert detail.status_code == 200
+    assert detail.json()["messages"][-1]["chart"]["type"] == "grouped_bar"
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Pencil, ShieldCheck, SquarePen, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { API_BASE, apiFetch } from "@/lib/api";
 import { hasPermission, readCachedUser, type CachedUser } from "@/lib/auth-storage";
 import ColoredTooltipValue, { DARK_TOOLTIP_CONTENT_STYLE, DARK_TOOLTIP_ITEM_STYLE } from "../ui/ColoredTooltipValue";
@@ -19,6 +19,12 @@ type ChatChart = {
   title: string;
   unit: string;
   points: { label: string; value: number }[];
+} | {
+  type: "grouped_bar";
+  title: string;
+  unit: string;
+  series: { key: string; label: string }[];
+  points: { label: string; values: Record<string, number> }[];
 };
 type ChatScope = {
   intent: string;
@@ -77,6 +83,53 @@ const suggestions = [
 const timeRangeLabels: Record<NonNullable<ChatScope["time_range"]>, string> = {
   today: "24 giờ qua", "7d": "7 ngày qua", "30d": "30 ngày qua", all: "Toàn bộ thời gian",
 };
+
+const comparisonColors = ["#60a5fa", "#fb923c"];
+
+function ChatChartDisplay({ chart }: { chart: ChatChart }) {
+  return (
+    <div className="chat-chart" role="img" aria-label={`${chart.title}; đơn vị ${chart.unit}`}>
+      <h3>{chart.title}</h3>
+      {chart.type === "grouped_bar" ? (
+        <ResponsiveContainer width="100%" height={Math.max(260, chart.points.length * 44 + 54)}>
+          <BarChart data={chart.points.map((point) => ({ label: point.label, ...point.values }))}
+            layout="vertical" margin={{ top: 8, right: 18, left: 0, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+            <XAxis type="number" allowDecimals={false} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <YAxis type="category" dataKey="label" width={110} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <Tooltip cursor={{ fill: "rgba(96, 165, 250, 0.08)" }}
+              contentStyle={{ ...DARK_TOOLTIP_CONTENT_STYLE, borderRadius: 8 }}
+              labelStyle={DARK_TOOLTIP_ITEM_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE}
+              formatter={(value, name, item) => [
+                <ColoredTooltipValue key="value" color={String(item.color)}>{Number(value).toLocaleString("vi-VN")} {chart.unit}</ColoredTooltipValue>,
+                name,
+              ]} />
+            <Legend wrapperStyle={{ color: "#cbd5e1", fontSize: 12 }} />
+            {chart.series.map((series, index) => (
+              <Bar key={series.key} dataKey={series.key} name={series.label} fill={comparisonColors[index % comparisonColors.length]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={chart.points} margin={{ top: 8, right: 12, left: 0, bottom: 40 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+            <XAxis dataKey="label" angle={-25} textAnchor="end" interval={0} height={56} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+            <Tooltip cursor={{ fill: "rgba(96, 165, 250, 0.1)" }}
+              contentStyle={{ ...DARK_TOOLTIP_CONTENT_STYLE, borderRadius: 8 }}
+              labelStyle={DARK_TOOLTIP_ITEM_STYLE} itemStyle={DARK_TOOLTIP_ITEM_STYLE}
+              formatter={(value) => [
+                <ColoredTooltipValue key="value" color="#60a5fa">{Number(value).toLocaleString("vi-VN")}</ColoredTooltipValue>,
+                chart.unit,
+              ]} />
+            <Bar dataKey="value" fill="#60a5fa" name={chart.unit} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
 
 export default function ChatView({ open, onClose, intelligenceScope, onClearScope }: {
   open: boolean;
@@ -727,27 +780,7 @@ export default function ChatView({ open, onClose, intelligenceScope, onClearScop
                 </small>
               )}
               {message.chart && message.chart.points.length > 0 && (
-                <div className="chat-chart" role="img" aria-label={`${message.chart.title}; đơn vị ${message.chart.unit}`}>
-                  <h3>{message.chart.title}</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={message.chart.points} margin={{ top: 8, right: 12, left: 0, bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="label" angle={-25} textAnchor="end" interval={0} height={56} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                      <Tooltip
-                        cursor={{ fill: "rgba(96, 165, 250, 0.1)" }}
-                        contentStyle={{ ...DARK_TOOLTIP_CONTENT_STYLE, borderRadius: 8 }}
-                        labelStyle={DARK_TOOLTIP_ITEM_STYLE}
-                        itemStyle={DARK_TOOLTIP_ITEM_STYLE}
-                        formatter={(value) => [
-                          <ColoredTooltipValue key="value" color="#60a5fa">{Number(value).toLocaleString("vi-VN")}</ColoredTooltipValue>,
-                          message.chart?.unit ?? "",
-                        ]}
-                      />
-                      <Bar dataKey="value" fill="#60a5fa" name={message.chart.unit} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <ChatChartDisplay chart={message.chart} />
               )}
               {!!message.sources?.length && (
                 <div className="chat-sources">

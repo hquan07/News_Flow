@@ -55,7 +55,7 @@ class ChatMessage(BaseModel):
     sources: list["ChatSource"] = Field(default_factory=list)
     tool: str | None = None
     queried_at: datetime | None = None
-    chart: "ChatChart | None" = None
+    chart: "ChatChart | ChatGroupedChart | None" = None
     context: "ChatContext | None" = None
     feedback: "ChatFeedback | None" = None
 
@@ -86,6 +86,24 @@ class ChatChart(BaseModel):
     title: str
     unit: str
     points: list[ChatChartPoint] = Field(default_factory=list)
+
+
+class ChatGroupedChartPoint(BaseModel):
+    label: str
+    values: dict[str, float]
+
+
+class ChatGroupedChartSeries(BaseModel):
+    key: str
+    label: str
+
+
+class ChatGroupedChart(BaseModel):
+    type: Literal["grouped_bar"] = "grouped_bar"
+    title: str
+    unit: str
+    series: list[ChatGroupedChartSeries]
+    points: list[ChatGroupedChartPoint] = Field(default_factory=list)
 
 
 class ChatContext(BaseModel):
@@ -129,7 +147,7 @@ class ChatResponse(BaseModel):
     sources: list[ChatSource] = Field(default_factory=list)
     queried_at: datetime | None = None
     time_range: str | None = None
-    chart: ChatChart | None = None
+    chart: ChatChart | ChatGroupedChart | None = None
     context: ChatContext | None = None
 
 

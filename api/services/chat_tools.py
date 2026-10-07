@@ -139,6 +139,10 @@ def _is_followup(message: str) -> bool:
     return normalized.startswith(("con ", "the ", "vay ", "neu ", "so voi ", "tu nguon ", "nguon "))
 
 
+def _asks_chart(message: str) -> bool:
+    return "bieu do" in _normalized(message)
+
+
 _SOURCE_NAMES = {
     "vnexpress": "vnexpress",
     "tuoi tre": "tuoitre",
@@ -586,7 +590,19 @@ def _source_categories(request: ChatRequest, time_range: str) -> ToolResult:
         answer += "\nChỉ hiển thị tối đa 12 danh mục có nhiều bài nhất."
     if "general" in by_category:
         answer += "\n‘general’ là nhãn category trong dữ liệu, không phải một chủ đề cụ thể."
-    return ToolResult(answer=answer, tool="compare_source_categories", time_range=time_range)
+    specific_categories = [category for category in ranked if category != "general"]
+    chart_categories = (specific_categories or ranked)[:10]
+    chart = {
+        "type": "grouped_bar",
+        "title": "So sánh danh mục" + (" (không gồm general)" if specific_categories and "general" in by_category else ""),
+        "unit": "bài báo",
+        "series": [{"key": source, "label": _SOURCE_LABELS.get(source, source)} for source in selected],
+        "points": [
+            {"label": category, "values": {source: by_category[category].get(source, 0) for source in selected}}
+            for category in chart_categories
+        ],
+    }
+    return ToolResult(answer=answer, tool="compare_source_categories", time_range=time_range, chart=chart)
 
 
 def _entity_subject(request: ChatRequest) -> str | None:
@@ -668,7 +684,10 @@ def plan_question(request: ChatRequest, previous_context: dict | None = None) ->
     intent = _intent(request.message)
     social_mentioned = _mentioned_social_sources(request.message)
     pending = bool(previous_context and previous_context.get("clarification"))
-    followup = previous_context is not None and (_is_followup(request.message) or pending)
+    followup = previous_context is not None and (
+        _is_followup(request.message) or pending
+        or (previous_context.get("intent") == "source_categories" and _asks_chart(request.message))
+    )
     if followup and intent is None:
         intent = previous_context.get("intent")
     if followup and previous_context.get("intent") in ("sources", "source_categories") and _asks_source_categories(
