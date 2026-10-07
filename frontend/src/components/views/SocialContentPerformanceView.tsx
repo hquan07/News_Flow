@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { BarChart3, Heart, MessageCircle, TrendingUp } from "lucide-react";
 import {
   Bar,
@@ -15,7 +16,8 @@ import ChartCard from "@/components/ui/ChartCard";
 import ChartSkeleton from "@/components/ui/ChartSkeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import MetricCard from "@/components/ui/MetricCard";
-import { formatCompactNumber, formatDateTime, formatSourceName } from "@/lib/formatters";
+import MetricDetailList from "@/components/ui/MetricDetailList";
+import { formatCompactNumber, formatDateTime, formatPercent, formatSourceName } from "@/lib/formatters";
 import type { SocialContentPerformanceData } from "@/lib/social-types";
 
 export default function SocialContentPerformanceView({
@@ -25,16 +27,29 @@ export default function SocialContentPerformanceView({
   data: SocialContentPerformanceData | null;
   updatedAt: string | null;
 }) {
+  const [activeMetric, setActiveMetric] = useState<string | null>(null);
   if (!data) return <div className="social-view-loading"><ChartSkeleton /></div>;
 
   const { summary } = data;
+  const interactiveMetric = (metric: string) => ({
+    expanded: activeMetric === metric,
+    onToggle: () => setActiveMetric((current) => current === metric ? null : metric),
+  });
+  const topPlatforms = data.platform_performance.slice(0, 5);
+  const topInteractionCount = Math.max(0, ...data.top_posts.map((post) => post.interactions));
+
   return (
     <div className="social-analytics-view">
       <div className="overview-grid social-summary-grid">
-        <MetricCard label="Total posts" value={formatCompactNumber(summary.total_posts)} hint="Content in the selected scope" />
-        <MetricCard label="Total interactions" value={formatCompactNumber(summary.total_interactions)} hint="Likes and replies combined" />
-        <MetricCard label="Avg. per post" value={formatCompactNumber(summary.avg_interactions_per_post)} hint="Observed interactions per post" />
-        <MetricCard label="High performers" value={formatCompactNumber(summary.high_performing_posts)} hint="Posts with at least 50 interactions" tone="success" />
+        <MetricCard {...interactiveMetric("posts")} label="Total posts" value={formatCompactNumber(summary.total_posts)} hint="Content in the selected scope" details={<MetricDetailList rows={topPlatforms.map((platform) => ({ label: formatSourceName(platform.source), value: `${formatCompactNumber(platform.post_count)} posts` }))} emptyMessage="No platform post data available" />} />
+        <MetricCard {...interactiveMetric("interactions")} label="Total interactions" value={formatCompactNumber(summary.total_interactions)} hint="Likes and replies combined" details={<MetricDetailList rows={topPlatforms.map((platform) => ({ label: formatSourceName(platform.source), value: formatCompactNumber(platform.total_interactions) }))} emptyMessage="No platform interaction data available" />} />
+        <MetricCard {...interactiveMetric("average")} label="Avg. per post" value={formatCompactNumber(summary.avg_interactions_per_post)} hint="Observed interactions per post" details={<MetricDetailList rows={topPlatforms.map((platform) => ({ label: formatSourceName(platform.source), value: formatCompactNumber(platform.avg_interactions_per_post) }))} emptyMessage="No platform averages available" />} />
+        <MetricCard {...interactiveMetric("high-performers")} label="High performers" value={formatCompactNumber(summary.high_performing_posts)} hint="Posts with at least 50 interactions" tone="success" details={<MetricDetailList rows={[
+          { label: "Performance threshold", value: "≥ 50 interactions" },
+          { label: "Share of all posts", value: formatPercent(summary.total_posts ? (summary.high_performing_posts / summary.total_posts) * 100 : 0) },
+          { label: "Top observed post", value: `${formatCompactNumber(topInteractionCount)} interactions` },
+          { label: "Time range", value: data.time_range },
+        ]} />} />
       </div>
 
       <div className="charts-grid">

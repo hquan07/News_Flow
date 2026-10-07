@@ -1,23 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import { AlertTriangle, Flame, ShieldCheck } from "lucide-react";
 import ChartSkeleton from "@/components/ui/ChartSkeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import MetricCard from "@/components/ui/MetricCard";
-import { formatCompactNumber, formatDateTime, formatPercent, formatSourceName } from "@/lib/formatters";
+import MetricDetailList from "@/components/ui/MetricDetailList";
+import { formatCompactNumber, formatDateTime, formatPercent, formatSourceName, truncateLabel } from "@/lib/formatters";
 import type { SocialAlertSignalsData } from "@/lib/social-types";
 
 export default function SocialAlertsView({ data }: { data: SocialAlertSignalsData | null }) {
+  const [activeMetric, setActiveMetric] = useState<string | null>(null);
   if (!data) return <div className="social-view-loading"><ChartSkeleton /></div>;
 
   const { summary, thresholds } = data;
+  const interactiveMetric = (metric: string) => ({
+    expanded: activeMetric === metric,
+    onToggle: () => setActiveMetric((current) => current === metric ? null : metric),
+  });
+  const activeRisks = data.source_risks.filter((risk) => risk.active);
+  const topRisks = [...data.source_risks].sort((left, right) => right.negative_pct - left.negative_pct).slice(0, 5);
+  const topViralPosts = data.viral_posts.slice(0, 5);
+
   return (
     <div className="social-analytics-view">
       <div className="overview-grid social-summary-grid">
-        <MetricCard label="Active signals" value={summary.active_alerts.toLocaleString()} hint={data.window} tone={summary.active_alerts ? "danger" : "success"} />
-        <MetricCard label="Sentiment risks" value={summary.crisis_sources.toLocaleString()} hint={`≥ ${formatPercent(thresholds.negative_pct)} negative sentiment`} tone={summary.crisis_sources ? "danger" : "success"} />
-        <MetricCard label="Viral posts" value={summary.viral_posts.toLocaleString()} hint={`≥ ${formatCompactNumber(thresholds.interactions)} interactions`} tone={summary.viral_posts ? "warning" : "success"} />
-        <MetricCard label="Negative posts" value={formatCompactNumber(summary.negative_posts)} hint="Observed during the alert window" />
+        <MetricCard {...interactiveMetric("signals")} label="Active signals" value={summary.active_alerts.toLocaleString()} hint={data.window} tone={summary.active_alerts ? "danger" : "success"} details={<MetricDetailList rows={[
+          { label: "Sentiment risks", value: summary.crisis_sources.toLocaleString() },
+          { label: "Viral posts", value: summary.viral_posts.toLocaleString() },
+          { label: "Monitoring window", value: data.window },
+          { label: "Last evaluated", value: formatDateTime(data.generated_at) },
+        ]} />} />
+        <MetricCard {...interactiveMetric("sentiment-risks")} label="Sentiment risks" value={summary.crisis_sources.toLocaleString()} hint={`≥ ${formatPercent(thresholds.negative_pct)} negative sentiment`} tone={summary.crisis_sources ? "danger" : "success"} details={<MetricDetailList rows={(activeRisks.length ? activeRisks : topRisks).map((risk) => ({ label: formatSourceName(risk.source), value: `${formatPercent(risk.negative_pct)} negative` }))} emptyMessage="No platform sentiment data available" />} />
+        <MetricCard {...interactiveMetric("viral-posts")} label="Viral posts" value={summary.viral_posts.toLocaleString()} hint={`≥ ${formatCompactNumber(thresholds.interactions)} interactions`} tone={summary.viral_posts ? "warning" : "success"} details={<MetricDetailList rows={topViralPosts.map((post) => ({ label: `${formatSourceName(post.source)} · ${truncateLabel(post.title?.trim() || post.content?.trim() || "Untitled", 24)}`, value: formatCompactNumber(post.interactions) }))} emptyMessage="No viral posts in the current window" />} />
+        <MetricCard {...interactiveMetric("negative-posts")} label="Negative posts" value={formatCompactNumber(summary.negative_posts)} hint="Observed during the alert window" details={<MetricDetailList rows={topRisks.map((risk) => ({ label: formatSourceName(risk.source), value: `${formatCompactNumber(risk.negative_posts)} of ${formatCompactNumber(risk.total_posts)}` }))} emptyMessage="No negative post breakdown available" />} />
       </div>
 
       <section className="social-analytics-panel">

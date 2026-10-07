@@ -1187,9 +1187,21 @@ h1 {
 .metric-details-list li {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
   margin-bottom: 0.4rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px dashed rgba(255,255,255,0.05);
+}
+.metric-details-list li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.metric-details-list li > strong {
+  flex: 0 0 auto;
+  text-align: right;
 }
 .metric-details-list li:last-child {
   border-bottom: none;

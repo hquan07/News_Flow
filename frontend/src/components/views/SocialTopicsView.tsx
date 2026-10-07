@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Hash, MessageSquareText } from "lucide-react";
 import ChartSkeleton from "@/components/ui/ChartSkeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import MetricCard from "@/components/ui/MetricCard";
+import MetricDetailList from "@/components/ui/MetricDetailList";
 import { formatCompactNumber, formatSourceName } from "@/lib/formatters";
 import type { SocialTopicsData } from "@/lib/social-types";
 
@@ -14,16 +16,24 @@ function sentimentClass(score: number) {
 }
 
 export default function SocialTopicsView({ data }: { data: SocialTopicsData | null }) {
+  const [activeMetric, setActiveMetric] = useState<string | null>(null);
   if (!data) return <div className="social-view-loading"><ChartSkeleton /></div>;
 
   const { summary } = data;
+  const interactiveMetric = (metric: string) => ({
+    expanded: activeMetric === metric,
+    onToggle: () => setActiveMetric((current) => current === metric ? null : metric),
+  });
+  const topHashtags = data.hashtags.slice(0, 5);
+  const topTopics = data.top_topics.slice(0, 5);
+
   return (
     <div className="social-analytics-view">
       <div className="overview-grid social-summary-grid">
-        <MetricCard label="Top hashtags" value={summary.unique_hashtags.toLocaleString()} hint="Distinct tags in the ranked set" />
-        <MetricCard label="Hashtag mentions" value={formatCompactNumber(summary.hashtag_mentions)} hint="Mentions across top hashtags" />
-        <MetricCard label="Tracked topics" value={summary.tracked_topics.toLocaleString()} hint="Ranked conversation clusters" />
-        <MetricCard label="Topic interactions" value={formatCompactNumber(summary.topic_interactions)} hint="Interactions across ranked topics" tone="success" />
+        <MetricCard {...interactiveMetric("hashtags")} label="Top hashtags" value={summary.unique_hashtags.toLocaleString()} hint="Distinct tags in the ranked set" details={<MetricDetailList rows={topHashtags.map((hashtag) => ({ label: hashtag.hashtag, value: `${formatCompactNumber(hashtag.mentions)} mentions` }))} emptyMessage="No hashtag details available" />} />
+        <MetricCard {...interactiveMetric("mentions")} label="Hashtag mentions" value={formatCompactNumber(summary.hashtag_mentions)} hint="Mentions across top hashtags" details={<MetricDetailList rows={topHashtags.map((hashtag) => ({ label: hashtag.hashtag, value: formatCompactNumber(hashtag.mentions) }))} emptyMessage="No hashtag mention data available" />} />
+        <MetricCard {...interactiveMetric("topics")} label="Tracked topics" value={summary.tracked_topics.toLocaleString()} hint="Ranked conversation clusters" details={<MetricDetailList rows={topTopics.map((topic) => ({ label: topic.topic, value: `${formatCompactNumber(topic.post_count)} posts` }))} emptyMessage="No tracked topic data available" />} />
+        <MetricCard {...interactiveMetric("topic-interactions")} label="Topic interactions" value={formatCompactNumber(summary.topic_interactions)} hint="Interactions across ranked topics" tone="success" details={<MetricDetailList rows={topTopics.map((topic) => ({ label: topic.topic, value: formatCompactNumber(topic.interactions) }))} emptyMessage="No topic interaction data available" />} />
       </div>
 
       <section className="social-analytics-panel">
