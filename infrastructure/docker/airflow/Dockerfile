@@ -33,6 +33,7 @@ RUN pip install --no-cache-dir \
     feedparser==6.0.11 \
     itemadapter>=0.8.0 \
     clickhouse-connect==0.7.0 \
+    requests==2.32.3 \
     groq>=0.9.0 \
     sentence-transformers==2.5.1 \
     "httpx>=0.25.0,<0.28.0" \
