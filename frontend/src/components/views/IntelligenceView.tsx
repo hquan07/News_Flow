@@ -50,7 +50,13 @@ export default function IntelligenceView({ onRunQuery, onAskWatchlist }: {
       ? { name, kind: form.get("kind"), value: target, enabled: true }
       : section === "alert-rules"
         ? { name, kind: form.get("kind"), target, threshold: Number(form.get("threshold") || 10), window_minutes: 60, channels: ["dashboard"], enabled: true }
-        : { name, query: target, schedule: form.get("schedule"), enabled: true };
+        : {
+          name,
+          query: target,
+          schedule: form.get("schedule"),
+          enabled: true,
+          cloudvault_export_enabled: form.get("cloudvault_export_enabled") === "on",
+        };
     setBusy(true);
     try {
       await apiFetch(`${API_BASE}/intelligence/${section}`, {
@@ -66,6 +72,15 @@ export default function IntelligenceView({ onRunQuery, onAskWatchlist }: {
   const toggle = async (section: Section, item: Item) => {
     await apiFetch(`${API_BASE}/intelligence/${section}/${item.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !item.enabled }),
+    });
+    await load();
+  };
+
+  const toggleCloudVaultExport = async (item: Item) => {
+    await apiFetch(`${API_BASE}/intelligence/saved-queries/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cloudvault_export_enabled: !item.cloudvault_export_enabled }),
     });
     await load();
   };
@@ -87,14 +102,14 @@ export default function IntelligenceView({ onRunQuery, onAskWatchlist }: {
             <input name="target" required maxLength={240} placeholder={section === "saved-queries" ? "Search terms" : "Target keyword or entity"} aria-label={`${section} target`} />
             {section === "watchlists" && <select name="kind" defaultValue="keyword"><option value="keyword">Keyword</option><option value="entity">Entity</option><option value="source">Source</option><option value="topic">Topic</option></select>}
             {section === "alert-rules" && <><select name="kind" defaultValue="keyword_volume"><option value="keyword_volume">Keyword volume</option><option value="negative_sentiment">Negative sentiment</option><option value="entity_mention">Entity mentions</option></select><input name="threshold" type="number" min="1" defaultValue="10" aria-label="Threshold" /></>}
-            {section === "saved-queries" && <select name="schedule" defaultValue="none"><option value="none">No schedule</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>}
+            {section === "saved-queries" && <><select name="schedule" defaultValue="none"><option value="none">No schedule</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select><label><input name="cloudvault_export_enabled" type="checkbox"/> Archive scheduled exports to CloudVault (project-visible)</label></>}
             <button type="submit" disabled={busy}><Plus size={15} /> Add</button>
           </form>
           <div className="intelligence-list">
             {data[section].map((item) => <article key={item.id} className={!item.enabled ? "disabled" : ""}>
               <div><strong>{item.name}</strong><small>{String(item.value ?? item.target ?? item.query ?? "")}{item.schedule && item.schedule !== "none" ? ` · ${item.schedule}` : ""}</small></div>
               <div className="intelligence-actions">
-                {section === "saved-queries" && <button type="button" onClick={() => onRunQuery(item)}>Run</button>}
+                {section === "saved-queries" && <><button type="button" onClick={() => onRunQuery(item)}>Run</button><button type="button" onClick={() => void toggleCloudVaultExport(item)}>{item.cloudvault_export_enabled ? "Stop archive" : "Archive"}</button></>}
                 {section === "watchlists" && <button type="button" onClick={() => onAskWatchlist(item)}>Ask</button>}
                 <button type="button" onClick={() => void toggle(section, item)}>{item.enabled ? "Pause" : "Enable"}</button>
                 <button type="button" className="danger" aria-label={`Delete ${item.name}`} onClick={() => void remove(section, item.id)}><Trash2 size={15} /></button>

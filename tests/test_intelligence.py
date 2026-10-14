@@ -56,10 +56,12 @@ async def test_alert_rules_and_scheduled_queries(async_client: AsyncClient, inte
     }, headers=auth)
     assert alert.status_code == 201
     query = await async_client.post("/api/v1/intelligence/saved-queries", json={
-        "name": "Morning AI", "query": "AI", "schedule": "daily"
+        "name": "Morning AI", "query": "AI", "schedule": "daily",
+        "cloudvault_export_enabled": True,
     }, headers=auth)
     assert query.status_code == 201
     assert query.json()["next_run_at"] is not None
+    assert query.json()["cloudvault_export_enabled"] is True
     assert len((await async_client.get("/api/v1/intelligence/alert-rules", headers=auth)).json()) == 1
     assert len((await async_client.get("/api/v1/intelligence/saved-queries", headers=auth)).json()) == 1
 

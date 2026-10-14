@@ -90,6 +90,7 @@ class SavedQueryCreate(BaseModel):
     sentiment: Literal["positive", "neutral", "negative"] | None = None
     schedule: Literal["none", "daily", "weekly", "monthly"] = "none"
     enabled: bool = True
+    cloudvault_export_enabled: bool = False
 
     @field_validator("name")
     @classmethod
@@ -110,6 +111,7 @@ class SavedQueryUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     schedule: Literal["none", "daily", "weekly", "monthly"] | None = None
     enabled: bool | None = None
+    cloudvault_export_enabled: bool | None = None
 
 
 class SavedQuery(SavedQueryCreate):
