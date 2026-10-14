@@ -57,6 +57,11 @@ def _report_data(query: dict) -> dict:
 async def ensure_indexes() -> None:
     collection = get_mongo_db().intelligence_reports
     await collection.create_index([("owner_id", ASCENDING), ("created_at", DESCENDING)])
+    await collection.create_index(
+        [("saved_query_id", ASCENDING), ("source_run_id", ASCENDING)],
+        unique=True,
+        sparse=True,
+    )
     await collection.create_index("expires_at", expireAfterSeconds=0)
 
 

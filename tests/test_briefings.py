@@ -62,3 +62,17 @@ async def test_saved_query_report_has_chart_and_citations(monkeypatch):
     assert error.value.status_code == 404
     await scheduled_reports.delete_report("alice", report["id"])
     assert database.intelligence_reports.documents == []
+
+
+@pytest.mark.asyncio
+async def test_scheduled_report_run_identity_is_unique_and_sparse(monkeypatch):
+    collection = _Collection()
+    database = SimpleNamespace(intelligence_reports=collection)
+    monkeypatch.setattr(scheduled_reports, "get_mongo_db", lambda: database)
+
+    await scheduled_reports.ensure_indexes()
+
+    assert (
+        [("saved_query_id", 1), ("source_run_id", 1)],
+        {"unique": True, "sparse": True},
+    ) in collection.indexes

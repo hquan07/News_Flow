@@ -79,6 +79,10 @@ class CloudVaultClient:
         self._sleep = sleeper
         self._jitter = jitter
 
+    @classmethod
+    def from_env(cls) -> "CloudVaultClient":
+        return cls(CloudVaultConfig.from_env())
+
     @property
     def _project_url(self) -> str:
         return f"{self.config.base_url}/api/v1/projects/{quote(self.config.project_id, safe='')}"
