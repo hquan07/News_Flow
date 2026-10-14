@@ -32,6 +32,7 @@ RUN pip install --no-cache-dir \
     fake-useragent==1.5.1 \
     feedparser==6.0.11 \
     itemadapter>=0.8.0 \
+    boto3==1.34.14 \
     clickhouse-connect==0.7.0 \
     requests==2.32.3 \
     groq>=0.9.0 \

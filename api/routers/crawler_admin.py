@@ -7,8 +7,12 @@ import logging
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
+from pymongo import DESCENDING
+
+from api.database import get_mongo_db
 from api.security import require_permission
 from api.services.analytics import _query
 from api.services import source_config
@@ -175,6 +179,39 @@ async def list_crawlers(user: dict = Depends(require_permission("crawler.read"))
         "dag_state": latest_run.get("state", "unknown"),
         "dag_run_id": latest_run.get("dag_run_id"),
         "dag_execution_date": latest_run.get("execution_date"),
+    }
+
+
+@router.get("/cloudvault-archives")
+async def cloudvault_archive_status(
+    status: Literal["uploading", "retry_pending", "uploaded", "failed"] | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(require_permission("crawler.read")),
+):
+    """Expose selected archive outcomes without returning raw HTML or credentials."""
+    query = {"status": status} if status else {}
+    documents = await get_mongo_db().cloudvault_raw_html_archives.find(query).sort(
+        "updated_at", DESCENDING
+    ).to_list(length=limit)
+    return {
+        "archives": [
+            {
+                "id": str(document["_id"]),
+                "source": document.get("source"),
+                "category": document.get("category"),
+                "canonical_url": document.get("canonical_url"),
+                "status": document.get("status"),
+                "attempt_count": int(document.get("attempt_count", 0)),
+                "file_id": document.get("file_id"),
+                "last_error": document.get("last_error"),
+                "selected_at": document.get("selected_at"),
+                "updated_at": document.get("updated_at"),
+                "expires_at": document.get("expires_at"),
+            }
+            for document in documents
+        ],
+        "limit": limit,
+        "status": status,
     }
 
 

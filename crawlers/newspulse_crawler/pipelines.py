@@ -2,6 +2,8 @@ import hashlib
 import logging
 import re
 import time
+from datetime import datetime, timedelta, timezone
+
 import boto3
 
 from itemadapter import ItemAdapter
@@ -9,6 +11,14 @@ from pymongo import MongoClient, ASCENDING
 from pymongo.errors import AutoReconnect, NetworkTimeout
 from scrapy.exceptions import DropItem
 from twisted.internet.threads import deferToThread
+
+from integrations.cloudvault import CloudVaultClient, CloudVaultError
+from integrations.cloudvault_raw_html import (
+    RawHtmlArchivePolicy,
+    build_archive_record,
+    raw_html_object_name,
+    upload_raw_html_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +115,7 @@ class MinIOPipeline:
         return deferred
 
     def _upload(self, raw_html: str, url: str, spider_name: str) -> None:
-        url_hash = hashlib.md5(url.encode()).hexdigest()
-        object_name = f"{spider_name}/{url_hash}.html"
+        object_name = raw_html_object_name(url, spider_name)
         try:
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
@@ -116,6 +125,122 @@ class MinIOPipeline:
             )
         except Exception as exc:
             logger.error("Failed to upload to MinIO: %s", exc)
+
+
+class CloudVaultArchivePipeline:
+    """Archive selected HTML while keeping normal crawler persistence independent."""
+
+    def __init__(self, policy, mongo_uri: str, mongo_db: str):
+        self.policy = policy
+        self.mongo_uri = mongo_uri
+        self.mongo_db = mongo_db
+        self.client = None
+        self.mongo = None
+        self.collection = None
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(
+            policy=RawHtmlArchivePolicy.from_env(),
+            mongo_uri=crawler.settings.get("MONGO_URI"),
+            mongo_db=crawler.settings.get("MONGO_DB"),
+        )
+
+    def open_spider(self, spider):
+        if not self.policy.enabled:
+            return
+        if not self.policy.sources:
+            logger.warning("CloudVault raw HTML archive enabled without an allowlisted source")
+            return
+        self.client = CloudVaultClient.from_env()
+        self.mongo = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=3000)
+        self.collection = self.mongo[self.mongo_db]["cloudvault_raw_html_archives"]
+        self.collection.create_index(
+            [("url_sha256", ASCENDING), ("content_sha256", ASCENDING)], unique=True
+        )
+        self.collection.create_index([("status", ASCENDING), ("next_retry_at", ASCENDING)])
+        self.collection.create_index("expires_at", expireAfterSeconds=0)
+
+    def close_spider(self, spider):
+        if self.mongo is not None:
+            self.mongo.close()
+
+    def process_item(self, item, spider):
+        if self.collection is None or self.client is None:
+            return item
+        adapter = ItemAdapter(item)
+        raw_html = adapter.get("raw_html") or ""
+        source = str(adapter.get("source") or spider.name)
+        size_bytes = len(raw_html.encode("utf-8")) if isinstance(raw_html, str) else len(raw_html)
+        if not self.policy.allows(
+            source=source,
+            category=adapter.get("category"),
+            size_bytes=size_bytes,
+        ):
+            return item
+        document = adapter.asdict()
+        document["source"] = source
+        document["_spider_name"] = spider.name
+        deferred = deferToThread(self._archive, document)
+        deferred.addCallback(lambda _result: item)
+        return deferred
+
+    def _archive(self, item: dict) -> None:
+        now = datetime.now(timezone.utc)
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        selected_today = self.collection.count_documents({
+            "selected_at": {"$gte": start_of_day},
+            "status": {"$in": ["uploading", "retry_pending", "uploaded"]},
+        })
+        if selected_today >= self.policy.daily_limit:
+            logger.info("CloudVault daily raw HTML archive limit reached")
+            return
+
+        record, content = build_archive_record(item, policy=self.policy, now=now)
+        result = self.collection.update_one(
+            {
+                "url_sha256": record["url_sha256"],
+                "content_sha256": record["content_sha256"],
+            },
+            {"$setOnInsert": {**record, "status": "uploading", "attempt_count": 0}},
+            upsert=True,
+        )
+        if result.upserted_id is None:
+            return
+
+        key = {"_id": result.upserted_id}
+        try:
+            uploaded = upload_raw_html_bytes(content, record, client=self.client)
+        except CloudVaultError as error:
+            self.collection.update_one(key, {"$set": {
+                "status": "retry_pending" if error.retriable else "failed",
+                "last_error": {
+                    "code": error.code,
+                    "http_status": error.status_code,
+                    "retriable": error.retriable,
+                },
+                "attempt_count": 1,
+                "next_retry_at": now + timedelta(minutes=5),
+                "updated_at": now,
+            }})
+            logger.warning("CloudVault raw HTML archive failed: %s", error.code)
+            return
+        except Exception:
+            self.collection.update_one(key, {"$set": {
+                "status": "retry_pending",
+                "last_error": {"code": "ARCHIVE_UPLOAD_FAILED", "retriable": True},
+                "attempt_count": 1,
+                "next_retry_at": now + timedelta(minutes=5),
+                "updated_at": now,
+            }})
+            logger.exception("Unexpected CloudVault raw HTML archive failure")
+            return
+
+        self.collection.update_one(key, {"$set": {
+            **uploaded,
+            "last_error": None,
+            "updated_at": now,
+        }})
 
 
 class MongoPipeline:

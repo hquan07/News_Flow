@@ -27,6 +27,8 @@ ITEM_PIPELINES = {
     "newspulse_crawler.pipelines.KafkaPipeline": 300,
     # Mongo is the completion marker used by persistent URL deduplication.
     "newspulse_crawler.pipelines.MongoPipeline": 400,
+    # Optional, allowlisted archive. Failures are queued without blocking Mongo/Kafka.
+    "newspulse_crawler.pipelines.CloudVaultArchivePipeline": 450,
 }
 
 # Middlewares
